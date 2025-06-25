@@ -38,7 +38,7 @@ from scipy.spatial import Delaunay
 from tqdm.auto import tqdm
 
   #Other LayerOver modules
-import Point_Clod
+from Point_Clod import Point_Clod
 
 
 class Camera():

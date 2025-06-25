@@ -39,7 +39,7 @@ from scipy.spatial import ConvexHull
 from scipy.spatial import Delaunay
 
   #Import other LayerUp modules
-import Point_Clod
+from Point_Clod import Point_Clod
 
   #Utilities
 from tqdm.auto import tqdm
