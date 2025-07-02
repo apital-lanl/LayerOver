@@ -42,23 +42,21 @@ from scipy.spatial import Delaunay
 from tqdm.auto import tqdm
 
   #Import other LayerUp modules
-import Gcode
+from Gcode import Gcode
 
 
+blank_spec_dict = {
+    'n_voxel_points': 5,      #Number of points for that get evaluated for opacity in a part
+    'n_pixels': 100,          #Number of pixels in 'Camera'; Number of pixels in final opacity measure
+    'camera_radius': 1,       #Radius of points around voxel center to consider
+    'distance_cutoff_threshold': 1,           #distance between pixel vector and layer point (in mm typically) 
+    'max_opacity': 0.1,   # max decrement multiplier of light crossing through thickest part of strand
+    }
+
+
+general_opacity_func = lambda distance: max_opacity * (math.sqrt(strand_radius**2 - distance**2) / strand_radius)
 
 class Opacity:
-   
-    blank_spec_dict = {
-        'n_voxel_points': 5,      #Number of points for that get evaluated for opacity in a part
-        'n_pixels': 100,          #Number of pixels in 'Camera'; Number of pixels in final opacity measure
-        'camera_radius': 1,       #Radius of points around voxel center to consider
-        'distance_cutoff_threshold': 1,           #distance between pixel vector and layer point (in mm typically) 
-        'max_opacity': 0.1,   # max decrement multiplier of light crossing through thickest part of strand
-        }
-
-    
-    general_opacity_func = lambda distance: max_opacity * (math.sqrt(strand_radius**2 - distance**2) / strand_radius)
-    
     
     def generate_opacity_from_part(Gcode_object = '', object_filenames = '', spec_dict = {}, num_points = 1):
     
