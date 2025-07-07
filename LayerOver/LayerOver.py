@@ -47,7 +47,7 @@ from tqdm.auto import tqdm
 from Gcode import Gcode
 from Camera import Camera
 from Point_Clod import Point_Clod
-from Opacity import general 
+# from Opacity import general 
 
 # Define package-variables
 color_lists = {
@@ -57,7 +57,6 @@ color_lists = {
            'mediumturquoise','slateblue','mediumorchid'].reverse(),
 }
     
-
 #################################################################################################################
 def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100, camera_radius = 1,
                     threshold = 1, max_opacity= 0.1, opacity_func = 'fixed-radial'):
