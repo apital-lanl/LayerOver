@@ -47,7 +47,7 @@ from tqdm.auto import tqdm
 from Gcode import Gcode
 from Camera import Camera
 from Point_Clod import Point_Clod
-from Opacity import gneral 
+from Opacity import general 
 
 # Define package-variables
 color_lists = {
