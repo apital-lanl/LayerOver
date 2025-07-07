@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
 Created:   2024-09-12
-Modified:  2025-04-17
-Version:   1.1.0 
+Modified:  2025-07-07
+Version:   1.2.0 
 
 @author: Aaron Pital (Los Alamos National Lab)
 
 Description: Combined library for gcode, STL, voxelization, and related operations for Direct Ink Write (DIW) work.
 
 """
-version = '1.1.0'
-last_modified_date = '2025-04-17'
+version = '1.2.0'
+last_modified_date = '2025-07-07'
 
   #System and built-ins
 import os
@@ -102,6 +102,7 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
     #TODO: add options in the future
     if opacity_func == 'fixed-radial':
         opacity_func = lambda distance: max_opacity * (math.sqrt(strand_radius**2 - distance**2) / strand_radius)
+     
     #Default to 'fixed-radial'
     else:
         opacity_func = lambda distance: max_opacity * (math.sqrt(strand_radius**2 - distance**2) / strand_radius)
@@ -275,6 +276,7 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 
                     flat_coordinates = voxel_dict['flat_layer_coordinates'][layer_key]['coordinates']
                     flat_indices = voxel_dict['flat_layer_coordinates'][layer_key]['indices']
+                    layer_opacity_array = np.ones( (voxel_dict['top_pixel_coordinate_array'].shape[0]))
                 
                     for pixel_idx in tqdm(range(voxel_dict['top_pixel_coordinate_array'].shape[0])):
                         top_pixel = voxel_dict['top_pixel_coordinate_array'][pixel_idx]
@@ -336,12 +338,19 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                         
                           #update opacity image
                         opacity_array[pixel_idx] = opacity_array[pixel_idx] * this_opacity
+                        layer_opacity_array[pixel_idx] = this_opacity
+
+                    plt.imshow(layer_opacity_array)
+                    plt.title(f"{voxel_name}-{layer_key}")
+                    save_name = os.path.join(part_dir, str(f"{voxel_name}-{layer_key}"+ '.png'))
+                    plt.imsave(save_name, opacity_image, dpi=600)
+                    plt.show()
                     
                 opacity_image = np.reshape(opacity_array, (n_pixels, n_pixels))
                 voxel_opacity_images.append(opacity_image)
                 
                 plt.imshow(opacity_image)
-                plt.title(voxel_name)
+                plt.title(f"{voxel_name}-CombinedOpacity")
                 save_name = os.path.join(part_dir, str(voxel_name+ '.png'))
                 plt.imsave(save_name, opacity_image, dpi=600)
                 plt.show()
@@ -351,10 +360,11 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
             save_name = os.path.join(part_dir, partial_name)
             np.save(save_name, opacity_arrays)
         except IndexError as IE:
+            print()
             print(IE)
             print()
-            print("Random failure")    
-        
+            print(traceback.format_exc())   
+            print()
         
 ###############################################################################################################################       
     
