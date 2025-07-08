@@ -19,6 +19,7 @@ import os
 import math
 # import csv
 from tkinter import Tk, filedialog
+import traceback
 
   #Visualizaiton
 import matplotlib.pyplot as plt
@@ -109,7 +110,7 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
     #%% (3) Do everything
     for file_list in filename_lists:
         try:
-            part = Gcode.Gcode()
+            part = Gcode()
             part.get_gcode(files = file_list)
             
               #get names of layers
