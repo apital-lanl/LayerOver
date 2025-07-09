@@ -213,10 +213,16 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 ax.scatter(bot_xs, bot_ys, bot_zs, s=.2, color = 'brown', alpha=0.5)
                 
                 if plot_first_layer:
-                    ax.scatter(first_points[0], first_points[1], first_points[2], s=10, color = 'blue', alpha=0.1)
+                    try:
+                        ax.scatter(first_points[0], first_points[1], first_points[2], s=10, color = 'blue', alpha=0.1)
+                    except:
+                        pass
                 if plot_last_layer:
-                    ax.scatter(last_points[0], last_points[1], last_points[2], s=10, color = 'purple', alpha=0.1)
-                
+                    try:
+                        ax.scatter(last_points[0], last_points[1], last_points[2], s=10, color = 'purple', alpha=0.1)
+                    except:
+                        pass
+
                 def init():
                     ax.view_init(elev=10., azim=0)
                     return [fig]
@@ -322,8 +328,12 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                         #get minimum segment-to-segment perpendicular distance
                         distances = np.array([Point_Clod.line_line_distance(layerp1, layerp2, bot_pixel, top_pixel)[2]
                                      for layerp1, layerp2 in close_segment_points])
-                        min_distance = np.min(distances)
-                        
+                        try:
+                            min_distance = np.min(distances)
+                        #if 'distances' is empty, just set to minimum opacity distance
+                        #TODO: this is an inelegant solution; need better scoping here
+                        except ValueError:
+                            min_distance = strand_radius + (strand_radius*0.1)
                           #check if strand radius is homogenous; if so, use that value, otherwise get layer's individual radius
                         if homogenous_strand_size:
                             pass  #strand_radius will already be defined
@@ -340,10 +350,11 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                         opacity_array[pixel_idx] = opacity_array[pixel_idx] * this_opacity
                         layer_opacity_array[pixel_idx] = this_opacity
 
-                    plt.imshow(layer_opacity_array)
+                    layer_opacity_image = np.reshape(layer_opacity_array, (n_pixels, n_pixels))
+                    plt.imshow(layer_opacity_image)
                     plt.title(f"{voxel_name}-{layer_key}")
                     save_name = os.path.join(part_dir, str(f"{voxel_name}-{layer_key}"+ '.png'))
-                    plt.imsave(save_name, opacity_image, dpi=600)
+                    plt.imsave(save_name, layer_opacity_image, dpi=600)
                     plt.show()
                     
                 opacity_image = np.reshape(opacity_array, (n_pixels, n_pixels))
