@@ -354,6 +354,10 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                     save_name = os.path.join(part_dir, str(f"{voxel_name}-{layer_key}"+ '.png'))
                     plt.imsave(save_name, layer_opacity_image, dpi=600)
                     plt.show()
+
+                    partial_layer_name = str(part_name_guess + f"_{voxel_name}-{layer_key}.npy")
+                    save_name = os.path.join(part_dir, partial_layer_name)
+                    np.save(save_name, layer_opacity_image)
                     
                 opacity_image = np.reshape(opacity_array, (n_pixels, n_pixels))
                 voxel_opacity_images.append(opacity_image)
