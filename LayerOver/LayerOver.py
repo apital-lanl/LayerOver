@@ -48,7 +48,8 @@ color_lists = {
     
 #################################################################################################################
 def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100, camera_radius = 1,
-                    threshold = 1, max_opacity= 0.1, opacity_func = 'fixed-radial', size_multiplier = 1):
+                    threshold = 1, max_opacity= 0.1, opacity_func = 'fixed-radial', size_multiplier = 1,
+                    strand_thickness_func = 'circular'):
     
     ''' v1.0.0  created: 2024-10-06  modified:  2025-07-02
     
@@ -88,12 +89,21 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 continue_check = False
     
     #TODO: add options in the future
+      #if 'strand_thickness_func' is already a callable object, assume it's a function and just use it
+    if callable(strand_thickness_func):
+        pass
+    #otherwise, start parsing what the input wants the functional form to look like
+      #standard circular strand assumptions
+    elif strand_thickness_func == 'circular':
+        strand_thickness_func = lambda distance: 2* math.sqrt(strand_radius**2 - distance**2)
+
+    #TODO: add options in the future
     if opacity_func == 'fixed-radial':
-        opacity_func = lambda distance: max_opacity * (math.sqrt(strand_radius**2 - distance**2) / strand_radius)
+        opacity_func = lambda distance: max_opacity * strand_thickness_func(distance) / (2*strand_radius) 
      
     #Default to 'fixed-radial'
     else:
-        opacity_func = lambda distance: max_opacity * (math.sqrt(strand_radius**2 - distance**2) / strand_radius)
+        opacity_func = lambda distance: max_opacity * strand_thickness_func(distance) / (2*strand_radius)
     
     #%% (3) Do everything
     for file_list in filename_lists:
