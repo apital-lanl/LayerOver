@@ -60,7 +60,7 @@ color_lists = {
     
 #################################################################################################################
 def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100, camera_radius = 1,
-                    threshold = 1, max_opacity= 0.1, opacity_func = 'fixed-radial'):
+                    threshold = 1, max_opacity= 0.1, opacity_func = 'fixed-radial', size_multiplier = 1):
     
     ''' v1.0.0  created: 2024-10-06  modified:  2025-07-02
     
@@ -122,11 +122,11 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
             
               #check if there's a single strand diameter
             if part.strand_diameter != 0:
-                strand_radius = part.strand_diameter/2*10
+                strand_radius = part.strand_diameter/2*size_multiplier
                 homogenous_strand_size = True
             else:
                 homogenous_strand_size = False
-                radius_list = [size/2*10 for size in part.layer_strand_diameters]
+                radius_list = [size/2*size_multiplier for size in part.layer_strand_diameters]
                 
             #################################################################################################################
             #Generate center point, normals, etc. from fibonacci points and near neighbors

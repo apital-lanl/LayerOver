@@ -312,10 +312,10 @@ class Camera():
     
     
     @staticmethod
-    def make_camera(center_point, unit_normal, \
-                    plane_size = (6,6), lens_type = 'square', \
-                    focal_pyramid_length = 6, \
-                    camera_color= 'k', opacity = 0.7 \
+    def make_camera(center_point, unit_normal, 
+                    plane_size = (6,6), lens_type = 'square', 
+                    focal_pyramid_length = 6, 
+                    camera_color= 'k', opacity = 0.7 
                     ):
         ''' v0.1.0  created:2024-05-10  modified:2024-05-10
 
