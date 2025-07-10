@@ -23,23 +23,11 @@ import traceback
 
   #Visualizaiton
 import matplotlib.pyplot as plt
-# from matplotlib import cm, colors
 from matplotlib import animation
-# from mpl_toolkits.mplot3d import Axes3D
 
   #Data Handling
 import numpy as np
 # import pandas as pd
-
-  #Scientifiic algorithm packages
-# import scipy.interpolate
-# from scipy.spatial import KDTree
-# from scipy.spatial import ConvexHull
-# from scipy.spatial import Delaunay
-
-  #Get random biz
-# from random import choice
-# import random
 
   #Utilities
 from tqdm.auto import tqdm
@@ -48,7 +36,7 @@ from tqdm.auto import tqdm
 from Gcode import Gcode
 from Camera import Camera
 from Point_Clod import Point_Clod
-# from Opacity import general 
+
 
 # Define package-variables
 color_lists = {
@@ -147,7 +135,7 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 center = point_dicts[idx]['approximate_center']
                 normal_vector = point_dicts[idx]['unit_normal']
                 radius = camera_radius      #TODO: leave option to make this layer-defined
-                #TODO: Radius is currently hard-coded by user input (Cell 1); could be made to be more flexible here
+                #TODO: Radius is currently hard-coded by user or default input; could be made to be more flexible here
                 
                 #get voxel bounds and add to dictionary 
                 voxel_dict = Camera.get_voxel(center, normal_vector, radius= radius, voxel_depth= 2*radius, n_pixels=n_pixels)

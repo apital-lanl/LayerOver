@@ -20,33 +20,24 @@ version = '0.6.1'
 last_modified_date = '2025-04-16'
 
   #System and built-ins
-import os
-import sys
-import json
 import math
-import csv
 from tkinter import Tk, filedialog
-from random import choice
 import random
 
   #Visualizaiton
 import matplotlib.pyplot as plt
-from matplotlib import cm, colors
+from matplotlib import cm
 from matplotlib import animation
-from mpl_toolkits.mplot3d import Axes3D
 
   #Data Handling
 import numpy as np
-import pandas as pd
 
   #Scientifiic algorithm packages
-import scipy.interpolate
+from scipy.interpolate import interp1d
 from scipy.spatial import KDTree
 from scipy.spatial import ConvexHull
 from scipy.spatial import Delaunay
 
-  #Utilities
-from tqdm.auto import tqdm
 
 class Point_Clod():
     
@@ -420,12 +411,12 @@ class Point_Clod():
         
     #
     @staticmethod
-    def fibonnaci_points(verts, lats, points=1):
+    def fibonnaci_points(lats, verts, points=1):
         if points == 1:
             points = len(verts)
         else:
             if points > len(verts):
-                verts, lats = Point_Clod.curve_interpolate(lats, verts, points)
+                lats, verts = Point_Clod.curve_interpolate(lats, verts, points)
                 
         # Make some golden ratio
         phi = math.pi*(math.sqrt(5)-1)
@@ -767,10 +758,37 @@ class Point_Clod():
 
     # Helper function to interpolate between curve points to get a reasonable result
     @staticmethod
-    def curve_interpolate(xs, ys, desired_point_tuple):
+    def curve_interpolate(xs, zs, desired_number_of_points,
+                          interpol_type = 'quadratic'):
         ''' v1.0   created:2024-03-20   modified:2024-03-20
-        
+        Description: Use 2D curve definition to interpolate to arbitrary number of points.
+            Obviously breaks down if there are too few points in 'xs' and 'ys', but usually not a problem.
+            NOTE: in general for DIW and other additive applications, Z-axis is accurate, but X/Y is arbitrary
+                i.e. a 2D slice defining the substrate of a print has a 'real' up/down axis, but many X/Y combos for sideways
+
+        INPUTS:
+            'xs'-   in-plane-of-floor coordinates; 'lats', or 'sideways-ness'
+            'zs'-   out-of-plane coordinates; 'verts', or 'up/down-ness'
+            'desired_number_of_points'- number of interpolated points to return
+          (optional)
+            'interpol_type'- scipy.interp1d() takes:
+                    'slinear'- 1st order spline
+                    'cubic'- 2nd order spline
+                    'quadratic'- 3rd order spline
+        OUTPUT:
+            numpy arrays of interpolated xs and zs
+
         '''
-        pass
+
+        #TODO: make sure this is a numpy array or list
+        x_min = min(xs)
+        x_max = max(xs)
+
+        interpol_function = interp1d(xs, zs, kind = interpol_type)
+
+        xsnew = np.linspace(x_min, x_max, desired_number_of_points)
+        zsnew = interpol_function(xsnew)
+
+        return xsnew, zsnew
 
 

@@ -12,37 +12,19 @@ Description:
 version = '0.4.0'
 last_modified_date = '2024-03-22'
 
+
   #System and built-ins
 import os
-import sys
 import json
 import math
-import csv
 from tkinter import Tk, filedialog
-from random import choice
-import random
-
-  #Visualizaiton
-import matplotlib.pyplot as plt
-from matplotlib import cm, colors
-from matplotlib import animation
-from mpl_toolkits.mplot3d import Axes3D
 
   #Data Handling
 import numpy as np
-import pandas as pd
-
-  #Scientifiic algorithm packages
-import scipy.interpolate
-from scipy.spatial import KDTree
-from scipy.spatial import ConvexHull
-from scipy.spatial import Delaunay
 
   #Import other LayerUp modules
 from Point_Clod import Point_Clod
 
-  #Utilities
-from tqdm.auto import tqdm
 
 class Gcode():
 
@@ -179,7 +161,8 @@ class Gcode():
             verts = offsets
         
         #lats are X, verts are Z, and Y is interpolated
-        xs, zs, ys, radii = Point_Clod.fibonnaci_points(verts, lats)
+        xs, zs, ys, radii = Point_Clod.fibonnaci_points(lats, verts)
+
           #remove points out of the plate bounds; zero is the center
         plate_xs =[]
         plate_ys = []
@@ -216,7 +199,7 @@ class Gcode():
         Generate a mandrel from config.json file profile points
         '''
         
-        xs, ys, zs, radii = Point_Clod.fibonnaci_points(verts, lats)
+        xs, ys, zs, radii = Point_Clod.fibonnaci_points(lats, verts)
         
         # Make some triangles
         xyzarray, sphereInds, triangInds = Point_Clod.convexHull(xs,zs,ys)

@@ -13,27 +13,12 @@ version = '0.0.0'
 last_modified_date = '2000-00-00'
 
   #System and built-ins
-import os
-import sys
-import json
 import math
-import csv
-from tkinter import Tk, filedialog
 from random import choice
-import random
-  #Visualizaiton
-import matplotlib.pyplot as plt
-from matplotlib import cm, colors
-from matplotlib import animation
-from mpl_toolkits.mplot3d import Axes3D
+
   #Data Handling
 import numpy as np
-import pandas as pd
-  #Scientifiic algorithm packages
-import scipy.interpolate
-from scipy.spatial import KDTree
-from scipy.spatial import ConvexHull
-from scipy.spatial import Delaunay
+
   #Utilities
 from tqdm.auto import tqdm
 
