@@ -411,8 +411,8 @@ class Point_Clod():
         
     #
     @staticmethod
-    def fibonnaci_points(lats, verts, points=1):
-        if points == 1:
+    def fibonnaci_points(lats, verts, points=1000):
+        if points <= 1:
             points = len(verts)
         else:
             if points > len(verts):

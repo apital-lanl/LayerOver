@@ -74,7 +74,7 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
         while continue_check:
             # Get the names by user selection
             root = Tk()
-            these_filenames = filedialog.askopenfilenames(title= 'Select images to stitch')
+            these_filenames = filedialog.askopenfilenames(title= 'Select images to stitch', filetypes = [('LayerOver Files', '*.json *.pgm')])
             root.destroy()
             
             # Sort to get images in left-to-right, top-to-bottom order by index (hopefully)
