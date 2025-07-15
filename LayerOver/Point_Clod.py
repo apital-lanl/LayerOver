@@ -837,7 +837,7 @@ def point_stl_from_gcode(filename_lists = None,
                          flip_normals= True, n_voxel_points = 5,
                          num_strand_exterior_points = 5,
                          minimum_point_dist = 0.2,
-                         voxel_size= 0.01):
+                         voxel_size= 0.01, size_multiplier = 1):
     
     """
     Created:   2025-03-26
@@ -914,11 +914,11 @@ def point_stl_from_gcode(filename_lists = None,
         
               #check if there's a single strand diameter
             if part.strand_diameter != 0:
-                strand_radius = part.strand_diameter/2*10
+                strand_radius = part.strand_diameter/2*size_multiplier
                 homogenous_strand_size = True
             else:
                 homogenous_strand_size = False
-                radius_list = [size/2*10 for size in part.layer_strand_diameters]
+                radius_list = [size/2*size_multiplier for size in part.layer_strand_diameters]
 
 
         except Exception as e:
@@ -977,20 +977,20 @@ def point_stl_from_gcode(filename_lists = None,
                 voxel_x_locations = np.linspace(min_x-(5*half_voxel_size), max_x+(5*half_voxel_size), voxel_x_grid_size)
                 voxel_y_locations = np.linspace(min_y-(5*half_voxel_size), max_y+(5*half_voxel_size), voxel_y_grid_size)
                 voxel_z_locations = np.linspace(min_z-(5*half_voxel_size), max_z+(5*half_voxel_size), voxel_z_grid_size)
-                voxel_locations = np.vstack((voxel_x_locations, voxel_y_locations, voxel_z_locations))
+                voxel_locations = np.vstack(np.meshgrid(voxel_x_locations,voxel_y_locations,voxel_z_locations))
             
                 #Initialize variables for looping through gcode points
                 points = []
                 normals = []
                   # initialize 'last_position' to first coordinate and get first radial (strand exterior) points
                 last_position = part.layers[layer_key]['coordinates'][0, ::]
-        
                 #Get coordinates and normals
                 pbar = tqdm(total= part.layers[layer_key]['coordinates'].shape[0])  #initialize progress bar
                 for p_idx in range(1, part.layers[layer_key]['coordinates'].shape[0]):
                     pbar.update(1)  #update progress bar
                     #Get this point and the 'last point', calculate max distance bewteen strand surface points
                     current_position = part.layers[layer_key]['coordinates'][p_idx, ::]
+                    points.append(current_position)
                       # max distance is bottom of one strand at 'p1' to top of strand at 'p2'; calc. that max distance
                     p1 = np.array([last_position[0], last_position[1], 0])
                     p2 = np.array([current_position[0], current_position[1], layer_nozzle_size])
@@ -1017,40 +1017,49 @@ def point_stl_from_gcode(filename_lists = None,
                               #rotate -90 degrees to get outward normal (clockwise)
                             normal_x, normal_y = dy, -dx
                             point_normal_vector = [dx, dy, dz]
+                            normals.append(point_normal_vector)
 
                             #Get voxel to line-segment (strand) distance matrix
                               #focus in on only voxel region this segment occupies
-                            vox_x_min = min(current_position[0], last_postion[0])
-                            vox_x_max = max(current_position[0], last_postion[0])
-                            vox_y_min = min(current_position[1], last_postion[1])
-                            vox_y_max = max(current_position[1], last_postion[1])
-                            vox_z_min = min(current_position[2], last_postion[2])
-                            vox_z_max = max(current_position[2], last_postion[2])
+                            vox_x_min = min(current_position[0], last_position[0])
+                            vox_x_max = max(current_position[0], last_position[0])
+                            vox_y_min = min(current_position[1], last_position[1])
+                            vox_y_max = max(current_position[1], last_position[1])
+                            vox_z_min = min(current_position[2], last_position[2])
+                            vox_z_max = max(current_position[2], last_position[2])
                             x_min_idx = np.argmin(np.abs(voxel_x_locations - vox_x_min))
                             x_max_idx = np.argmin(np.abs(voxel_x_locations - vox_x_max))
                             y_min_idx = np.argmin(np.abs(voxel_y_locations - vox_y_min))
                             y_max_idx = np.argmin(np.abs(voxel_y_locations - vox_y_max))
                             z_min_idx = np.argmin(np.abs(voxel_z_locations - vox_z_min))
                             z_max_idx = np.argmin(np.abs(voxel_z_locations - vox_z_max))
+                              #make sure indices are actually the max or min in absolute value
+                            x_min_idx = min(x_min_idx, x_max_idx)
+                            x_max_idx = max(x_min_idx, x_max_idx)
+                            y_min_idx = min(y_min_idx, y_max_idx)
+                            y_max_idx = max(y_min_idx, y_max_idx)
+                            z_min_idx = min(z_min_idx, z_max_idx)
+                            z_max_idx = max(z_min_idx, z_max_idx)
+                              #pull sub-region of interest
                             sub_voxel = voxels[x_min_idx:x_max_idx,
                                                y_min_idx:y_max_idx,
                                                z_min_idx:z_max_idx]
-
-                            point_line_distance(point, line_segment_start, line_segment_end)
-
-                            #Generate strand exterior points
-                            exterior_points = Point_Clod.generate_radial_points(point_normal_vector, current_position, 
-                                                                     strand_radius, n_circ_points = num_strand_exterior_points, 
-                                                                     randomize_radial_start = True)
-                            for exterior_point in exterior_points:
-                            
-                                dx = exterior_point[0] - current_position[0]
-                                dy = exterior_point[1] - current_position[1]
-                                dz = exterior_point[2] - current_position[2]
-                                length = math.sqrt(dx**2 + dy**2 + dz**2)
-                                this_normal = [dx/length, dy/length, dz/length]
-                                points.append(exterior_point)
-                                normals.append(this_normal)
+                            sub_voxel_locations = voxel_locations[x_min_idx:x_max_idx,
+                                               y_min_idx:y_max_idx,
+                                               z_min_idx:z_max_idx]
+                            sub_voxel_array = sub_voxel_locations.reshape(3,-1).T  #make the m,n,o,3 array into an mxnxo,3 array for speed
+                              #ironically, get rid of that speed by adding a FOR loop
+                            #TODO: vectorize and speed this up by a lot
+                            distance_array = []
+                            for idx in range(sub_voxel_array.shape[0]):
+                                distance_array.append(Point_Clod.point_line_distance(sub_voxel_array[idx], last_position, current_position))
+                              #shape back into orginal size 
+                            distance_voxel = distance_array.reshape(x_max_idx-x_min_idx,
+                                                                    y_max_idx-y_min_idx,
+                                                                    z_max_idx-z_min_idx)
+                              #mark all of the global 'voxels' voxels that are "within" the strand as calculated above
+                            sub_voxel[distance_voxel <= strand_radius] = 1
+                                
                             last_position = current_position
                         
                     else:
@@ -1063,18 +1072,48 @@ def point_stl_from_gcode(filename_lists = None,
                           #rotate -90 degrees to get outward normal (clockwise)
                         normal_x, normal_y = dy, -dx
                         point_normal_vector = [dx, dy, dz]
-                        #Generate strand exterior points
-                        exterior_points = Point_Clod.generate_radial_points(point_normal_vector, current_position, 
-                                                                 strand_radius, n_circ_points = num_strand_exterior_points, 
-                                                                 randomize_radial_start = True)
-                        for exterior_point in exterior_points:
-                            dx = exterior_point[0] - current_position[0]
-                            dy = exterior_point[1] - current_position[1]
-                            dz = exterior_point[2] - current_position[2]
-                            length = math.sqrt(dx**2 + dy**2 + dz**2)
-                            this_normal = [dx/length, dy/length, dz/length]
-                            points.append(exterior_point)
-                            normals.append(this_normal)
+                        
+                        #Get voxel to line-segment (strand) distance matrix
+                            #focus in on only voxel region this segment occupies
+                        vox_x_min = min(current_position[0], last_position[0])
+                        vox_x_max = max(current_position[0], last_position[0])
+                        vox_y_min = min(current_position[1], last_position[1])
+                        vox_y_max = max(current_position[1], last_position[1])
+                        vox_z_min = min(current_position[2], last_position[2])
+                        vox_z_max = max(current_position[2], last_position[2])
+                        x_min_idx = np.argmin(np.abs(voxel_x_locations - vox_x_min))
+                        x_max_idx = np.argmin(np.abs(voxel_x_locations - vox_x_max))
+                        y_min_idx = np.argmin(np.abs(voxel_y_locations - vox_y_min))
+                        y_max_idx = np.argmin(np.abs(voxel_y_locations - vox_y_max))
+                        z_min_idx = np.argmin(np.abs(voxel_z_locations - vox_z_min))
+                        z_max_idx = np.argmin(np.abs(voxel_z_locations - vox_z_max))
+                            #make sure indices are actually the max or min in absolute value
+                        x_min_idx = min(x_min_idx, x_max_idx)
+                        x_max_idx = max(x_min_idx, x_max_idx)
+                        y_min_idx = min(y_min_idx, y_max_idx)
+                        y_max_idx = max(y_min_idx, y_max_idx)
+                        z_min_idx = min(z_min_idx, z_max_idx)
+                        z_max_idx = max(z_min_idx, z_max_idx)
+                            #pull sub-region of interest
+                        sub_voxel = voxels[x_min_idx:x_max_idx,
+                                            y_min_idx:y_max_idx,
+                                            z_min_idx:z_max_idx]
+                        sub_voxel_locations = voxel_locations[x_min_idx:x_max_idx,
+                                            y_min_idx:y_max_idx,
+                                            z_min_idx:z_max_idx]
+                        sub_voxel_array = sub_voxel_locations.reshape(3,-1).T  #make the m,n,o,3 array into an mxnxo,3 array for speed
+                            #ironically, get rid of that speed by adding a FOR loop
+                        #TODO: vectorize and speed this up by a lot
+                        distance_array = []
+                        for idx in range(sub_voxel_array.shape[0]):
+                            distance_array.append(Point_Clod.point_line_distance(sub_voxel_array[idx], last_position, current_position))
+                            #shape back into orginal size 
+                        distance_voxel = distance_array.reshape(x_max_idx-x_min_idx,
+                                                                y_max_idx-y_min_idx,
+                                                                z_max_idx-z_min_idx)
+                            #mark all of the global 'voxels' voxels that are "within" the strand as calculated above
+                        sub_voxel[distance_voxel <= strand_radius] = 1
+                                
                         last_position = current_position
                     
                 pbar.close()  #close progress bar
