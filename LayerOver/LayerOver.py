@@ -125,12 +125,10 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 homogenous_strand_size = False
                 radius_list = [size/2*size_multiplier for size in part.layer_strand_diameters]
                 
-            #################################################################################################################
             #Generate center point, normals, etc. from fibonacci points and near neighbors
             point_dicts = Camera.get_random_point_summaries(part, n_retrieval_points = n_voxel_points, \
                                                excluded_point_indcs = [], show_iterations = True)
                 
-            #################################################################################################################
             # Make voxels and visualize
             
             voxel_opacity_images = []
@@ -141,7 +139,6 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 voxel_point_name = str(part_name_guess + "_VoxelPoints" + str(idx))
                 save_name = os.path.join(part_dir, voxel_point_name)
                 
-                #################################################################################################################
                 #pull voxel features
                 center = point_dicts[idx]['approximate_center']
                 normal_vector = point_dicts[idx]['unit_normal']
@@ -157,7 +154,6 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 voxel_dict.update({'voxel_name': voxel_name})
                 voxel_dict.updtae({'save_filepath': save_name})
                 
-                #################################################################################################################
                 #Visualize voxel
                 Camera.voxel_points_visualize(voxel_dict, 
                            gif = False,
@@ -167,7 +163,6 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                            azim_step = 0,
                            save_plot = True)
                     
-                #################################################################################################################
                 #Flatten array of coordinates to make it homogenous
                 #   (otherwise it's a list of lists, and each sub-list is a different size; this makes numpy sad)
                 voxel_dict.update( {'flat_layer_coordinates':{} } )
@@ -187,7 +182,6 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                                             'coordinates':flat_coordinates, \
                                             'indices':flat_indices} })
                 
-                #################################################################################################################
                 #Get the actual distances for each pixel and calculate opacity
                 #NOTE: this is v1 and isn't vectorized, making it incredibly slow
                 pixel_min_distances = []
@@ -306,5 +300,4 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
 
 ###############################################################################################################################
 
-#%%
 
