@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 Created:   2024-09-12
@@ -66,9 +67,7 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
         opacity_func =   Function to use for calculating opacity from distance-to-strand-center normal measure
             'fixed-radial'- assumes a constant, round shape 
     '''
-    
-    
-    
+
     if len(filenames_lists) < 1:
         continue_check = True
         filename_lists = []
@@ -139,6 +138,8 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 
                 #generate voxel name
                 voxel_name = str(part_name_guess + "_voxel-" + str(idx))
+                voxel_point_name = str(part_name_guess + "_VoxelPoints" + str(idx))
+                save_name = os.path.join(part_dir, voxel_point_name)
                 
                 #################################################################################################################
                 #pull voxel features
@@ -150,107 +151,21 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 #get voxel bounds and add to dictionary 
                 voxel_dict = Camera.get_voxel(center, normal_vector, radius= radius, voxel_depth= 2*radius, n_pixels=n_pixels)
                 voxel_dict = Camera.get_layer_points(part, voxel_dict, boundary_buffer_multiplier = 0.2)
+
+                #update voxel_dict
+                voxel_dict.update({'layer_names': layer_list})
+                voxel_dict.update({'voxel_name': voxel_name})
+                voxel_dict.updtae({'save_filepath': save_name})
                 
                 #################################################################################################################
-                #PLot voxel
-                gif = False
-                gif_frames = 4     #number of frames in GIF
-                gif_integrals = 50   #delay between frames in msec
-                azim_total_degrees = 360
-                azim_step = azim_total_degrees/gif_frames
-                
-                plot_first_layer = True
-                plot_last_layer = True
-                
-                top_pixel_coordinate_array = voxel_dict['top_pixel_coordinate_array']
-                bottom_pixel_coordinate_array = voxel_dict['bottom_pixel_coordinate_array']
-                
-                bottom_layer_name = layer_list[0]
-                top_layer_name = layer_list[-1]
-                
-                first_points = np.array([0])
-                for c_idx, contig_list in enumerate(voxel_dict['layer_coordinates'][bottom_layer_name]['coordinates']):
-                    for p_idx, point in enumerate(contig_list):
-                        this_point = point
-                        #ignore 0-dim arrays
-                        if this_point.shape[0]<3:
-                            pass
-                        elif len(first_points.shape)<2:
-                            first_points = np.array([this_point])
-                        else:
-                            first_points = np.append(first_points, [this_point], axis =0)
-                first_points = np.transpose(first_points)
-                
-                last_points = np.array([0])
-                for c_idx, contig_list in enumerate(voxel_dict['layer_coordinates'][top_layer_name]['coordinates']):
-                    for p_idx, point in enumerate(contig_list):
-                        this_point = point
-                        #ignore 0-dim arrays
-                        if this_point.shape[0]<3:
-                            pass
-                        elif len(last_points.shape)<2:
-                            last_points = np.array([this_point])
-                        else:
-                            last_points = np.append(last_points, [this_point], axis =0)
-                last_points = np.transpose(last_points)
-                
-                  #split x/y/z for plotting
-                top_xs = top_pixel_coordinate_array[::, 0]
-                top_ys = top_pixel_coordinate_array[::, 1]
-                top_zs = top_pixel_coordinate_array[::, 2] 
-                bot_xs = bottom_pixel_coordinate_array[::, 0]
-                bot_ys = bottom_pixel_coordinate_array[::, 1]
-                bot_zs = bottom_pixel_coordinate_array[::, 2] 
-                
-                #Initialize 3D plot
-                fig = plt.figure(figsize=(10,10))
-                ax = fig.add_subplot(111, projection = '3d')
-                
-                  #add substrate points
-                ax.scatter(top_xs, top_ys, top_zs, s=.2, color = 'teal', alpha=0.5)
-                ax.scatter(bot_xs, bot_ys, bot_zs, s=.2, color = 'brown', alpha=0.5)
-                
-                if plot_first_layer:
-                    try:
-                        ax.scatter(first_points[0], first_points[1], first_points[2], s=10, color = 'blue', alpha=0.1)
-                    except:
-                        pass
-                if plot_last_layer:
-                    try:
-                        ax.scatter(last_points[0], last_points[1], last_points[2], s=10, color = 'purple', alpha=0.1)
-                    except:
-                        pass
-
-                def init():
-                    ax.view_init(elev=10., azim=0)
-                    return [fig]
-                
-                def animate(i):
-                    global azim_step
-                    ax.view_init(elev=10., azim=i*azim_step)
-                    print(f"Running {i+1} of {gif_frames}")
-                    return [fig]
-                
-                # Animate
-                anim = animation.FuncAnimation(fig, animate, init_func=init,
-                                               frames=gif_frames, interval=gif_integrals, blit=True)
-                if gif:
-                    # Save; Takes a while (~5 minutes?)
-                    save_format = ".mp4"
-                    format_name = save_format.replace('.','').upper()
-                    
-                    root = Tk()
-                    save_filename = filedialog.asksaveasfilename(filetypes=[(format_name, save_format)])
-                    root.destroy()
-                    
-                    anim.save(save_filename+save_format, fps=30, extra_args=['-vcodec', 'libx264'])
-                    #anim.save(save_filename, fps=30)
-                else:
-                    plt.title(voxel_name)
-                    voxel_point_name = str(part_name_guess + "_VoxelPoints" + str(idx))
-                    save_name = os.path.join(part_dir, voxel_point_name)
-                    plt.savefig(save_name, dpi=600)
-                    plt.show()
+                #Visualize voxel
+                Camera.voxel_points_visualize(voxel_dict, 
+                           gif = False,
+                           gif_frames = 4,
+                           gif_integrals = 50,
+                           azim_total_degrees = 360,
+                           azim_step = 0,
+                           save_plot = True)
                     
                 #################################################################################################################
                 #Flatten array of coordinates to make it homogenous
@@ -274,6 +189,7 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 
                 #################################################################################################################
                 #Get the actual distances for each pixel and calculate opacity
+                #NOTE: this is v1 and isn't vectorized, making it incredibly slow
                 pixel_min_distances = []
                 opacity_array = np.ones( (voxel_dict['top_pixel_coordinate_array'].shape[0]))
                 for l_idx, layer_key in enumerate(list(part.layers.keys())):
