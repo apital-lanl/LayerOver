@@ -1040,6 +1040,7 @@ def point_stl_from_gcode(filename_lists = None,
                             distance_array = []
                             for idx in range(sub_voxel_array.shape[0]):
                                 distance_array.append(point_line_distance(sub_voxel_array[idx], last_position, current_position))
+                            distance_array = np.array(distance_array)
                                 #shape back into orginal size 
                             distance_voxel = distance_array.reshape(x_max_idx-x_min_idx,
                                                                     y_max_idx-y_min_idx,
@@ -1121,8 +1122,8 @@ def point_stl_from_gcode(filename_lists = None,
         
                 verts, faces, _, _ = marching_cubes(voxels)
             
-                    # scale vertices back to the original point cloud dimensions
-                verts = verts * scales + min_bound
+                #     # scale vertices back to the original point cloud dimensions
+                # verts = verts * scales + min_bound
                 stl_mesh = Mesh(np.zeros(faces.shape[0], dtype= Mesh.dtype))
                 if flip_normals:
                     # Reverse the order of vertices for each face to flip normals
