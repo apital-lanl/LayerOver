@@ -809,12 +809,13 @@ class Point_Clod():
         return xsnew, zsnew
 
 
-def point_stl_from_gcode(filename_lists == None, 
+def point_stl_from_gcode(filename_lists = None, 
                          save_stl = True, show_stl = False,
                          flip_normals= True, n_voxel_points = 5,
                          num_strand_exterior_points = 5,voxel_max_divisor = 10,
                          voxel_min_divisor = 2,minimum_point_dist = 0.2,
                          voxel_size= 0.01, voxel_grid_size= 5000):
+    
     """
     Created:   2025-03-26
     Modified:  2025-06-24
