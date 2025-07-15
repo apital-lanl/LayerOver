@@ -654,7 +654,30 @@ class Point_Clod():
             #anim.save(save_filename, fps=30)
         else:
             plt.show()
-            
+    
+
+    @staticmethod
+    def point_line_distance(point, line_segment_start, line_segment_end):
+        '''
+        Description: calculate the min distance between a 3D line segment and a point in 3D space; works in 2D as well, but coordinate systems can't be mixed.
+        taken almost verbatim from https://stackoverflow.com/questions/56463412/distance-from-a-point-to-a-line-segment-in-3d-python
+        '''
+
+        # normalized tangent vector
+        d = np.divide(line_segment_end - line_segment_start, np.linalg.norm(line_segment_end - line_segment_start))
+
+        # signed parallel distance components
+        s = np.dot(line_segment_start - point, d)
+        t = np.dot(point - line_segment_end, d)
+
+        # clamped parallel distance
+        h = np.maximum.reduce([s, t, 0])
+
+        # perpendicular distance component
+        c = np.cross(point - line_segment_start, d)
+
+        return np.hypot(h, np.linalg.norm(c))
+
             
     @staticmethod
     def line_line_distance(a0,a1,b0,b1,\
@@ -812,9 +835,9 @@ class Point_Clod():
 def point_stl_from_gcode(filename_lists = None, 
                          save_stl = True, show_stl = False,
                          flip_normals= True, n_voxel_points = 5,
-                         num_strand_exterior_points = 5,voxel_max_divisor = 10,
-                         voxel_min_divisor = 2,minimum_point_dist = 0.2,
-                         voxel_size= 0.01, voxel_grid_size= 5000):
+                         num_strand_exterior_points = 5,
+                         minimum_point_dist = 0.2,
+                         voxel_size= 0.01):
     
     """
     Created:   2025-03-26
@@ -838,12 +861,13 @@ def point_stl_from_gcode(filename_lists = None,
     #flip_normals= True
     #n_voxel_points = 5              #Number of random points to select from parts
     #num_strand_exterior_points = 5  #IMPORTANT: number of surface points to generate at exterior of of each gcode coordinate
-    #voxel_max_divisor = 10          #voxel can't be more that this size smaller than 'minimum_point_dist'
-    #voxel_min_divisor = 2           #voxel can't be less that this size smaller than 'minimum_point_dist'
     #minimum_point_dist = 0.2        #smallest voxel boundary to inperpolate gcode points between (if smaller, ignore interpolation)
     #voxel_size= 0.01                #size of the actual voxels created for marching cubes algorithm
     #voxel_grid_size= 5000           #number of grid regions
 
+    #Hard-coded contraints
+    voxel_max_divisor = 10  #voxel can't be more that this size smaller than 'minimum_point_dist'
+    voxel_min_divisor = 2   #voxel can't be less that this size smaller than 'minimum_point_dist'
 
     #%% (1.2) Select file(s) to make STLs of
     if filename_lists == None:
@@ -944,6 +968,16 @@ def point_stl_from_gcode(filename_lists = None,
                 voxel_x_grid_size = round(x_dim/voxel_size) + 10
                 voxel_y_grid_size = round(y_dim/voxel_size) + 10
                 voxel_z_grid_size = round(z_dim/voxel_size) + 10
+
+                # Convert a point cloud to a voxel grid; Create an empty voxel grid
+                  #create the global voxel array
+                voxels = np.zeros((voxel_x_grid_size, voxel_y_grid_size, voxel_z_grid_size))
+                  #create arrays of actual locations to index point coordinates to voxel array indices
+                half_voxel_size = voxel_size/2
+                voxel_x_locations = np.linspace(min_x-(5*half_voxel_size), max_x+(5*half_voxel_size), voxel_x_grid_size)
+                voxel_y_locations = np.linspace(min_y-(5*half_voxel_size), max_y+(5*half_voxel_size), voxel_y_grid_size)
+                voxel_z_locations = np.linspace(min_z-(5*half_voxel_size), max_z+(5*half_voxel_size), voxel_z_grid_size)
+                voxel_locations = np.vstack((voxel_x_locations, voxel_y_locations, voxel_z_locations))
             
                 #Initialize variables for looping through gcode points
                 points = []
@@ -952,9 +986,9 @@ def point_stl_from_gcode(filename_lists = None,
                 last_position = part.layers[layer_key]['coordinates'][0, ::]
         
                 #Get coordinates and normals
-                pbar = tqdm(total= part.layers[layer_key]['coordinates'].shape[0])
+                pbar = tqdm(total= part.layers[layer_key]['coordinates'].shape[0])  #initialize progress bar
                 for p_idx in range(1, part.layers[layer_key]['coordinates'].shape[0]):
-                    pbar.update(1)
+                    pbar.update(1)  #update progress bar
                     #Get this point and the 'last point', calculate max distance bewteen strand surface points
                     current_position = part.layers[layer_key]['coordinates'][p_idx, ::]
                       # max distance is bottom of one strand at 'p1' to top of strand at 'p2'; calc. that max distance
@@ -963,7 +997,7 @@ def point_stl_from_gcode(filename_lists = None,
                     distance = math.sqrt( (p1[0]-p2[0])**2 + \
                                           (p1[1]-p2[1])**2 + \
                                           (p1[2]-p2[2])**2)
-                    #Check 
+                    #Run point-by-point, check if next point is <= 'minimum_point_distance', and interpolate new points if it's not
                     if distance > minimum_point_dist:
                         num_points = int(distance / minimum_point_dist) + 1
                         if num_points <2:
@@ -983,6 +1017,27 @@ def point_stl_from_gcode(filename_lists = None,
                               #rotate -90 degrees to get outward normal (clockwise)
                             normal_x, normal_y = dy, -dx
                             point_normal_vector = [dx, dy, dz]
+
+                            #Get voxel to line-segment (strand) distance matrix
+                              #focus in on only voxel region this segment occupies
+                            vox_x_min = min(current_position[0], last_postion[0])
+                            vox_x_max = max(current_position[0], last_postion[0])
+                            vox_y_min = min(current_position[1], last_postion[1])
+                            vox_y_max = max(current_position[1], last_postion[1])
+                            vox_z_min = min(current_position[2], last_postion[2])
+                            vox_z_max = max(current_position[2], last_postion[2])
+                            x_min_idx = np.argmin(np.abs(voxel_x_locations - vox_x_min))
+                            x_max_idx = np.argmin(np.abs(voxel_x_locations - vox_x_max))
+                            y_min_idx = np.argmin(np.abs(voxel_y_locations - vox_y_min))
+                            y_max_idx = np.argmin(np.abs(voxel_y_locations - vox_y_max))
+                            z_min_idx = np.argmin(np.abs(voxel_z_locations - vox_z_min))
+                            z_max_idx = np.argmin(np.abs(voxel_z_locations - vox_z_max))
+                            sub_voxel = voxels[x_min_idx:x_max_idx,
+                                               y_min_idx:y_max_idx,
+                                               z_min_idx:z_max_idx]
+
+                            point_line_distance(point, line_segment_start, line_segment_end)
+
                             #Generate strand exterior points
                             exterior_points = Point_Clod.generate_radial_points(point_normal_vector, current_position, 
                                                                      strand_radius, n_circ_points = num_strand_exterior_points, 
@@ -1022,7 +1077,7 @@ def point_stl_from_gcode(filename_lists = None,
                             normals.append(this_normal)
                         last_position = current_position
                     
-                pbar.close()
+                pbar.close()  #close progress bar
             
                 #Save as .xyz file
                 xyz_save_name = this_save_name + '.xyz'
@@ -1030,15 +1085,7 @@ def point_stl_from_gcode(filename_lists = None,
                 with open(xyz_save_filepath, 'w') as file:
                    for point, normal in zip(points, normals):
                        file.write(f"{point[0]} {point[1]} {point[2]} {normal[0]} {normal[1]} {normal[2]}\n")
-                   
-                # Convert a point cloud to a voxel grid; Create an empty voxel grid
-                voxels = np.zeros((voxel_x_grid_size, voxel_y_grid_size, voxel_z_grid_size))
-                min_bound = np.min(points, axis=0) - voxel_size
-                max_bound = np.max(points, axis=0) + voxel_size
-                scales = (max_bound - min_bound) / voxel_size
-                indices = ((points - min_bound) / scales).astype(int)
-                for index in indices:
-                    voxels[index[0], index[1], index[2]] = 1
+                  
             
                 #Convert a voxel grid to an STL file using the Marching Cubes algorithm, ensuring the output matches the original scale.
                   # calculate the scale factors based on the point cloud dimensions and the voxel grid
@@ -1099,118 +1146,6 @@ def point_stl_from_gcode(filename_lists = None,
             print(traceback.format_exc())
             print('#'*50)
             print()
-    
-    
-    #%%  (3.b)
-    #Get STL from each layer
-    layer_keys = list(part.layers.keys())
-    for layer_idx, layer_key in enumerate(layer_keys):
-    
-        these_coordinates = part.layers[layer_key]['coordinates']
-    
-        #Define variables for this layer
-        this_save_name = f"{part_name_guess}_{layer_key.replace('.txt','')}"
-        layer_nozzle_size = part.layer_strand_diameters[layer_idx]
-        strand_radius = layer_nozzle_size/2
-          # Get max/min boundaries for setting up smart grid coordinates
-        max_x = np.max(these_coordinates[::,0])
-        min_x = np.min(these_coordinates[::,0])
-        max_y = np.max(these_coordinates[::,1])
-        min_y = np.min(these_coordinates[::,1])
-        max_z = np.max(these_coordinates[::,2])
-        min_z = np.min(these_coordinates[::,2])
-        x_dim = abs(max_x-min_x)
-        y_dim = abs(max_y-min_y)
-        z_dim = abs(max_z-min_z)
-          # adjust parameters for new size constraints
-        if (layer_nozzle_size/minimum_point_dist < 2):
-            minimum_point_dist = layer_nozzle_size/2
-            print(f"Adjusting 'minimum_point_dist' to: {round(minimum_point_dist, 3)}")
-        if (minimum_point_dist/voxel_size > voxel_max_divisor) or (minimum_point_dist/voxel_size < voxel_min_divisor):
-            #Make sure the voxel size is 'well-matched' to strand diameter
-            voxel_size = round(minimum_point_dist/voxel_min_divisor, 5)
-        voxel_x_grid_size = round(x_dim/voxel_size) + 10
-        voxel_y_grid_size = round(y_dim/voxel_size) + 10
-        voxel_z_grid_size = round(z_dim/voxel_size) + 10
-    
-        #Initialize variables for looping through gcode points
-        points = []
-        normals = []
-          # initialize 'last_position' to first coordinate and get first radial (strand exterior) points
-        last_position = part.layers[layer_key]['coordinates'][0, ::]
-
-        #Get coordinates and normals
-        pbar = tqdm(total= part.layers[layer_key]['coordinates'].shape[0])
-        for p_idx in range(1, part.layers[layer_key]['coordinates'].shape[0]):
-            pbar.update(1)
-            #Get this point and the 'last point', calculate max distance bewteen strand surface points
-            current_position = part.layers[layer_key]['coordinates'][p_idx, ::]
-              # max distance is bottom of one strand at 'p1' to top of strand at 'p2'; calc. that max distance
-            p1 = np.array([last_position[0], last_position[1], 0])
-            p2 = np.array([current_position[0], current_position[1], layer_nozzle_size])
-            distance = math.sqrt( (p1[0]-p2[0])**2 + \
-                                  (p1[1]-p2[1])**2 + \
-                                  (p1[2]-p2[2])**2)
-            #Check 
-            if distance > minimum_point_dist:
-                num_points = int(distance / minimum_point_dist) + 1
-                if num_points <2:
-                    num_points = 2
-                interpolated_points = [\
-                        (last_position[0] + (current_position[0] - last_position[0]) * t/num_points, \
-                         last_position[1] + (current_position[1] - last_position[1]) * t/num_points, \
-                         last_position[2] + (current_position[2] - last_position[2]) * t/num_points) for t in range(1, num_points+1)]
-            
-                for current_position in interpolated_points:
-                    #Calculate direction vector
-                    dx = current_position[0] - last_position[0]
-                    dy = current_position[1] - last_position[1]
-                    dz = current_position[2] - last_position[2]
-                      #normalize the normal vector
-                    length = math.sqrt(dx**2 + dy**2 + dz**2)
-                      #rotate -90 degrees to get outward normal (clockwise)
-                    normal_x, normal_y = dy, -dx
-                    point_normal_vector = [dx, dy, dz]
-                    #Generate strand exterior points
-                    exterior_points = Point_Clod.generate_radial_points(point_normal_vector, current_position, 
-                                                             strand_radius, n_circ_points = num_strand_exterior_points, 
-                                                             randomize_radial_start = True)
-                    for exterior_point in exterior_points:
-                    
-                        dx = exterior_point[0] - current_position[0]
-                        dy = exterior_point[1] - current_position[1]
-                        dz = exterior_point[2] - current_position[2]
-                        length = math.sqrt(dx**2 + dy**2 + dz**2)
-                        this_normal = [dx/length, dy/length, dz/length]
-                        points.append(exterior_point)
-                        normals.append(this_normal)
-                    last_position = current_position
-                
-            else:
-                #Calculate direction vector
-                dx = current_position[0] - last_position[0]
-                dy = current_position[1] - last_position[1]
-                dz = current_position[2] - last_position[2]
-                  #normalize the normal vector
-                length = math.sqrt(dx**2 + dy**2 + dz**2)
-                  #rotate -90 degrees to get outward normal (clockwise)
-                normal_x, normal_y = dy, -dx
-                point_normal_vector = [dx, dy, dz]
-                #Generate strand exterior points
-                exterior_points = Point_Clod.generate_radial_points(point_normal_vector, current_position, 
-                                                         strand_radius, n_circ_points = num_strand_exterior_points, 
-                                                         randomize_radial_start = True)
-                for exterior_point in exterior_points:
-                    dx = exterior_point[0] - current_position[0]
-                    dy = exterior_point[1] - current_position[1]
-                    dz = exterior_point[2] - current_position[2]
-                    length = math.sqrt(dx**2 + dy**2 + dz**2)
-                    this_normal = [dx/length, dy/length, dz/length]
-                    points.append(exterior_point)
-                    normals.append(this_normal)
-                last_position = current_position
-            
-        pbar.close()
     
         #Save as .xyz file
         xyz_save_name = this_save_name + '.xyz'
@@ -1280,19 +1215,4 @@ def point_stl_from_gcode(filename_lists = None,
             # Show the plot to the screen
             plt.show()
     
-    #%% (opt, 4)
-    #Matplotlib approach
-    # Create a new plot
-    figure = plt.figure()
-    axes = figure.add_subplot(projection='3d')
-
-    # Load the STL files and add the vectors to the plot
-    opened_mesh = Mesh.from_file(stl_save_filepath)
-    poly_collection = mplot3d.art3d.Poly3DCollection(opened_mesh.vectors)
-    poly_collection.set_color((0.7,0.7,0.7))  # play with color
-    axes.add_collection3d(poly_collection)
-
-    # Show the plot to the screen
-    plt.show()
-
 
