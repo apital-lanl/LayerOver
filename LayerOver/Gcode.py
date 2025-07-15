@@ -23,8 +23,7 @@ from tkinter import Tk, filedialog
 import numpy as np
 
   #Import other LayerUp modules
-from Point_Clod import Point_Clod
-
+import Points
 
 class Gcode():
 
@@ -78,7 +77,7 @@ class Gcode():
             for layer_filename in self.layer_files:
                 layer_name = os.path.basename(layer_filename.replace('.pgm',''))
                 xyzacf_array = Gcode.parse_gcode_file(layer_filename, part = self)
-                layer_dict = Point_Clod.AC_to_XYZ(xyzacf_array, self.substrate_dict, offset_adjust=False)
+                layer_dict = Points.AC_to_XYZ(xyzacf_array, self.substrate_dict, offset_adjust=False)
                 layer_dict.update( {'layer_name': layer_name} )
                 self.layers.update( {layer_name: layer_dict} )
                 print(f"Layer added: {layer_name}")
@@ -161,7 +160,7 @@ class Gcode():
             verts = offsets
         
         #lats are X, verts are Z, and Y is interpolated
-        xs, zs, ys, radii = Point_Clod.fibonnaci_points(lats, verts)
+        xs, zs, ys, radii = Points.fibonnaci_points(lats, verts)
 
           #remove points out of the plate bounds; zero is the center
         plate_xs =[]
@@ -175,10 +174,10 @@ class Gcode():
                 plate_zs.append(z)
 
         # Make some triangles
-        xyzarray, sphereInds, triangInds = Point_Clod.convexHull(plate_xs,plate_ys,plate_zs)
+        xyzarray, sphereInds, triangInds = Points.convexHull(plate_xs,plate_ys,plate_zs)
 
         # Show the biz
-        Point_Clod.visualize_3D(xyzarray, sphereInds, triangInds, gif=gif_make, point_color='k')
+        Points.visualize_3D(xyzarray, sphereInds, triangInds, gif=gif_make, point_color='k')
 
         substrate_dict ={
             'width': width,
@@ -199,13 +198,13 @@ class Gcode():
         Generate a mandrel from config.json file profile points
         '''
         
-        xs, ys, zs, radii = Point_Clod.fibonnaci_points(lats, verts)
+        xs, ys, zs, radii = Points.fibonnaci_points(lats, verts)
         
         # Make some triangles
-        xyzarray, sphereInds, triangInds = Point_Clod.convexHull(xs,zs,ys)
+        xyzarray, sphereInds, triangInds = Points.convexHull(xs,zs,ys)
         
         # plot the test
-        Point_Clod.visualize_3D(xyzarray, sphereInds, triangInds, gif=False, point_color ='k') 
+        Points.visualize_3D(xyzarray, sphereInds, triangInds, gif=False, point_color ='k') 
         
         substrate_dict = {
             'radius': max(lats)-min(lats),

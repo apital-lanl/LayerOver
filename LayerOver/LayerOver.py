@@ -36,7 +36,7 @@ from tqdm.auto import tqdm
   #LayerOver imports
 from Gcode import Gcode
 from Camera import Camera
-from Point_Clod import Point_Clod
+from Points import Point_Clod
 
 
 # Define package-variables

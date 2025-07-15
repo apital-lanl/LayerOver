@@ -29,8 +29,7 @@ from matplotlib import animation
 from tqdm.auto import tqdm
 
   #Other LayerOver modules
-from Point_Clod import Point_Clod
-
+import Points
 
 
 class Camera():
@@ -232,7 +231,7 @@ class Camera():
         #Run through each set of triangles and get normal, center, equation of plane, etc. for them
         point_dicts = {}
         for idx, point_coords in enumerate(rand_triang_coord):
-            this_point_dict = Point_Clod.get_3point_normal(point_coords, show_plot = show_iterations)
+            this_point_dict = Points.get_3point_normal(point_coords, show_plot = show_iterations)
             point_dicts.update({idx:this_point_dict})
     
         return point_dicts
@@ -357,13 +356,13 @@ class Camera():
         bottom_center = center - (vector*(voxel_depth/2))
           #Generate points for circumerence of cirlce
           #   will be 360/'n_circ_points' number of points
-        top_radial_points = Point_Clod.generate_radial_points(vector, top_center, radius, n_circ_points = 6)
-        bottom_radial_points = Point_Clod.generate_radial_points(vector, bottom_center, radius, n_circ_points = 6)
+        top_radial_points = Points.generate_radial_points(vector, top_center, radius, n_circ_points = 6)
+        bottom_radial_points = Points.generate_radial_points(vector, bottom_center, radius, n_circ_points = 6)
     
         #Get corners of visualization square
         pixel_array_radius = math.sqrt(2*radius**2)
-        top_pixel_array_corners = Point_Clod.generate_radial_points(vector, top_center, pixel_array_radius, n_circ_points = 4)
-        bottom_pixel_array_corners = Point_Clod.generate_radial_points(vector, bottom_center, pixel_array_radius, n_circ_points = 4)
+        top_pixel_array_corners = Points.generate_radial_points(vector, top_center, pixel_array_radius, n_circ_points = 4)
+        bottom_pixel_array_corners = Points.generate_radial_points(vector, bottom_center, pixel_array_radius, n_circ_points = 4)
         
         #Draw 'top' pixel array by coordinates
         pa = top_pixel_array_corners[0]
