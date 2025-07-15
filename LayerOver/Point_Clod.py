@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created:   2024-03-18
-Modified:  2025-04-16
+Modified:  2025-07-15
 Version:   0.6.1
 
 @author: Aaron Pital (Los Alamos National Lab)
@@ -14,29 +14,46 @@ Description: Class wrapper for handling 3D data; parametric conversion, 3D trans
             - Added random initialization support to 'generate_radial_points'
         2025-04-16
             - Fixed # of points returned in 'generate_radial_points'
+        2025-07-15
+            - Refactored STL 
 
 """
-version = '0.6.1'
-last_modified_date = '2025-04-16'
+
 
   #System and built-ins
+import os
 import math
-from tkinter import Tk, filedialog
 import random
+import sys
+import traceback
+from tkinter import Tk, filedialog
+from tqdm import tqdm
 
   #Visualizaiton
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib import animation
+from mpl_toolkits import mplot3d
 
   #Data Handling
 import numpy as np
+import math
 
   #Scientifiic algorithm packages
 from scipy.interpolate import interp1d
 from scipy.spatial import KDTree
 from scipy.spatial import ConvexHull
 from scipy.spatial import Delaunay
+
+#stl and voxelization
+from skimage.measure import marching_cubes
+from stl.mesh import Mesh
+# import open3d as o3d
+
+#Import LayerOver modules
+from Gcode import Gcode
+from Point_Clod import Point_Clod
+from Camera import Camera
 
 
 class Point_Clod():
@@ -790,5 +807,491 @@ class Point_Clod():
         zsnew = interpol_function(xsnew)
 
         return xsnew, zsnew
+
+
+def point_stl_from_gcode(filename_lists == None, 
+                         save_stl = True, show_stl = False,
+                         flip_normals= True, n_voxel_points = 5,
+                         num_strand_exterior_points = 5,voxel_max_divisor = 10,
+                         voxel_min_divisor = 2,minimum_point_dist = 0.2,
+                         voxel_size= 0.01, voxel_grid_size= 5000):
+    """
+    Created:   2025-03-26
+    Modified:  2025-06-24
+    Version:   0.4.0 (beta)
+
+    @author: Aaron Pital (Los Alamos National Lab)
+
+    Description: Taking a 'config.json' file and at least one 'layer.pgm' file with gcode coordinates, take 'n_voxel_points' number of random points and generate
+        an STL.
+        Wraps up prior versions into a function. Retains cell markers (#%%) for use as a Notebook or in an IDE with appropriate extensions (Spyder natively).
+
+    INPUT:
+        filename_lists          2D list with each i,[] list containing a config file and at least one .pgm layer file. If no list is passed, open a dialog to select files.
+
+
+    """
+
+    #save_stl = True
+    #show_stl = False
+    #flip_normals= True
+    #n_voxel_points = 5              #Number of random points to select from parts
+    #num_strand_exterior_points = 5  #IMPORTANT: number of surface points to generate at exterior of of each gcode coordinate
+    #voxel_max_divisor = 10          #voxel can't be more that this size smaller than 'minimum_point_dist'
+    #voxel_min_divisor = 2           #voxel can't be less that this size smaller than 'minimum_point_dist'
+    #minimum_point_dist = 0.2        #smallest voxel boundary to inperpolate gcode points between (if smaller, ignore interpolation)
+    #voxel_size= 0.01                #size of the actual voxels created for marching cubes algorithm
+    #voxel_grid_size= 5000           #number of grid regions
+
+
+    #%% (1.2) Select file(s) to make STLs of
+    if filename_lists == None:
+        continue_check = True
+        filename_lists = []
+        filenames_idx = 0
+
+        while continue_check:
+            # Get the names by user selection
+            root = Tk()
+            filenames = filedialog.askopenfilenames(title= 'Select images to stitch')
+            root.destroy()
+    
+            # Sort to get images in left-to-right, top-to-bottom order by index (hopefully)
+            filename_lists.append(filenames)
+            print(f"____Index {filenames_idx}_________")
+            for idx, filename in enumerate(filenames):
+                print(f"{idx} \t {filename}")
+    
+            # Ask if user want to add more
+            user_report = input("Stitch another set of images (y/n or any key+ENTER to quit)").lower()
+            if 'y' in user_report:
+                continue_check = True
+            else:
+                continue_check = False
+        
+            filenames_idx += 1
+
+
+    #%% (2.a) Process file(s)
+    for filenames_idx, filenames in enumerate(filename_lists):
+    
+        # Open and generate a LayerOver part
+        try:
+            part = Gcode()
+            part.get_gcode(files = filenames)
+        
+              #get names of layers
+            layer_list = list(part.layers.keys())
+        
+              #auto-generate part name guess and assign directory to save to
+            part_dir = os.path.dirname(part.config_path)
+            part_name_guess = os.path.basename(part_dir)
+        
+              #check if there's a single strand diameter
+            if part.strand_diameter != 0:
+                strand_radius = part.strand_diameter/2*10
+                homogenous_strand_size = True
+            else:
+                homogenous_strand_size = False
+                radius_list = [size/2*10 for size in part.layer_strand_diameters]
+
+
+        except Exception as e:
+            print(traceback.format_exception(*sys.exc_info()))
+            print()
+            print("Random failure")
+        
+        
+    #%%  (2.b) Get random points to evaluate STLs on
+    point_dicts = Camera.get_random_point_summaries(part, n_retrieval_points = n_voxel_points, \
+                                       excluded_point_indcs = [], show_iterations = True)
+        
+    #%%  (3.a)
+    #Get STL from each point in point_dict
+    point_keys = list(point_dicts.keys())
+    layer_keys = list(part.layers.keys())
+
+    for point_key in point_keys:
+        this_point_dict = point_dicts[point_key]
+    
+        try:
+            for layer_idx, layer_key in enumerate(layer_keys):
+            
+                these_coordinates = part.layers[layer_key]['coordinates']
+            
+                #Define variables for this layer
+                this_save_name = f"{part_name_guess}_{layer_key.replace('.txt','')}"
+                layer_nozzle_size = part.layer_strand_diameters[layer_idx]
+                strand_radius = layer_nozzle_size/2
+                  # Get max/min boundaries for setting up smart grid coordinates
+                max_x = np.max(these_coordinates[::,0])
+                min_x = np.min(these_coordinates[::,0])
+                max_y = np.max(these_coordinates[::,1])
+                min_y = np.min(these_coordinates[::,1])
+                max_z = np.max(these_coordinates[::,2])
+                min_z = np.min(these_coordinates[::,2])
+                x_dim = abs(max_x-min_x)
+                y_dim = abs(max_y-min_y)
+                z_dim = abs(max_z-min_z)
+                  # adjust parameters for new size constraints
+                if (layer_nozzle_size/minimum_point_dist < 2):
+                    minimum_point_dist = layer_nozzle_size/2
+                    print(f"Adjusting 'minimum_point_dist' to: {round(minimum_point_dist, 3)}")
+                if (minimum_point_dist/voxel_size > voxel_max_divisor) or (minimum_point_dist/voxel_size < voxel_min_divisor):
+                    #Make sure the voxel size is 'well-matched' to strand diameter
+                    voxel_size = round(minimum_point_dist/voxel_min_divisor, 5)
+                voxel_x_grid_size = round(x_dim/voxel_size) + 10
+                voxel_y_grid_size = round(y_dim/voxel_size) + 10
+                voxel_z_grid_size = round(z_dim/voxel_size) + 10
+            
+                #Initialize variables for looping through gcode points
+                points = []
+                normals = []
+                  # initialize 'last_position' to first coordinate and get first radial (strand exterior) points
+                last_position = part.layers[layer_key]['coordinates'][0, ::]
+        
+                #Get coordinates and normals
+                pbar = tqdm(total= part.layers[layer_key]['coordinates'].shape[0])
+                for p_idx in range(1, part.layers[layer_key]['coordinates'].shape[0]):
+                    pbar.update(1)
+                    #Get this point and the 'last point', calculate max distance bewteen strand surface points
+                    current_position = part.layers[layer_key]['coordinates'][p_idx, ::]
+                      # max distance is bottom of one strand at 'p1' to top of strand at 'p2'; calc. that max distance
+                    p1 = np.array([last_position[0], last_position[1], 0])
+                    p2 = np.array([current_position[0], current_position[1], layer_nozzle_size])
+                    distance = math.sqrt( (p1[0]-p2[0])**2 + \
+                                          (p1[1]-p2[1])**2 + \
+                                          (p1[2]-p2[2])**2)
+                    #Check 
+                    if distance > minimum_point_dist:
+                        num_points = int(distance / minimum_point_dist) + 1
+                        if num_points <2:
+                            num_points = 2
+                        interpolated_points = [\
+                                (last_position[0] + (current_position[0] - last_position[0]) * t/num_points, \
+                                 last_position[1] + (current_position[1] - last_position[1]) * t/num_points, \
+                                 last_position[2] + (current_position[2] - last_position[2]) * t/num_points) for t in range(1, num_points+1)]
+                    
+                        for current_position in interpolated_points:
+                            #Calculate direction vector
+                            dx = current_position[0] - last_position[0]
+                            dy = current_position[1] - last_position[1]
+                            dz = current_position[2] - last_position[2]
+                              #normalize the normal vector
+                            length = math.sqrt(dx**2 + dy**2 + dz**2)
+                              #rotate -90 degrees to get outward normal (clockwise)
+                            normal_x, normal_y = dy, -dx
+                            point_normal_vector = [dx, dy, dz]
+                            #Generate strand exterior points
+                            exterior_points = Point_Clod.generate_radial_points(point_normal_vector, current_position, 
+                                                                     strand_radius, n_circ_points = num_strand_exterior_points, 
+                                                                     randomize_radial_start = True)
+                            for exterior_point in exterior_points:
+                            
+                                dx = exterior_point[0] - current_position[0]
+                                dy = exterior_point[1] - current_position[1]
+                                dz = exterior_point[2] - current_position[2]
+                                length = math.sqrt(dx**2 + dy**2 + dz**2)
+                                this_normal = [dx/length, dy/length, dz/length]
+                                points.append(exterior_point)
+                                normals.append(this_normal)
+                            last_position = current_position
+                        
+                    else:
+                        #Calculate direction vector
+                        dx = current_position[0] - last_position[0]
+                        dy = current_position[1] - last_position[1]
+                        dz = current_position[2] - last_position[2]
+                          #normalize the normal vector
+                        length = math.sqrt(dx**2 + dy**2 + dz**2)
+                          #rotate -90 degrees to get outward normal (clockwise)
+                        normal_x, normal_y = dy, -dx
+                        point_normal_vector = [dx, dy, dz]
+                        #Generate strand exterior points
+                        exterior_points = Point_Clod.generate_radial_points(point_normal_vector, current_position, 
+                                                                 strand_radius, n_circ_points = num_strand_exterior_points, 
+                                                                 randomize_radial_start = True)
+                        for exterior_point in exterior_points:
+                            dx = exterior_point[0] - current_position[0]
+                            dy = exterior_point[1] - current_position[1]
+                            dz = exterior_point[2] - current_position[2]
+                            length = math.sqrt(dx**2 + dy**2 + dz**2)
+                            this_normal = [dx/length, dy/length, dz/length]
+                            points.append(exterior_point)
+                            normals.append(this_normal)
+                        last_position = current_position
+                    
+                pbar.close()
+            
+                #Save as .xyz file
+                xyz_save_name = this_save_name + '.xyz'
+                xyz_save_filepath = os.path.join(part_dir, xyz_save_name)
+                with open(xyz_save_filepath, 'w') as file:
+                   for point, normal in zip(points, normals):
+                       file.write(f"{point[0]} {point[1]} {point[2]} {normal[0]} {normal[1]} {normal[2]}\n")
+                   
+                # Convert a point cloud to a voxel grid; Create an empty voxel grid
+                voxels = np.zeros((voxel_x_grid_size, voxel_y_grid_size, voxel_z_grid_size))
+                min_bound = np.min(points, axis=0) - voxel_size
+                max_bound = np.max(points, axis=0) + voxel_size
+                scales = (max_bound - min_bound) / voxel_size
+                indices = ((points - min_bound) / scales).astype(int)
+                for index in indices:
+                    voxels[index[0], index[1], index[2]] = 1
+            
+                #Convert a voxel grid to an STL file using the Marching Cubes algorithm, ensuring the output matches the original scale.
+                  # calculate the scale factors based on the point cloud dimensions and the voxel grid
+                min_bound = np.min(points, axis=0)
+                max_bound = np.max(points, axis=0)
+                scales = (max_bound - min_bound) / np.array(voxels.shape)
+        
+                verts, faces, _, _ = marching_cubes(voxels)
+            
+                  # scale vertices back to the original point cloud dimensions
+                verts = verts * scales + min_bound
+                stl_mesh = Mesh(np.zeros(faces.shape[0], dtype= Mesh.dtype))
+                if flip_normals:
+                    # Reverse the order of vertices for each face to flip normals
+                    faces = faces[:, ::-1]
+                for i, f in enumerate(faces):
+                    for j in range(3):
+                        stl_mesh.vectors[i][j] = verts[f[j], :]
+            
+                #Save/show the results
+                  # get save name and filepath
+                stl_save_name = this_save_name + '.stl'
+                stl_save_filepath = os.path.join(part_dir, stl_save_name)
+            
+                if save_stl:
+                    stl_mesh.save(stl_save_filepath)
+            
+                if show_stl:
+                    #Open3D approach
+                    # vis = o3d.visualization.Visualizer()
+                    # vis.create_window()
+                    # vis.add_geometry(stl_mesh)
+                    # vis.run()
+                    # vis.destroy_window()
+                
+                    #   #attempt to load stl to ensure saving worked
+                    # opened_mesh = o3d.io.read_triangle_model(stl_save_filepath)
+                    # visualize(opened_mesh)
+                
+                    #Matplotlib approach
+                    # Create a new plot
+                    figure = plt.figure()
+                    axes = figure.add_subplot(projection='3d')
+                
+                    # Load the STL files and add the vectors to the plot
+                    opened_mesh = Mesh.from_file(stl_save_filepath)
+                    poly_collection = mplot3d.art3d.Poly3DCollection(opened_mesh.vectors)
+                    poly_collection.set_color((0.7,0.7,0.7))  # play with color
+                    axes.add_collection3d(poly_collection)
+                
+                    # Show the plot to the screen
+                    plt.show()
+    
+        except error as e:
+            print()
+            print('#'*50)
+            print(f"Exception encountered: {e}")
+            print(traceback.format_exc())
+            print('#'*50)
+            print()
+    
+    
+    #%%  (3.b)
+    #Get STL from each layer
+    layer_keys = list(part.layers.keys())
+    for layer_idx, layer_key in enumerate(layer_keys):
+    
+        these_coordinates = part.layers[layer_key]['coordinates']
+    
+        #Define variables for this layer
+        this_save_name = f"{part_name_guess}_{layer_key.replace('.txt','')}"
+        layer_nozzle_size = part.layer_strand_diameters[layer_idx]
+        strand_radius = layer_nozzle_size/2
+          # Get max/min boundaries for setting up smart grid coordinates
+        max_x = np.max(these_coordinates[::,0])
+        min_x = np.min(these_coordinates[::,0])
+        max_y = np.max(these_coordinates[::,1])
+        min_y = np.min(these_coordinates[::,1])
+        max_z = np.max(these_coordinates[::,2])
+        min_z = np.min(these_coordinates[::,2])
+        x_dim = abs(max_x-min_x)
+        y_dim = abs(max_y-min_y)
+        z_dim = abs(max_z-min_z)
+          # adjust parameters for new size constraints
+        if (layer_nozzle_size/minimum_point_dist < 2):
+            minimum_point_dist = layer_nozzle_size/2
+            print(f"Adjusting 'minimum_point_dist' to: {round(minimum_point_dist, 3)}")
+        if (minimum_point_dist/voxel_size > voxel_max_divisor) or (minimum_point_dist/voxel_size < voxel_min_divisor):
+            #Make sure the voxel size is 'well-matched' to strand diameter
+            voxel_size = round(minimum_point_dist/voxel_min_divisor, 5)
+        voxel_x_grid_size = round(x_dim/voxel_size) + 10
+        voxel_y_grid_size = round(y_dim/voxel_size) + 10
+        voxel_z_grid_size = round(z_dim/voxel_size) + 10
+    
+        #Initialize variables for looping through gcode points
+        points = []
+        normals = []
+          # initialize 'last_position' to first coordinate and get first radial (strand exterior) points
+        last_position = part.layers[layer_key]['coordinates'][0, ::]
+
+        #Get coordinates and normals
+        pbar = tqdm(total= part.layers[layer_key]['coordinates'].shape[0])
+        for p_idx in range(1, part.layers[layer_key]['coordinates'].shape[0]):
+            pbar.update(1)
+            #Get this point and the 'last point', calculate max distance bewteen strand surface points
+            current_position = part.layers[layer_key]['coordinates'][p_idx, ::]
+              # max distance is bottom of one strand at 'p1' to top of strand at 'p2'; calc. that max distance
+            p1 = np.array([last_position[0], last_position[1], 0])
+            p2 = np.array([current_position[0], current_position[1], layer_nozzle_size])
+            distance = math.sqrt( (p1[0]-p2[0])**2 + \
+                                  (p1[1]-p2[1])**2 + \
+                                  (p1[2]-p2[2])**2)
+            #Check 
+            if distance > minimum_point_dist:
+                num_points = int(distance / minimum_point_dist) + 1
+                if num_points <2:
+                    num_points = 2
+                interpolated_points = [\
+                        (last_position[0] + (current_position[0] - last_position[0]) * t/num_points, \
+                         last_position[1] + (current_position[1] - last_position[1]) * t/num_points, \
+                         last_position[2] + (current_position[2] - last_position[2]) * t/num_points) for t in range(1, num_points+1)]
+            
+                for current_position in interpolated_points:
+                    #Calculate direction vector
+                    dx = current_position[0] - last_position[0]
+                    dy = current_position[1] - last_position[1]
+                    dz = current_position[2] - last_position[2]
+                      #normalize the normal vector
+                    length = math.sqrt(dx**2 + dy**2 + dz**2)
+                      #rotate -90 degrees to get outward normal (clockwise)
+                    normal_x, normal_y = dy, -dx
+                    point_normal_vector = [dx, dy, dz]
+                    #Generate strand exterior points
+                    exterior_points = Point_Clod.generate_radial_points(point_normal_vector, current_position, 
+                                                             strand_radius, n_circ_points = num_strand_exterior_points, 
+                                                             randomize_radial_start = True)
+                    for exterior_point in exterior_points:
+                    
+                        dx = exterior_point[0] - current_position[0]
+                        dy = exterior_point[1] - current_position[1]
+                        dz = exterior_point[2] - current_position[2]
+                        length = math.sqrt(dx**2 + dy**2 + dz**2)
+                        this_normal = [dx/length, dy/length, dz/length]
+                        points.append(exterior_point)
+                        normals.append(this_normal)
+                    last_position = current_position
+                
+            else:
+                #Calculate direction vector
+                dx = current_position[0] - last_position[0]
+                dy = current_position[1] - last_position[1]
+                dz = current_position[2] - last_position[2]
+                  #normalize the normal vector
+                length = math.sqrt(dx**2 + dy**2 + dz**2)
+                  #rotate -90 degrees to get outward normal (clockwise)
+                normal_x, normal_y = dy, -dx
+                point_normal_vector = [dx, dy, dz]
+                #Generate strand exterior points
+                exterior_points = Point_Clod.generate_radial_points(point_normal_vector, current_position, 
+                                                         strand_radius, n_circ_points = num_strand_exterior_points, 
+                                                         randomize_radial_start = True)
+                for exterior_point in exterior_points:
+                    dx = exterior_point[0] - current_position[0]
+                    dy = exterior_point[1] - current_position[1]
+                    dz = exterior_point[2] - current_position[2]
+                    length = math.sqrt(dx**2 + dy**2 + dz**2)
+                    this_normal = [dx/length, dy/length, dz/length]
+                    points.append(exterior_point)
+                    normals.append(this_normal)
+                last_position = current_position
+            
+        pbar.close()
+    
+        #Save as .xyz file
+        xyz_save_name = this_save_name + '.xyz'
+        xyz_save_filepath = os.path.join(part_dir, xyz_save_name)
+        with open(xyz_save_filepath, 'w') as file:
+           for point, normal in zip(points, normals):
+               file.write(f"{point[0]} {point[1]} {point[2]} {normal[0]} {normal[1]} {normal[2]}\n")
+           
+        # Convert a point cloud to a voxel grid; Create an empty voxel grid
+        voxels = np.zeros((voxel_x_grid_size, voxel_y_grid_size, voxel_z_grid_size))
+        min_bound = np.min(points, axis=0) - voxel_size
+        max_bound = np.max(points, axis=0) + voxel_size
+        scales = (max_bound - min_bound) / voxel_size
+        indices = ((points - min_bound) / scales).astype(int)
+        for index in indices:
+            voxels[index[0], index[1], index[2]] = 1
+    
+        #Convert a voxel grid to an STL file using the Marching Cubes algorithm, ensuring the output matches the original scale.
+          # calculate the scale factors based on the point cloud dimensions and the voxel grid
+        min_bound = np.min(points, axis=0)
+        max_bound = np.max(points, axis=0)
+        scales = (max_bound - min_bound) / np.array(voxels.shape)
+
+        verts, faces, _, _ = marching_cubes(voxels)
+    
+          # scale vertices back to the original point cloud dimensions
+        verts = verts * scales + min_bound
+        stl_mesh = Mesh(np.zeros(faces.shape[0], dtype= Mesh.dtype))
+        if flip_normals:
+            # Reverse the order of vertices for each face to flip normals
+            faces = faces[:, ::-1]
+        for i, f in enumerate(faces):
+            for j in range(3):
+                stl_mesh.vectors[i][j] = verts[f[j], :]
+    
+        #Save/show the results
+          # get save name and filepath
+        stl_save_name = this_save_name + '.stl'
+        stl_save_filepath = os.path.join(part_dir, stl_save_name)
+    
+        if save_stl:
+            stl_mesh.save(stl_save_filepath)
+    
+        if show_stl:
+            #Open3D approach
+            # vis = o3d.visualization.Visualizer()
+            # vis.create_window()
+            # vis.add_geometry(stl_mesh)
+            # vis.run()
+            # vis.destroy_window()
+        
+            #   #attempt to load stl to ensure saving worked
+            # opened_mesh = o3d.io.read_triangle_model(stl_save_filepath)
+            # visualize(opened_mesh)
+        
+            #Matplotlib approach
+            # Create a new plot
+            figure = plt.figure()
+            axes = figure.add_subplot(projection='3d')
+        
+            # Load the STL files and add the vectors to the plot
+            opened_mesh = Mesh.from_file(stl_save_filepath)
+            poly_collection = mplot3d.art3d.Poly3DCollection(opened_mesh.vectors)
+            poly_collection.set_color((0.7,0.7,0.7))  # play with color
+            axes.add_collection3d(poly_collection)
+        
+            # Show the plot to the screen
+            plt.show()
+    
+    #%% (opt, 4)
+    #Matplotlib approach
+    # Create a new plot
+    figure = plt.figure()
+    axes = figure.add_subplot(projection='3d')
+
+    # Load the STL files and add the vectors to the plot
+    opened_mesh = Mesh.from_file(stl_save_filepath)
+    poly_collection = mplot3d.art3d.Poly3DCollection(opened_mesh.vectors)
+    poly_collection.set_color((0.7,0.7,0.7))  # play with color
+    axes.add_collection3d(poly_collection)
+
+    # Show the plot to the screen
+    plt.show()
 
 
