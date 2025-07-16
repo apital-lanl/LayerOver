@@ -29,7 +29,7 @@ import numpy as np
 from tqdm.auto import tqdm
 
   #LayerOver imports
-from part_gcode import Gcode
+from Part import Gcode
 from Points import Point_Clod
 import Voxel
 

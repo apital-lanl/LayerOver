@@ -37,7 +37,7 @@ from tqdm.auto import tqdm
 
   #Other LayerOver modules
 import Points
-from part_gcode import Gcode
+from Part import Gcode
 
 
 def get_random_point_summaries(gcode_part, n_retrieval_points = 5, \
