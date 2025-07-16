@@ -501,23 +501,28 @@ def voxel_stl_from_gcode(filename_lists = None,
         Wraps up prior versions into a function. Retains cell markers (#%%) for use as a Notebook or in an IDE with appropriate extensions (Spyder natively).
 
     INPUT:
+      (optional)
         filename_lists          2D list with each i,[] list containing a config file and at least one .pgm layer file. If no list is passed, open a dialog to select files.
-
+        save_stl                Save the STL file to the 'filename_lists' directory
+        show_stl                Attempt to visualize STL (not currently working)
+        flip_normals            Flip normals to point 'out' of strand rather than 'in'
+        n_voxel_points          Number of random points to select from parts
+        minimum_point_dist      Minimum distance between gcode points allowed before new points are interpolated
+        voxel_size              Size (in mm) of each voxel's side-length. Voxels should be 'perfect' cubes, but may be off a bit from rounding errors.
+      
+      (deprecated; kept for potential future scope)
+        num_strand_exterior_points  number of surface points to generate at exterior of of each gcode coordinate 
+        size_multiplier         Multiplier to 'blow up' strand size; legacy of prior iterations that's kept for future scope
 
     """
-
-    #save_stl = True
-    #show_stl = False
-    #flip_normals= True
-    #n_voxel_points = 5              #Number of random points to select from parts
-    #num_strand_exterior_points = 5  #IMPORTANT: number of surface points to generate at exterior of of each gcode coordinate
-    #minimum_point_dist = 0.2        #smallest voxel boundary to inperpolate gcode points between (if smaller, ignore interpolation)
-    #voxel_size= 0.01                #size of the actual voxels created for marching cubes algorithm
-    #voxel_grid_size= 5000           #number of grid regions
 
     #Hard-coded contraints
     voxel_max_divisor = 10  #voxel can't be more that this size smaller than 'minimum_point_dist'
     voxel_min_divisor = 2   #voxel can't be less that this size smaller than 'minimum_point_dist'
+      #random-point voxel parameters
+      # Note: different than the voxel array that's returned as an STL; This is the 'camera' voxel that pulls points to feed into the STL voxel
+    n_pixels = 100          #number of pixels in the voxel 'camera'; irrelevant for this function, but kept as an option for future scope
+    radius = 3              #radius of 'camera' to pull points from (in mm); actually pulls a square region defined by the radius with 2*radius per side
 
     ##%% (1.2) Select file(s) to make STLs of
     if filename_lists == None:
@@ -591,8 +596,55 @@ def voxel_stl_from_gcode(filename_lists = None,
     
         try:
             for layer_idx, layer_key in enumerate(layer_keys):
-            
-                these_coordinates = part.layers[layer_key]['coordinates']
+                
+                #generate voxel name
+                voxel_name = str(part_name_guess + "_voxel-" + str(layer_idx))
+                voxel_point_name = str(part_name_guess + "_VoxelPoints" + str(layer_idx))
+                save_name = os.path.join(part_dir, voxel_point_name)
+                
+                #pull voxel features
+                center = point_dicts[layer_idx]['approximate_center']
+                normal_vector = point_dicts[layer_idx]['unit_normal']
+                #TODO: Radius is currently hard-coded by user or default input; could be made to be more flexible here
+                
+                #get voxel bounds and add to dictionary 
+                voxel_dict = get_voxel(center, normal_vector, radius= radius, voxel_depth= 2*radius, n_pixels=n_pixels)
+                voxel_dict = get_layer_points(part, voxel_dict, boundary_buffer_multiplier = 0.2)
+
+                #update voxel_dict
+                voxel_dict.update({'layer_names': layer_list})
+                voxel_dict.update({'voxel_name': voxel_name})
+                voxel_dict.updtae({'save_filepath': save_name})
+                
+                #Visualize voxel
+                voxel_points_visualize(voxel_dict, 
+                           gif = False,
+                           gif_frames = 4,
+                           gif_integrals = 50,
+                           azim_total_degrees = 360,
+                           azim_step = 0,
+                           save_plot = True)
+                    
+                #Flatten array of coordinates to make it homogenous
+                #   (otherwise it's a list of lists, and each sub-list is a different size; this makes numpy sad)
+                voxel_dict.update( {'flat_layer_coordinates':{} } )
+                for layer_key in list(part.layers.keys()):
+                    #flatten coordinate array; kept previously as inhomogenous list to make it easier to parse consecutive strand coordinates
+                       #NOTE: each 'this_list' is a strand of the print
+                    flat_coordinates = []
+                    for this_list in voxel_dict['layer_coordinates'][layer_key]['coordinates']:
+                        for point in this_list:
+                            flat_coordinates.append(point)
+                
+                    #re-wrap these lists as numpy arrays to make the following stuff faster and the syntax clearer (mostly the faster part)
+                    flat_coordinates = np.array(flat_coordinates)
+                    flat_indices = np.array(voxel_dict['layer_coordinates'][layer_key]['indices'])
+                
+                    voxel_dict['flat_layer_coordinates'].update ( {layer_key: {
+                                            'coordinates':flat_coordinates, \
+                                            'indices':flat_indices} })
+
+                these_coordinates = voxel_dict['flat_layer_coordinates']['coordinates']
             
                 #Define variables for this layer
                 this_save_name = f"{part_name_guess}_{layer_key.replace('.txt','')}"
