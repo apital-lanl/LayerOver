@@ -15,28 +15,23 @@ last_modified_date = '2025-07-07'
 
   #System and built-ins
 import os
-# import sys
-# import json
 import math
-# import csv
 from tkinter import Tk, filedialog
 import traceback
 
   #Visualizaiton
 import matplotlib.pyplot as plt
-from matplotlib import animation
 
   #Data Handling
 import numpy as np
-# import pandas as pd
 
   #Utilities
 from tqdm.auto import tqdm
 
   #LayerOver imports
-from Gcode import Gcode
-from Camera import Camera
+from part_gcode import Gcode
 from Points import Point_Clod
+import Voxel
 
 
 # Define package-variables
@@ -126,7 +121,7 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 radius_list = [size/2*size_multiplier for size in part.layer_strand_diameters]
                 
             #Generate center point, normals, etc. from fibonacci points and near neighbors
-            point_dicts = Camera.get_random_point_summaries(part, n_retrieval_points = n_voxel_points, \
+            point_dicts = Voxel.get_random_point_summaries(part, n_retrieval_points = n_voxel_points, \
                                                excluded_point_indcs = [], show_iterations = True)
                 
             # Make voxels and visualize
@@ -146,8 +141,8 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 #TODO: Radius is currently hard-coded by user or default input; could be made to be more flexible here
                 
                 #get voxel bounds and add to dictionary 
-                voxel_dict = Camera.get_voxel(center, normal_vector, radius= radius, voxel_depth= 2*radius, n_pixels=n_pixels)
-                voxel_dict = Camera.get_layer_points(part, voxel_dict, boundary_buffer_multiplier = 0.2)
+                voxel_dict = Voxel.get_voxel(center, normal_vector, radius= radius, voxel_depth= 2*radius, n_pixels=n_pixels)
+                voxel_dict = Voxel.get_layer_points(part, voxel_dict, boundary_buffer_multiplier = 0.2)
 
                 #update voxel_dict
                 voxel_dict.update({'layer_names': layer_list})
@@ -155,7 +150,7 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 voxel_dict.updtae({'save_filepath': save_name})
                 
                 #Visualize voxel
-                Camera.voxel_points_visualize(voxel_dict, 
+                Voxel.voxel_points_visualize(voxel_dict, 
                            gif = False,
                            gif_frames = 4,
                            gif_integrals = 50,

@@ -42,7 +42,7 @@ from scipy.spatial import Delaunay
 from tqdm.auto import tqdm
 
   #Import other LayerUp modules
-from Gcode import Gcode
+from part_gcode import Gcode
 
 
 blank_spec_dict = {
