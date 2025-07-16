@@ -43,7 +43,7 @@ color_lists = {
 }
     
 #################################################################################################################
-def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100, camera_radius = 1,
+def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100, camera_radius = 3,
                     threshold = 1, max_opacity= 0.1, opacity_func = 'fixed-radial', size_multiplier = 1,
                     strand_thickness_func = 'circular'):
     
