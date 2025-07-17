@@ -616,7 +616,7 @@ def voxel_stl_from_gcode(filename_lists = None,
                 #update voxel_dict
                 voxel_dict.update({'layer_names': layer_list})
                 voxel_dict.update({'voxel_name': voxel_name})
-                voxel_dict.updtae({'save_filepath': save_name})
+                voxel_dict.update({'save_filepath': save_name})
                 
                 #Visualize voxel
                 voxel_points_visualize(voxel_dict, 
@@ -645,8 +645,9 @@ def voxel_stl_from_gcode(filename_lists = None,
                     voxel_dict['flat_layer_coordinates'].update ( {layer_key: {
                                             'coordinates':flat_coordinates, \
                                             'indices':flat_indices} })
-
-                these_coordinates = voxel_dict['flat_layer_coordinates']['coordinates']
+                
+                #Pull the flat coordinate list just made
+                these_coordinates = voxel_dict['flat_layer_coordinates'][layer_key]['coordinates']
             
                 #Define variables for this layer
                 this_save_name = f"{part_name_guess}_{layer_key.replace('.txt','')}"
