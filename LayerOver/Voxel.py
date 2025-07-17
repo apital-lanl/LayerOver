@@ -380,7 +380,9 @@ def voxel_points_visualize(voxel_dict,
         gif_integrals       Delay between frames of gif (in msec)
         azim_total_degrees  Number of degrees to spin the graph during the gif
         azim_step           Number of degrees to step spinning graph in each frame of gif
-
+    OUTPU:
+        Returns nothing
+        Opens new window with plot, plots inline, a 
     '''
             
     plot_first_layer = True
@@ -888,7 +890,10 @@ def voxel_stl_from_gcode(filename_lists = None,
             print(traceback.format_exc())
             print('#'*50)
             print()
-    
+        
+        #|  To-be-deleted...
+        #V  Duplicated from code import? Keeping it in case I'm wrong and because I'm too lazy to figure it out right now
+
         # #Save as .xyz file
         # this_save_name = f"{part_name_guess}_points-normals"
         # xyz_save_name = this_save_name + '.xyz'
