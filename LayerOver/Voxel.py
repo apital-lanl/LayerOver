@@ -516,6 +516,8 @@ def voxel_stl_from_gcode(filename_lists = None,
         num_strand_exterior_points  number of surface points to generate at exterior of of each gcode coordinate 
         size_multiplier         Multiplier to 'blow up' strand size; legacy of prior iterations that's kept for future scope
 
+    OUTPU:
+        voxel_dict              Updated with new coordinate measures
     """
 
     #Hard-coded contraints
@@ -590,11 +592,11 @@ def voxel_stl_from_gcode(filename_lists = None,
         
     ##%%  (3.a)
     #Get STL from each point in point_dict
+      #grab appropriate keys to index data from dicts
     point_keys = list(point_dicts.keys())
     layer_keys = list(part.layers.keys())
 
     for point_key in point_keys:
-        this_point_dict = point_dicts[point_key]
     
         try:
             for layer_idx, layer_key in enumerate(layer_keys):
@@ -632,27 +634,30 @@ def voxel_stl_from_gcode(filename_lists = None,
                 voxel_dict.update( {'flat_layer_coordinates':{} } )
                 for layer_key in list(part.layers.keys()):
                     #flatten coordinate array; kept previously as inhomogenous list to make it easier to parse consecutive strand coordinates
-                       #NOTE: each 'this_list' is a strand of the print
+                       #NOTE: each 'this_list' is a strand of the print visible within the 'camera voxel' 
                     flat_coordinates = []
                     for this_list in voxel_dict['layer_coordinates'][layer_key]['coordinates']:
                         for point in this_list:
                             flat_coordinates.append(point)
                 
-                    #re-wrap these lists as numpy arrays to make the following stuff faster and the syntax clearer (mostly the faster part)
+                    #re-wrap lists as numpy arrays to make the following stuff faster and the syntax clearer (mostly the faster part)
                     flat_coordinates = np.array(flat_coordinates)
                     flat_indices = np.array(voxel_dict['layer_coordinates'][layer_key]['indices'])
-                
+                    
+                    #write the flattened results to the returned dict
                     voxel_dict['flat_layer_coordinates'].update ( {layer_key: {
                                             'coordinates':flat_coordinates, \
                                             'indices':flat_indices} })
                 
-                #Pull the flat coordinate list just made
-                these_coordinates = voxel_dict['flat_layer_coordinates'][layer_key]['coordinates']
-            
                 #Define variables for this layer
                 this_save_name = f"{part_name_guess}_{layer_key.replace('.txt','')}"
                 layer_nozzle_size = part.layer_strand_diameters[layer_idx]
                 strand_radius = layer_nozzle_size/2
+
+                    #Pull the flat coordinates and their indices (made just above)
+                these_coordinates = voxel_dict['flat_layer_coordinates'][layer_key]['coordinates']
+                these_indices = voxel_dict['flat_layer_coordinates'][layer_key]['indices']
+
                     # Get max/min boundaries for setting up smart grid coordinates
                 max_x = np.max(these_coordinates[::,0])
                 min_x = np.min(these_coordinates[::,0])
@@ -688,22 +693,30 @@ def voxel_stl_from_gcode(filename_lists = None,
                 points = []
                 normals = []
                     # initialize 'last_position' to first coordinate and get first radial (strand exterior) points
-                last_position = part.layers[layer_key]['coordinates'][0, ::]
+                last_position = these_coordinates[0, ::]
+                last_index = these_indices[0]
                 #Get coordinates and normals
                 pbar = tqdm(total= part.layers[layer_key]['coordinates'].shape[0])  #initialize progress bar
-                for p_idx in range(1, part.layers[layer_key]['coordinates'].shape[0]):
+                for current_index, current_position in zip(these_indices[1::], these_coordinates[1::,::]):
                     pbar.update(1)  #update progress bar
-                    #Get this point and the 'last point', calculate max distance bewteen strand surface points
-                    current_position = part.layers[layer_key]['coordinates'][p_idx, ::]
                     points.append(current_position)
-                        # max distance is bottom of one strand at 'p1' to top of strand at 'p2'; calc. that max distance
-                    p1 = np.array([last_position[0], last_position[1], 0])
-                    p2 = np.array([current_position[0], current_position[1], layer_nozzle_size])
-                    distance = math.sqrt( (p1[0]-p2[0])**2 + \
-                                            (p1[1]-p2[1])**2 + \
-                                            (p1[2]-p2[2])**2)
+                    
+                    #Check if this point is in the same strand as the last point. If not, move on.
+                    if (current_index-last_index)>1:
+                        continuous_point = False
+
+                    else:
+                        continuous_point = True
+                        #Get this point and the 'last point', calculate max distance bewteen strand surface points
+                            # max distance is bottom of one strand at 'p1' to top of strand at 'p2'; calc. that max distance
+                        p1 = np.array([last_position[0], last_position[1], 0])
+                        p2 = np.array([current_position[0], current_position[1], layer_nozzle_size])
+                        distance = math.sqrt( (p1[0]-p2[0])**2 + \
+                                                (p1[1]-p2[1])**2 + \
+                                                (p1[2]-p2[2])**2)
+
                     #Run point-by-point, check if next point is <= 'minimum_point_distance', and interpolate new points if it's not
-                    if distance > minimum_point_dist:
+                    if continuous_point and (distance > minimum_point_dist):
                         num_points = int(distance / minimum_point_dist) + 1
                         if num_points <2:
                             num_points = 2
@@ -717,10 +730,14 @@ def voxel_stl_from_gcode(filename_lists = None,
                             dx = current_position[0] - last_position[0]
                             dy = current_position[1] - last_position[1]
                             dz = current_position[2] - last_position[2]
-                                #normalize the normal vector
-                            length = math.sqrt(dx**2 + dy**2 + dz**2)
+                            if flip_normals:
                                 #rotate -90 degrees to get outward normal (clockwise)
-                            normal_x, normal_y = dy, -dx
+                                dx, dy = dy, -dx
+                            #normalize the normal vector
+                            length = math.sqrt(dx**2 + dy**2 + dz**2)
+                            dx = dx/length
+                            dy = dy/length
+                            dz = dz/length
                             point_normal_vector = [dx, dy, dz]
                             normals.append(point_normal_vector)
 
@@ -767,18 +784,24 @@ def voxel_stl_from_gcode(filename_lists = None,
                             sub_voxel[distance_voxel <= strand_radius] = 1
                                 
                             last_position = current_position
-                        
-                    else:
+                    
+                    #If this point is continous and the distance to the last point doesn't require interpolation, just do the math
+                    elif continuous_point:
                         #Calculate direction vector
                         dx = current_position[0] - last_position[0]
                         dy = current_position[1] - last_position[1]
                         dz = current_position[2] - last_position[2]
-                            #normalize the normal vector
-                        length = math.sqrt(dx**2 + dy**2 + dz**2)
+                        if flip_normals:
                             #rotate -90 degrees to get outward normal (clockwise)
-                        normal_x, normal_y = dy, -dx
+                            dx, dy = dy, -dx
+                        #normalize the normal vector
+                        length = math.sqrt(dx**2 + dy**2 + dz**2)
+                        dx = dx/length
+                        dy = dy/length
+                        dz = dz/length
                         point_normal_vector = [dx, dy, dz]
-                        
+                        normals.append(point_normal_vector)
+
                         #Get voxel to line-segment (strand) distance matrix
                             #focus in on only voxel region this segment occupies
                         vox_x_min = min(current_position[0], last_position[0])
@@ -808,8 +831,9 @@ def voxel_stl_from_gcode(filename_lists = None,
                                             y_min_idx:y_max_idx,
                                             z_min_idx:z_max_idx]
                         sub_voxel_array = sub_voxel_locations.reshape(3,-1).T  #make the m,n,o,3 array into an mxnxo,3 array for speed
-                            #ironically, get rid of that speed by adding a FOR loop
-                        #TODO: vectorize and speed this up by a lot
+                        
+                        #ironically, get rid of that speed by adding a FOR loop
+                          #TODO: vectorize and speed this up by a lot
                         distance_array = []
                         for idx in range(sub_voxel_array.shape[0]):
                             distance_array.append(Points.point_line_distance(sub_voxel_array[idx], last_position, current_position))
@@ -819,8 +843,13 @@ def voxel_stl_from_gcode(filename_lists = None,
                                                                 z_max_idx-z_min_idx)
                             #mark all of the global 'voxels' voxels that are "within" the strand as calculated above
                         sub_voxel[distance_voxel <= strand_radius] = 1
-                                
+
                         last_position = current_position
+
+                    else:
+                        last_position = current_position
+                        normals.append([0,0,0])
+                    
                     
                 pbar.close()  #close progress bar
             
@@ -892,8 +921,8 @@ def voxel_stl_from_gcode(filename_lists = None,
             print('#'*50)
             print()
         
-        #|  To-be-deleted...
-        #V  Duplicated from code import? Keeping it in case I'm wrong and because I'm too lazy to figure it out right now
+        # |  To-be-deleted...
+        # V  Duplicated from code import? Keeping it in case I'm wrong and because I'm too lazy to figure it out right now
 
         # #Save as .xyz file
         # this_save_name = f"{part_name_guess}_points-normals"
@@ -963,3 +992,5 @@ def voxel_stl_from_gcode(filename_lists = None,
         
         #     # Show the plot to the screen
         #     plt.show()
+
+    return voxel_dict
