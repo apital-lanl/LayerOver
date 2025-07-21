@@ -668,6 +668,14 @@ def voxel_stl_from_gcode(filename_lists = None,
                 x_dim = abs(max_x-min_x)
                 y_dim = abs(max_y-min_y)
                 z_dim = abs(max_z-min_z)
+                # Make sure the dimensions allow for full strand size
+                if x_dim < (strand_radius*2)*1.5:
+                    x_dim = (strand_radius*2)*1.5
+                if y_dim < (strand_radius*2)*1.5:
+                    y_dim = (strand_radius*2)*1.5
+                if z_dim < (strand_radius*2)*1.5:
+                    z_dim = (strand_radius*2)*1.5
+                
                     # adjust parameters for new size constraints
                 if (layer_nozzle_size/minimum_point_dist < 2):
                     minimum_point_dist = layer_nozzle_size/2
@@ -682,12 +690,20 @@ def voxel_stl_from_gcode(filename_lists = None,
                 # Convert a point cloud to a voxel grid; Create an empty voxel grid
                     #create the global voxel array
                 voxels = np.zeros((voxel_x_grid_size, voxel_y_grid_size, voxel_z_grid_size))
+                
                     #create arrays of actual locations to index point coordinates to voxel array indices
                 half_voxel_size = voxel_size/2
                 voxel_x_locations = np.linspace(min_x-(5*half_voxel_size), max_x+(5*half_voxel_size), voxel_x_grid_size)
                 voxel_y_locations = np.linspace(min_y-(5*half_voxel_size), max_y+(5*half_voxel_size), voxel_y_grid_size)
                 voxel_z_locations = np.linspace(min_z-(5*half_voxel_size), max_z+(5*half_voxel_size), voxel_z_grid_size)
-                voxel_locations = np.vstack(np.meshgrid(voxel_x_locations,voxel_y_locations,voxel_z_locations))
+                   #generate meshed grid of locations (3, x_dim, y_dim, z_dim)
+                mesh_locations = np.array(np.meshgrid(voxel_x_locations,voxel_x_locations,voxel_z_locations, indexing='ij'))
+                   #populate voxel_locations array
+                   #TODO: this is inelegant, but I'm having trouble getting my head around an alternative
+                voxel_locations = np.zeros((voxel_x_grid_size, voxel_y_grid_size, voxel_z_grid_size, 3))
+                voxel_locations[::, ::, ::, 0] = mesh_locations[0, ::, ::, ::]
+                voxel_locations[::, ::, ::, 1] = mesh_locations[1, ::, ::, ::]
+                voxel_locations[::, ::, ::, 2] = mesh_locations[2, ::, ::, ::]
             
                 #Initialize variables for looping through gcode points
                 points = []
@@ -768,7 +784,8 @@ def voxel_stl_from_gcode(filename_lists = None,
                                                 z_min_idx:z_max_idx]
                             sub_voxel_locations = voxel_locations[x_min_idx:x_max_idx,
                                                 y_min_idx:y_max_idx,
-                                                z_min_idx:z_max_idx]
+                                                z_min_idx:z_max_idx,
+                                                ::]
                             sub_voxel_array = sub_voxel_locations.reshape(3,-1).T  #make the m,n,o,3 array into an mxnxo,3 array for speed
                                 #ironically, get rid of that speed by adding a FOR loop
                             #TODO: vectorize and speed this up by a lot
@@ -829,7 +846,8 @@ def voxel_stl_from_gcode(filename_lists = None,
                                             z_min_idx:z_max_idx]
                         sub_voxel_locations = voxel_locations[x_min_idx:x_max_idx,
                                             y_min_idx:y_max_idx,
-                                            z_min_idx:z_max_idx]
+                                            z_min_idx:z_max_idx, 
+                                            ::]
                         sub_voxel_array = sub_voxel_locations.reshape(3,-1).T  #make the m,n,o,3 array into an mxnxo,3 array for speed
                         
                         #ironically, get rid of that speed by adding a FOR loop
