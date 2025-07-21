@@ -697,13 +697,9 @@ def voxel_stl_from_gcode(filename_lists = None,
                 voxel_y_locations = np.linspace(min_y-(5*half_voxel_size), max_y+(5*half_voxel_size), voxel_y_grid_size)
                 voxel_z_locations = np.linspace(min_z-(5*half_voxel_size), max_z+(5*half_voxel_size), voxel_z_grid_size)
                    #generate meshed grid of locations (3, x_dim, y_dim, z_dim)
-                mesh_locations = np.array(np.meshgrid(voxel_x_locations,voxel_x_locations,voxel_z_locations, indexing='ij'))
+                mesh_locations = np.meshgrid(voxel_x_locations,voxel_x_locations,voxel_z_locations, indexing='ij')
                    #populate voxel_locations array
-                   #TODO: this is inelegant, but I'm having trouble getting my head around an alternative
-                voxel_locations = np.zeros((voxel_x_grid_size, voxel_y_grid_size, voxel_z_grid_size, 3))
-                voxel_locations[::, ::, ::, 0] = mesh_locations[0, ::, ::, ::]
-                voxel_locations[::, ::, ::, 1] = mesh_locations[1, ::, ::, ::]
-                voxel_locations[::, ::, ::, 2] = mesh_locations[2, ::, ::, ::]
+                voxel_locations = np.stack([mesh_locations[0], mesh_locations[1], mesh_locations[2]], axis= 3)
             
                 #Initialize variables for looping through gcode points
                 points = []
@@ -787,7 +783,8 @@ def voxel_stl_from_gcode(filename_lists = None,
                                                 z_min_idx:z_max_idx,
                                                 ::]
                             sub_voxel_array = sub_voxel_locations.reshape(3,-1).T  #make the m,n,o,3 array into an mxnxo,3 array for speed
-                                #ironically, get rid of that speed by adding a FOR loop
+                            
+                            #ironically, get rid of that speed by adding a FOR loop
                             #TODO: vectorize and speed this up by a lot
                             distance_array = []
                             for idx in range(sub_voxel_array.shape[0]):
