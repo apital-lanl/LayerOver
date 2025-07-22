@@ -380,9 +380,9 @@ def voxel_points_visualize(voxel_dict,
         gif_integrals       Delay between frames of gif (in msec)
         azim_total_degrees  Number of degrees to spin the graph during the gif
         azim_step           Number of degrees to step spinning graph in each frame of gif
-    OUTPU:
+    OUTPUT:
         Returns nothing
-        Opens new window with plot, plots inline, a 
+        Opens new window with plot, plots inline, and/or saves a plot to a chosen folder. 
     '''
             
     plot_first_layer = True
