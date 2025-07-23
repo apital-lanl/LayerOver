@@ -697,7 +697,7 @@ def voxel_stl_from_gcode(filename_lists = None,
                 voxel_y_locations = np.linspace(min_y-(5*half_voxel_size), max_y+(5*half_voxel_size), voxel_y_grid_size)
                 voxel_z_locations = np.linspace(min_z-(5*half_voxel_size), max_z+(5*half_voxel_size), voxel_z_grid_size)
                    #generate meshed grid of locations (3, x_dim, y_dim, z_dim)
-                mesh_locations = np.meshgrid(voxel_x_locations,voxel_x_locations,voxel_z_locations, indexing='ij')
+                mesh_locations = np.meshgrid(voxel_x_locations,voxel_y_locations,voxel_z_locations, indexing='ij')
                    #populate voxel_locations array
                 voxel_locations = np.stack([mesh_locations[0], mesh_locations[1], mesh_locations[2]], axis= 3)
             
