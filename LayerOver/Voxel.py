@@ -521,8 +521,10 @@ def voxel_stl_from_gcode(filename_lists = None,
     """
 
     #Hard-coded contraints
-    voxel_max_divisor = 10  #voxel can't be more that this size smaller than 'minimum_point_dist'
-    voxel_min_divisor = 2   #voxel can't be less that this size smaller than 'minimum_point_dist'
+    voxel_max_divisor = 10    #voxel can't be more that this size smaller than 'minimum_point_dist'
+      #NOTE: this is mostly useless in the current iteration; set to 10000 to allow for arbitrarily-small voxels
+    voxel_min_divisor = 10000 #voxel can't be less that this size smaller than 'minimum_point_dist'
+        
       #random-point voxel parameters
       # Note: different than the voxel array that's returned as an STL; This is the 'camera' voxel that pulls points to feed into the STL voxel
     n_pixels = 100          #number of pixels in the voxel 'camera'; irrelevant for this function, but kept as an option for future scope
@@ -600,7 +602,7 @@ def voxel_stl_from_gcode(filename_lists = None,
     
         try:
             for layer_idx, layer_key in enumerate(layer_keys):
-                
+
                 #generate voxel name
                 voxel_name = str(part_name_guess + "_voxel-" + str(layer_idx))
                 voxel_point_name = str(part_name_guess + "_VoxelPoints" + str(layer_idx))
@@ -652,7 +654,7 @@ def voxel_stl_from_gcode(filename_lists = None,
                 #Define variables for this layer
                 this_save_name = f"{part_name_guess}_{layer_key.replace('.txt','')}"
                 layer_nozzle_size = part.layer_strand_diameters[layer_idx]
-                strand_radius = layer_nozzle_size/2
+
 
                     #Pull the flat coordinates and their indices (made just above)
                 these_coordinates = voxel_dict['flat_layer_coordinates'][layer_key]['coordinates']
@@ -675,21 +677,28 @@ def voxel_stl_from_gcode(filename_lists = None,
                     y_dim = (strand_radius*2)*1.5
                 if z_dim < (strand_radius*2)*1.5:
                     z_dim = (strand_radius*2)*1.5
+                    
+                #get strand radius and adjust min number of voxels to get at least 10 per strand
+                strand_radius = layer_nozzle_size/2
+                min_number_voxels = layer_nozzle_size//voxel_size +2  #add 2 to accomodate strand cutoff on either end due to rounding
+                  #want the strand to be represented by at least 5 voxels for best results
+                if min_number_voxels < 11:
+                    min_number_voxels = 11
                 
                     # adjust parameters for new size constraints
                 if (layer_nozzle_size/minimum_point_dist < 2):
                     minimum_point_dist = layer_nozzle_size/2
                     print(f"Adjusting 'minimum_point_dist' to: {round(minimum_point_dist, 3)}")
-                if (minimum_point_dist/voxel_size > voxel_max_divisor) or (minimum_point_dist/voxel_size < voxel_min_divisor):
-                    #Make sure the voxel size is 'well-matched' to strand diameter
-                    voxel_size = round(minimum_point_dist/voxel_min_divisor, 5)
+                # if (minimum_point_dist/voxel_size > voxel_max_divisor) or (minimum_point_dist/voxel_size < voxel_min_divisor):
+                #     #Make sure the voxel size is 'well-matched' to strand diameter
+                #     voxel_size = round(minimum_point_dist/voxel_min_divisor, 5)
                 voxel_x_grid_size = round(x_dim/voxel_size) + 10
                 voxel_y_grid_size = round(y_dim/voxel_size) + 10
                 voxel_z_grid_size = round(z_dim/voxel_size) + 10
 
                 # Convert a point cloud to a voxel grid; Create an empty voxel grid
                     #create the global voxel array
-                voxels = np.zeros((voxel_x_grid_size, voxel_y_grid_size, voxel_z_grid_size))
+                voxels = np.zeros((voxel_x_grid_size, voxel_y_grid_size, voxel_z_grid_size), dtype=np.int8)
                 
                     #create arrays of actual locations to index point coordinates to voxel array indices
                 half_voxel_size = voxel_size/2
@@ -706,17 +715,17 @@ def voxel_stl_from_gcode(filename_lists = None,
                 normals = []
                     # initialize 'last_position' to first coordinate and get first radial (strand exterior) points
                 last_position = these_coordinates[0, ::]
-                last_index = these_indices[0]
+                last_index = int(these_indices[0])
                 #Get coordinates and normals
                 pbar = tqdm(total= part.layers[layer_key]['coordinates'].shape[0])  #initialize progress bar
                 for current_index, current_position in zip(these_indices[1::], these_coordinates[1::,::]):
                     pbar.update(1)  #update progress bar
                     points.append(current_position)
+                    current_index = int(current_index)
                     
                     #Check if this point is in the same strand as the last point. If not, move on.
                     if (current_index-last_index)>1:
                         continuous_point = False
-
                     else:
                         continuous_point = True
                         #Get this point and the 'last point', calculate max distance bewteen strand surface points
@@ -768,34 +777,64 @@ def voxel_stl_from_gcode(filename_lists = None,
                             z_min_idx = np.argmin(np.abs(voxel_z_locations - vox_z_min))
                             z_max_idx = np.argmin(np.abs(voxel_z_locations - vox_z_max))
                                 #make sure indices are actually the max or min in absolute value
-                            x_min_idx = min(x_min_idx, x_max_idx)
-                            x_max_idx = max(x_min_idx, x_max_idx)
-                            y_min_idx = min(y_min_idx, y_max_idx)
-                            y_max_idx = max(y_min_idx, y_max_idx)
-                            z_min_idx = min(z_min_idx, z_max_idx)
-                            z_max_idx = max(z_min_idx, z_max_idx)
+                            x_min_idx = int(min(x_min_idx, x_max_idx))
+                            x_max_idx = int(max(x_min_idx, x_max_idx))
+                            y_min_idx = int(min(y_min_idx, y_max_idx))
+                            y_max_idx = int(max(y_min_idx, y_max_idx))
+                            z_min_idx = int(min(z_min_idx, z_max_idx))
+                            z_max_idx = int(max(z_min_idx, z_max_idx))
+                              #make sure indices don't flag a zero-length
+                            if x_min_idx==x_max_idx:
+                                x_slice = slice(x_min_idx - min_number_voxels//2, 
+                                                x_max_idx + min_number_voxels//2)
+                            else:
+                                x_slice = slice(x_min_idx, x_max_idx)
+                            
+                            if y_min_idx==y_max_idx:
+                                y_slice = slice(y_min_idx - min_number_voxels//2, 
+                                                y_max_idx + min_number_voxels//2)
+                            else:
+                                y_slice = slice(y_min_idx, y_max_idx)
+                            
+                            if z_min_idx==z_max_idx:
+                                z_slice = slice(z_min_idx - min_number_voxels//2, 
+                                                z_max_idx + min_number_voxels//2)
+                            else:
+                                z_slice = slice(z_min_idx, z_max_idx)
+                                
                                 #pull sub-region of interest
-                            sub_voxel = voxels[x_min_idx:x_max_idx,
-                                                y_min_idx:y_max_idx,
-                                                z_min_idx:z_max_idx]
-                            sub_voxel_locations = voxel_locations[x_min_idx:x_max_idx,
-                                                y_min_idx:y_max_idx,
-                                                z_min_idx:z_max_idx,
-                                                ::]
+                            sub_voxel = voxels[x_slice,
+                                                y_slice,
+                                                z_slice]
+                            sub_voxel_locations = voxel_locations[x_slice,
+                                                                y_slice,
+                                                                z_slice,
+                                                                ::]
                             sub_voxel_array = sub_voxel_locations.reshape(3,-1).T  #make the m,n,o,3 array into an mxnxo,3 array for speed
                             
                             #ironically, get rid of that speed by adding a FOR loop
                             #TODO: vectorize and speed this up by a lot
                             distance_array = []
                             for idx in range(sub_voxel_array.shape[0]):
-                                distance_array.append(Points.point_line_distance(sub_voxel_array[idx], last_position, current_position))
+                                this_distance = Points.point_line_distance(sub_voxel_array[idx], last_position, current_position)
+                                distance_array.append(this_distance)
                             distance_array = np.array(distance_array)
-                                #shape back into orginal size 
-                            distance_voxel = distance_array.reshape(x_max_idx-x_min_idx,
-                                                                    y_max_idx-y_min_idx,
-                                                                    z_max_idx-z_min_idx)
+                            #shape back into orginal size 
+                              #need to account for zero-length indices if min_idx and max_idx are the same
+                            index_tuple = [x_max_idx-x_min_idx,
+                                           y_max_idx-y_min_idx,
+                                           z_max_idx-z_min_idx]
+                            if type(x_slice) == int:
+                                index_tuple[0]=1
+                            if type(y_slice) ==int:
+                                index_tuple[1]=1
+                            if type(z_slice) ==int:
+                                index_tuple[2]=1
+                            index_tuple = tuple(index_tuple)
+                            distance_voxel = distance_array.reshape(index_tuple)
                                 #mark all of the global 'voxels' voxels that are "within" the strand as calculated above
                             sub_voxel[distance_voxel <= strand_radius] = 1
+                            voxels[x_slice, y_slice, z_slice] = sub_voxel
                                 
                             last_position = current_position
                     
@@ -831,33 +870,63 @@ def voxel_stl_from_gcode(filename_lists = None,
                         z_min_idx = np.argmin(np.abs(voxel_z_locations - vox_z_min))
                         z_max_idx = np.argmin(np.abs(voxel_z_locations - vox_z_max))
                             #make sure indices are actually the max or min in absolute value
-                        x_min_idx = min(x_min_idx, x_max_idx)
-                        x_max_idx = max(x_min_idx, x_max_idx)
-                        y_min_idx = min(y_min_idx, y_max_idx)
-                        y_max_idx = max(y_min_idx, y_max_idx)
-                        z_min_idx = min(z_min_idx, z_max_idx)
-                        z_max_idx = max(z_min_idx, z_max_idx)
-                            #pull sub-region of interest
-                        sub_voxel = voxels[x_min_idx:x_max_idx,
-                                            y_min_idx:y_max_idx,
-                                            z_min_idx:z_max_idx]
-                        sub_voxel_locations = voxel_locations[x_min_idx:x_max_idx,
-                                            y_min_idx:y_max_idx,
-                                            z_min_idx:z_max_idx, 
-                                            ::]
+                        x_min_idx = int(min(x_min_idx, x_max_idx))
+                        x_max_idx = int(max(x_min_idx, x_max_idx))
+                        y_min_idx = int(min(y_min_idx, y_max_idx))
+                        y_max_idx = int(max(y_min_idx, y_max_idx))
+                        z_min_idx = int(min(z_min_idx, z_max_idx))
+                        z_max_idx = int(max(z_min_idx, z_max_idx))
+                          #make sure indices don't flag a zero-length
+                        if x_min_idx==x_max_idx:
+                            x_slice = slice(x_min_idx - min_number_voxels//2, 
+                                            x_max_idx + min_number_voxels//2)
+                        else:
+                            x_slice = slice(x_min_idx, x_max_idx)
+                        
+                        if y_min_idx==y_max_idx:
+                            y_slice = slice(y_min_idx - min_number_voxels//2, 
+                                            y_max_idx + min_number_voxels//2)
+                        else:
+                            y_slice = slice(y_min_idx, y_max_idx)
+                        
+                        if z_min_idx==z_max_idx:
+                            z_slice = slice(z_min_idx - min_number_voxels//2, 
+                                            z_max_idx + min_number_voxels//2)
+                        else:
+                            z_slice = slice(z_min_idx, z_max_idx)
+                            
+                        #pull sub-region of interest
+                        sub_voxel = voxels[x_slice,
+                                            y_slice,
+                                            z_slice]
+                        sub_voxel_locations = voxel_locations[x_slice,
+                                                            y_slice,
+                                                            z_slice,
+                                                            ::]
                         sub_voxel_array = sub_voxel_locations.reshape(3,-1).T  #make the m,n,o,3 array into an mxnxo,3 array for speed
                         
                         #ironically, get rid of that speed by adding a FOR loop
-                          #TODO: vectorize and speed this up by a lot
+                        #TODO: vectorize and speed this up by a lot
                         distance_array = []
                         for idx in range(sub_voxel_array.shape[0]):
                             distance_array.append(Points.point_line_distance(sub_voxel_array[idx], last_position, current_position))
-                            #shape back into orginal size 
-                        distance_voxel = distance_array.reshape(x_max_idx-x_min_idx,
-                                                                y_max_idx-y_min_idx,
-                                                                z_max_idx-z_min_idx)
+                        distance_array = np.array(distance_array)
+                        #shape back into orginal size 
+                          #need to account for zero-length indices if min_idx and max_idx are the same
+                        index_tuple = [x_max_idx-x_min_idx,
+                                       y_max_idx-y_min_idx,
+                                       z_max_idx-z_min_idx]
+                        if type(x_slice) == int:
+                            index_tuple[0]=1
+                        if type(y_slice) ==int:
+                            index_tuple[1]=1
+                        if type(z_slice) ==int:
+                            index_tuple[2]=1
+                        index_tuple = tuple(index_tuple)
+                        distance_voxel = distance_array.reshape(index_tuple)
                             #mark all of the global 'voxels' voxels that are "within" the strand as calculated above
                         sub_voxel[distance_voxel <= strand_radius] = 1
+                        voxels[x_slice, y_slice, z_slice] = sub_voxel
 
                         last_position = current_position
 
