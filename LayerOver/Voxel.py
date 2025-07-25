@@ -671,21 +671,18 @@ def voxel_stl_from_gcode(filename_lists = None,
                 y_dim = abs(max_y-min_y)
                 z_dim = abs(max_z-min_z)
                 # Make sure the dimensions allow for full strand size
-                if x_dim < (strand_radius*2)*1.5:
-                    x_dim = (strand_radius*2)*1.5
-                if y_dim < (strand_radius*2)*1.5:
-                    y_dim = (strand_radius*2)*1.5
-                if z_dim < (strand_radius*2)*1.5:
-                    z_dim = (strand_radius*2)*1.5
+                if x_dim < layer_nozzle_size*1.5:
+                    x_dim = layer_nozzle_size*1.5
+                if y_dim < layer_nozzle_size*1.5:
+                    y_dim = layer_nozzle_size*1.5
+                if z_dim < layer_nozzle_size*1.5:
+                    z_dim = layer_nozzle_size*1.5
                     
                 #get strand radius and adjust min number of voxels to get at least 10 per strand
                 strand_radius = layer_nozzle_size/2
                 min_number_voxels = layer_nozzle_size//voxel_size +2  #add 2 to accomodate strand cutoff on either end due to rounding
-                  #want the strand to be represented by at least 5 voxels for best results
-                if min_number_voxels < 11:
-                    min_number_voxels = 11
-                
-                    # adjust parameters for new size constraints
+                    
+                # adjust parameters for new size constraints
                 if (layer_nozzle_size/minimum_point_dist < 2):
                     minimum_point_dist = layer_nozzle_size/2
                     print(f"Adjusting 'minimum_point_dist' to: {round(minimum_point_dist, 3)}")
@@ -718,8 +715,9 @@ def voxel_stl_from_gcode(filename_lists = None,
                 last_index = int(these_indices[0])
                 #Get coordinates and normals
                 pbar = tqdm(total= part.layers[layer_key]['coordinates'].shape[0])  #initialize progress bar
-                for current_index, current_position in zip(these_indices[1::], these_coordinates[1::,::]):
+                for curr_idx, current_index in enumerate(these_indices[1::]):
                     pbar.update(1)  #update progress bar
+                    current_position = these_coordinates[curr_idx+1, ::]
                     points.append(current_position)
                     current_index = int(current_index)
                     
@@ -783,34 +781,50 @@ def voxel_stl_from_gcode(filename_lists = None,
                             y_max_idx = int(max(y_min_idx, y_max_idx))
                             z_min_idx = int(min(z_min_idx, z_max_idx))
                             z_max_idx = int(max(z_min_idx, z_max_idx))
-                              #make sure indices don't flag a zero-length
-                            if x_min_idx==x_max_idx:
-                                x_slice = slice(x_min_idx - min_number_voxels//2, 
-                                                x_max_idx + min_number_voxels//2)
-                            else:
-                                x_slice = slice(x_min_idx, x_max_idx)
                             
-                            if y_min_idx==y_max_idx:
-                                y_slice = slice(y_min_idx - min_number_voxels//2, 
-                                                y_max_idx + min_number_voxels//2)
-                            else:
-                                y_slice = slice(y_min_idx, y_max_idx)
-                            
-                            if z_min_idx==z_max_idx:
-                                z_slice = slice(z_min_idx - min_number_voxels//2, 
-                                                z_max_idx + min_number_voxels//2)
-                            else:
-                                z_slice = slice(z_min_idx, z_max_idx)
+                            #make sure values are within the index
+                            if x_min_idx<0:
+                                x_min_idx=0
+                            if y_min_idx<0:
+                                y_min_idx=0
+                            if z_min_idx<0:
+                                z_min_idx=0
                                 
-                                #pull sub-region of interest
-                            sub_voxel = voxels[x_slice,
-                                                y_slice,
-                                                z_slice]
+                            if x_max_idx >= voxels.shape[0]:
+                                x_max_idx=(voxels.shape[0]-1)
+                            if y_max_idx >= voxels.shape[1]:
+                                y_max_idx=(voxels.shape[1]-1)
+                            if z_max_idx >= voxels.shape[2]:
+                                z_max_idx=(voxels.shape[2]-1)
+                              
+                            #make sure voxel includes at least 1 strand diameter in each dimension
+                            if (x_max_idx- x_min_idx) < min_number_voxels:
+                                x_min_idx = int(x_min_idx - min_number_voxels//2)
+                                x_max_idx = int(x_max_idx + min_number_voxels//2)
+                            
+                            if (y_max_idx- y_min_idx) < min_number_voxels:
+                                y_min_idx = int(y_min_idx - min_number_voxels//2)
+                                y_max_idx = int(y_max_idx + min_number_voxels//2)
+                            
+                            if (z_max_idx- z_min_idx) < min_number_voxels:
+                                z_min_idx = int(z_min_idx - min_number_voxels//2)
+                                z_max_idx = int(z_max_idx + min_number_voxels//2)
+                            
+                            x_slice = slice(x_min_idx, x_max_idx)
+                            y_slice = slice(y_min_idx, y_max_idx)
+                            z_slice = slice(z_min_idx, z_max_idx)
+                            
+                            #pull sub-region of interest
+                            sub_voxel = voxels[x_slice, y_slice, z_slice]
                             sub_voxel_locations = voxel_locations[x_slice,
                                                                 y_slice,
                                                                 z_slice,
                                                                 ::]
-                            sub_voxel_array = sub_voxel_locations.reshape(3,-1).T  #make the m,n,o,3 array into an mxnxo,3 array for speed
+                            flat_dimensions = (int((sub_voxel_locations.shape[0])*
+                                                   (sub_voxel_locations.shape[1])*
+                                                   (sub_voxel_locations.shape[2])),3)
+                              #make the m,n,o,3 array into an mxnxo,3 array for speed
+                            sub_voxel_array = sub_voxel_locations.reshape(flat_dimensions)  
                             
                             #ironically, get rid of that speed by adding a FOR loop
                             #TODO: vectorize and speed this up by a lot
@@ -818,19 +832,11 @@ def voxel_stl_from_gcode(filename_lists = None,
                             for idx in range(sub_voxel_array.shape[0]):
                                 this_distance = Points.point_line_distance(sub_voxel_array[idx], last_position, current_position)
                                 distance_array.append(this_distance)
-                            distance_array = np.array(distance_array)
+                            distance_array = np.array(distance_array)  #faster to append to list than concat
                             #shape back into orginal size 
-                              #need to account for zero-length indices if min_idx and max_idx are the same
-                            index_tuple = [x_max_idx-x_min_idx,
-                                           y_max_idx-y_min_idx,
-                                           z_max_idx-z_min_idx]
-                            if type(x_slice) == int:
-                                index_tuple[0]=1
-                            if type(y_slice) ==int:
-                                index_tuple[1]=1
-                            if type(z_slice) ==int:
-                                index_tuple[2]=1
-                            index_tuple = tuple(index_tuple)
+                            index_tuple = (int(x_max_idx-x_min_idx), 
+                                           int(y_max_idx-y_min_idx), 
+                                           int(z_max_idx-z_min_idx))
                             distance_voxel = distance_array.reshape(index_tuple)
                                 #mark all of the global 'voxels' voxels that are "within" the strand as calculated above
                             sub_voxel[distance_voxel <= strand_radius] = 1
@@ -876,53 +882,68 @@ def voxel_stl_from_gcode(filename_lists = None,
                         y_max_idx = int(max(y_min_idx, y_max_idx))
                         z_min_idx = int(min(z_min_idx, z_max_idx))
                         z_max_idx = int(max(z_min_idx, z_max_idx))
-                          #make sure indices don't flag a zero-length
-                        if x_min_idx==x_max_idx:
-                            x_slice = slice(x_min_idx - min_number_voxels//2, 
-                                            x_max_idx + min_number_voxels//2)
-                        else:
-                            x_slice = slice(x_min_idx, x_max_idx)
                         
-                        if y_min_idx==y_max_idx:
-                            y_slice = slice(y_min_idx - min_number_voxels//2, 
-                                            y_max_idx + min_number_voxels//2)
-                        else:
-                            y_slice = slice(y_min_idx, y_max_idx)
+                        #make sure voxel includes at least 1 strand diameter in each dimension
+                        if (x_max_idx- x_min_idx) < min_number_voxels:
+                            x_min_idx = int(x_min_idx - min_number_voxels//2)
+                            x_max_idx = int(x_max_idx + min_number_voxels//2)
                         
-                        if z_min_idx==z_max_idx:
-                            z_slice = slice(z_min_idx - min_number_voxels//2, 
-                                            z_max_idx + min_number_voxels//2)
-                        else:
-                            z_slice = slice(z_min_idx, z_max_idx)
+                        if (y_max_idx- y_min_idx) < min_number_voxels:
+                            y_min_idx = int(y_min_idx - min_number_voxels//2)
+                            y_max_idx = int(y_max_idx + min_number_voxels//2)
+                        
+                        if (z_max_idx- z_min_idx) < min_number_voxels:
+                            z_min_idx = int(z_min_idx - min_number_voxels//2)
+                            z_max_idx = int(z_max_idx + min_number_voxels//2)
+                            
+                        #make sure values are within the index
+                        if x_min_idx<0:
+                            x_min_idx=0
+                        if y_min_idx<0:
+                            y_min_idx=0
+                        if z_min_idx<0:
+                            z_min_idx=0
+                            
+                        if x_max_idx >= voxels.shape[0]:
+                            x_max_idx=(voxels.shape[0]-1)
+                        if y_max_idx >= voxels.shape[1]:
+                            y_max_idx=(voxels.shape[1]-1)
+                        if z_max_idx >= voxels.shape[2]:
+                            z_max_idx=(voxels.shape[2]-1)
+                        
+                        x_slice = slice(x_min_idx, x_max_idx)
+                        y_slice = slice(y_min_idx, y_max_idx)
+                        z_slice = slice(z_min_idx, z_max_idx)
                             
                         #pull sub-region of interest
                         sub_voxel = voxels[x_slice,
-                                            y_slice,
-                                            z_slice]
+                                           y_slice,
+                                           z_slice]
                         sub_voxel_locations = voxel_locations[x_slice,
                                                             y_slice,
                                                             z_slice,
                                                             ::]
-                        sub_voxel_array = sub_voxel_locations.reshape(3,-1).T  #make the m,n,o,3 array into an mxnxo,3 array for speed
+                        
+                        flat_dimensions = (int((sub_voxel_locations.shape[0])*
+                                               (sub_voxel_locations.shape[1])*
+                                               (sub_voxel_locations.shape[2])),3)
+                          
+                          #make the m,n,o,3 array into an mxnxo,3 array for speed
+                        sub_voxel_array = sub_voxel_locations.reshape(flat_dimensions)  
                         
                         #ironically, get rid of that speed by adding a FOR loop
                         #TODO: vectorize and speed this up by a lot
                         distance_array = []
                         for idx in range(sub_voxel_array.shape[0]):
-                            distance_array.append(Points.point_line_distance(sub_voxel_array[idx], last_position, current_position))
-                        distance_array = np.array(distance_array)
+                            this_distance = Points.point_line_distance(sub_voxel_array[idx], last_position, current_position)
+                            distance_array.append(this_distance)
+                        distance_array = np.array(distance_array)  #faster to append to list than concat
                         #shape back into orginal size 
                           #need to account for zero-length indices if min_idx and max_idx are the same
-                        index_tuple = [x_max_idx-x_min_idx,
-                                       y_max_idx-y_min_idx,
-                                       z_max_idx-z_min_idx]
-                        if type(x_slice) == int:
-                            index_tuple[0]=1
-                        if type(y_slice) ==int:
-                            index_tuple[1]=1
-                        if type(z_slice) ==int:
-                            index_tuple[2]=1
-                        index_tuple = tuple(index_tuple)
+                        #shape back into orginal size 
+                        index_tuple = (int(x_max_idx-x_min_idx), 
+                                       int(y_max_idx-y_min_idx), 
+                                       int(z_max_idx-z_min_idx))
                         distance_voxel = distance_array.reshape(index_tuple)
                             #mark all of the global 'voxels' voxels that are "within" the strand as calculated above
                         sub_voxel[distance_voxel <= strand_radius] = 1
