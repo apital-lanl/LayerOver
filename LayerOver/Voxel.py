@@ -841,6 +841,10 @@ def voxel_stl_from_gcode(filename_lists = None,
                                 #mark all of the global 'voxels' voxels that are "within" the strand as calculated above
                             sub_voxel[distance_voxel <= strand_radius] = 1
                             voxels[x_slice, y_slice, z_slice] = sub_voxel
+                            
+                            plt.imshow(voxels[::,::,voxels.shape[2]//2])
+                            plt.title(f"Voxel midline at point {curr_idx}")
+                            plt.show()
                                 
                             last_position = current_position
                     
