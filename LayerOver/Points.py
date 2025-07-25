@@ -634,7 +634,12 @@ def point_line_distance(point, line_segment_start, line_segment_end):
     Description: calculate the min distance between a 3D line segment and a point in 3D space; works in 2D as well, but coordinate systems can't be mixed.
     taken almost verbatim from https://stackoverflow.com/questions/56463412/distance-from-a-point-to-a-line-segment-in-3d-python
     '''
-
+    
+    #Make sure point and arrays are numpy arrays to allow for operator casting (i.e. '-' operator)
+    line_segment_start = np.array(line_segment_start)
+    line_segment_end = np.array(line_segment_end)
+    point = np.array(point)
+    
     # normalized tangent vector
     d = np.divide(line_segment_end - line_segment_start, np.linalg.norm(line_segment_end - line_segment_start))
 
