@@ -781,7 +781,20 @@ def voxel_stl_from_gcode(filename_lists = None,
                             y_max_idx = int(max(y_min_idx, y_max_idx))
                             z_min_idx = int(min(z_min_idx, z_max_idx))
                             z_max_idx = int(max(z_min_idx, z_max_idx))
+                              
+                            #make sure voxel includes at least 1 strand diameter in each dimension
+                            if (x_max_idx- x_min_idx) < min_number_voxels:
+                                x_min_idx = int(x_min_idx - min_number_voxels//2)
+                                x_max_idx = int(x_max_idx + min_number_voxels//2)
                             
+                            if (y_max_idx- y_min_idx) < min_number_voxels:
+                                y_min_idx = int(y_min_idx - min_number_voxels//2)
+                                y_max_idx = int(y_max_idx + min_number_voxels//2)
+                            
+                            if (z_max_idx- z_min_idx) < min_number_voxels:
+                                z_min_idx = int(z_min_idx - min_number_voxels//2)
+                                z_max_idx = int(z_max_idx + min_number_voxels//2)
+                                
                             #make sure values are within the index
                             if x_min_idx<0:
                                 x_min_idx=0
@@ -796,19 +809,6 @@ def voxel_stl_from_gcode(filename_lists = None,
                                 y_max_idx=(voxels.shape[1]-1)
                             if z_max_idx >= voxels.shape[2]:
                                 z_max_idx=(voxels.shape[2]-1)
-                              
-                            #make sure voxel includes at least 1 strand diameter in each dimension
-                            if (x_max_idx- x_min_idx) < min_number_voxels:
-                                x_min_idx = int(x_min_idx - min_number_voxels//2)
-                                x_max_idx = int(x_max_idx + min_number_voxels//2)
-                            
-                            if (y_max_idx- y_min_idx) < min_number_voxels:
-                                y_min_idx = int(y_min_idx - min_number_voxels//2)
-                                y_max_idx = int(y_max_idx + min_number_voxels//2)
-                            
-                            if (z_max_idx- z_min_idx) < min_number_voxels:
-                                z_min_idx = int(z_min_idx - min_number_voxels//2)
-                                z_max_idx = int(z_max_idx + min_number_voxels//2)
                             
                             x_slice = slice(x_min_idx, x_max_idx)
                             y_slice = slice(y_min_idx, y_max_idx)
