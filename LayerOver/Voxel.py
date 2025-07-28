@@ -489,7 +489,8 @@ def voxel_stl_from_gcode(filename_lists = None,
                         flip_normals= True, n_voxel_points = 5,
                         num_strand_exterior_points = 5,
                         minimum_point_dist = 0.2,
-                        voxel_size= 0.01, size_multiplier = 1):
+                        voxel_size= 0.01, size_multiplier = 1,
+                        radius = 3):
     
     """
     Created:   2025-03-26
@@ -511,7 +512,8 @@ def voxel_stl_from_gcode(filename_lists = None,
         n_voxel_points          Number of random points to select from parts
         minimum_point_dist      Minimum distance between gcode points allowed before new points are interpolated
         voxel_size              Size (in mm) of each voxel's side-length. Voxels should be 'perfect' cubes, but may be off a bit from rounding errors.
-      
+        radius                  radius of 'camera' to pull points from (in mm); actually pulls a square region defined by the radius with 2*radius per side
+
       (deprecated; kept for potential future scope)
         num_strand_exterior_points  number of surface points to generate at exterior of of each gcode coordinate 
         size_multiplier         Multiplier to 'blow up' strand size; legacy of prior iterations that's kept for future scope
@@ -528,7 +530,6 @@ def voxel_stl_from_gcode(filename_lists = None,
       #random-point voxel parameters
       # Note: different than the voxel array that's returned as an STL; This is the 'camera' voxel that pulls points to feed into the STL voxel
     n_pixels = 100          #number of pixels in the voxel 'camera'; irrelevant for this function, but kept as an option for future scope
-    radius = 3              #radius of 'camera' to pull points from (in mm); actually pulls a square region defined by the radius with 2*radius per side
 
     ##%% (1.2) Select file(s) to make STLs of
     if filename_lists == None:
@@ -585,8 +586,8 @@ def voxel_stl_from_gcode(filename_lists = None,
         except Exception as e:
             print(traceback.format_exception(*sys.exc_info()))
             print()
-            print("Random failure")
-        
+            print("Failure to produce part from Gcode.")
+            print()
         
     ##%%  (2.b) Get random points to evaluate STLs on
     point_dicts = get_random_point_summaries(part, n_retrieval_points = n_voxel_points, \
@@ -609,8 +610,8 @@ def voxel_stl_from_gcode(filename_lists = None,
                 save_name = os.path.join(part_dir, voxel_point_name)
                 
                 #pull voxel features
-                center = point_dicts[layer_idx]['approximate_center']
-                normal_vector = point_dicts[layer_idx]['unit_normal']
+                center = point_dicts[point_key]['approximate_center']
+                normal_vector = point_dicts[point_key]['unit_normal']
                 #TODO: Radius is currently hard-coded by user or default input; could be made to be more flexible here
                 
                 #get voxel bounds and add to dictionary 
@@ -654,7 +655,6 @@ def voxel_stl_from_gcode(filename_lists = None,
                 #Define variables for this layer
                 this_save_name = f"{part_name_guess}_{layer_key.replace('.txt','')}"
                 layer_nozzle_size = part.layer_strand_diameters[layer_idx]
-
 
                     #Pull the flat coordinates and their indices (made just above)
                 these_coordinates = voxel_dict['flat_layer_coordinates'][layer_key]['coordinates']
@@ -842,11 +842,14 @@ def voxel_stl_from_gcode(filename_lists = None,
                             sub_voxel[distance_voxel <= strand_radius] = 1
                             voxels[x_slice, y_slice, z_slice] = sub_voxel
                             
-                            plt.imshow(voxels[::,::,voxels.shape[2]//2])
-                            plt.title(f"Voxel midline at point {curr_idx}")
-                            plt.show()
+                            #Print each iteration voxel slice at ~1/2 the z-height;
+                            #   extremely slow, but makes for nice visualizations
+                            # plt.imshow(voxels[::,::,voxels.shape[2]//2])
+                            # plt.title(f"Voxel midline at point {curr_idx}")
+                            # plt.show()
                                 
                             last_position = current_position
+                            last_index = current_index
                     
                     #If this point is continous and the distance to the last point doesn't require interpolation, just do the math
                     elif continuous_point:
@@ -953,15 +956,34 @@ def voxel_stl_from_gcode(filename_lists = None,
                         sub_voxel[distance_voxel <= strand_radius] = 1
                         voxels[x_slice, y_slice, z_slice] = sub_voxel
 
+                        #Print each iteration voxel slice at ~1/2 the z-height;
+                        #   extremely slow, but makes for nice visualizations
+                        # plt.imshow(voxels[::,::,voxels.shape[2]//2])
+                        # plt.title(f"Voxel midline at point {curr_idx}")
+                        # plt.show()
+
                         last_position = current_position
+                        last_index = current_index
 
                     else:
                         last_position = current_position
+                        last_index = current_index
                         normals.append([0,0,0])
-                    
-                    
+
+                    #Monitor the voxel fill percentage as points are processed;
+                    #  mostly used for testing, but kind of fun
+                    # total_voxels = 1
+                    # for dim in voxels.shape:
+                    #     total_voxels = dim*total_voxels
+                    # high_voxels = voxels[voxels==1].shape[0]
+                    # low_voxels = voxels[voxels==0].shape[0]
+                    # print(f"Point {current_index+1} of {these_indices.shape[0]}")
+                    # print(f"\t {high_voxels} voxels filled ({round(high_voxels/total_voxels * 100, 2)}%)")
+                    # print(f"\t {low_voxels} voxels filled ({round(low_voxels/total_voxels * 100, 2)}%)")
+                    # print()
+                            
                 pbar.close()  #close progress bar
-            
+                
             #Save as .xyz file
             xyz_save_name = this_save_name + '.xyz'
             xyz_save_filepath = os.path.join(part_dir, xyz_save_name)
@@ -974,7 +996,6 @@ def voxel_stl_from_gcode(filename_lists = None,
                 # calculate the scale factors based on the point cloud dimensions and the voxel grid
             min_bound = np.min(points, axis=0)
             max_bound = np.max(points, axis=0)
-            scales = (max_bound - min_bound) / np.array(voxels.shape)
     
             verts, faces, _, _ = marching_cubes(voxels)
         
@@ -1029,77 +1050,6 @@ def voxel_stl_from_gcode(filename_lists = None,
             print(traceback.format_exc())
             print('#'*50)
             print()
-        
-        # |  To-be-deleted...
-        # V  Duplicated from code import? Keeping it in case I'm wrong and because I'm too lazy to figure it out right now
-
-        # #Save as .xyz file
-        # this_save_name = f"{part_name_guess}_points-normals"
-        # xyz_save_name = this_save_name + '.xyz'
-        # xyz_save_filepath = os.path.join(part_dir, xyz_save_name)
-        # with open(xyz_save_filepath, 'w') as file:
-        #     for point, normal in zip(points, normals):
-        #         file.write(f"{point[0]} {point[1]} {point[2]} {normal[0]} {normal[1]} {normal[2]}\n")
-           
-        # # Convert a point cloud to a voxel grid; Create an empty voxel grid
-        # voxels = np.zeros((voxel_x_grid_size, voxel_y_grid_size, voxel_z_grid_size))
-        # min_bound = np.min(points, axis=0) - voxel_size
-        # max_bound = np.max(points, axis=0) + voxel_size
-        # scales = (max_bound - min_bound) / voxel_size
-        # indices = ((points - min_bound) / scales).astype(int)
-        # for index in indices:
-        #     voxels[index[0], index[1], index[2]] = 1
-    
-        # #Convert a voxel grid to an STL file using the Marching Cubes algorithm, ensuring the output matches the original scale.
-        #     # calculate the scale factors based on the point cloud dimensions and the voxel grid
-        # min_bound = np.min(points, axis=0)
-        # max_bound = np.max(points, axis=0)
-        # scales = (max_bound - min_bound) / np.array(voxels.shape)
-
-        # verts, faces, _, _ = marching_cubes(voxels)
-    
-        #     # scale vertices back to the original point cloud dimensions
-        # verts = verts * scales + min_bound
-        # stl_mesh = Mesh(np.zeros(faces.shape[0], dtype= Mesh.dtype))
-        # if flip_normals:
-        #     # Reverse the order of vertices for each face to flip normals
-        #     faces = faces[:, ::-1]
-        # for i, f in enumerate(faces):
-        #     for j in range(3):
-        #         stl_mesh.vectors[i][j] = verts[f[j], :]
-    
-        # #Save/show the results
-        #     # get save name and filepath
-        # stl_save_name = this_save_name + '.stl'
-        # stl_save_filepath = os.path.join(part_dir, stl_save_name)
-    
-        # if save_stl:
-        #     stl_mesh.save(stl_save_filepath)
-    
-        # if show_stl:
-        #     #Open3D approach
-        #     # vis = o3d.visualization.Visualizer()
-        #     # vis.create_window()
-        #     # vis.add_geometry(stl_mesh)
-        #     # vis.run()
-        #     # vis.destroy_window()
-        
-        #     #   #attempt to load stl to ensure saving worked
-        #     # opened_mesh = o3d.io.read_triangle_model(stl_save_filepath)
-        #     # visualize(opened_mesh)
-        
-        #     #Matplotlib approach
-        #     # Create a new plot
-        #     figure = plt.figure()
-        #     axes = figure.add_subplot(projection='3d')
-        
-        #     # Load the STL files and add the vectors to the plot
-        #     opened_mesh = Mesh.from_file(stl_save_filepath)
-        #     poly_collection = mplot3d.art3d.Poly3DCollection(opened_mesh.vectors)
-        #     poly_collection.set_color((0.7,0.7,0.7))  # play with color
-        #     axes.add_collection3d(poly_collection)
-        
-        #     # Show the plot to the screen
-        #     plt.show()
-
+            
+            
     return voxel_dict
