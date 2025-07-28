@@ -714,7 +714,7 @@ def voxel_stl_from_gcode(filename_lists = None,
                 last_position = these_coordinates[0, ::]
                 last_index = int(these_indices[0])
                 #Get coordinates and normals
-                pbar = tqdm(total= part.layers[layer_key]['coordinates'].shape[0])  #initialize progress bar
+                pbar = tqdm(total= these_indices.shape[0])  #initialize progress bar
                 for curr_idx, current_index in enumerate(these_indices[1::]):
                     pbar.update(1)  #update progress bar
                     current_position = these_coordinates[curr_idx+1, ::]
