@@ -78,7 +78,7 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
     
     if len(filenames_lists) < 1:
         continue_check = True
-        filename_lists = []
+        filenames_lists = []
         while continue_check:
             # Get the names by user selection
             root = Tk()
@@ -86,7 +86,7 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
             root.destroy()
             
             # Sort to get images in left-to-right, top-to-bottom order by index (hopefully)
-            filename_lists.append(these_filenames)
+            filenames_lists.append(these_filenames)
             
             # Ask if user want to add more
             user_report = input("Stitch another set of images (y/n or any key+ENTER to quit)").lower()
@@ -113,7 +113,7 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
         opacity_func = lambda distance: max_opacity * strand_thickness_func(distance) / (2*strand_radius)
     
     #%% (3) Do everything
-    for file_list in filename_lists:
+    for file_list in filenames_lists:
         try:
             part = Gcode()
             part.get_gcode(files = file_list)
@@ -282,12 +282,12 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 #  Adjusts for the fact that strands coallesce to some extent
                 for layer_idx, layer_image in enumerate(layer_opacity_images):
                     #Make adjustments for f'd up base layer
-                    if layer_idx == 1:
+                    if layer_idx == 0:
                         max_squished_opacity = max_opacity * (1-(squish_factor*base_compaction_ratio))  #assume baselayer squishes all over at max-strand-thickness, by about 'base_compaction_ratio'
                         layer_image[layer_image<max_squished_opacity]= max_squished_opacity
                         opacity_array = layer_image
                     #Make adjustments specifically for second layer (interacts w/ f'd up base layer)
-                    elif layer_idx == 2:
+                    elif layer_idx == 1:
                         sum_image = layer_opacity_images[layer_idx-1] * layer_image
                         max_squished_opacity = max_opacity**2 * (1-squish_factor)  #Each overlapping region will be (1-squish_factor) less opaque than expected 
                         max_layer_opacity = max_opacity * (1-squish_factor)
@@ -303,10 +303,14 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
 
                 opacity_image = np.reshape(opacity_array, (n_pixels, n_pixels))
                 voxel_opacity_images.append(opacity_image)
+                partial_name = str(part_name_guess + "-{voxel_name}_CombinedOpacity.npy")
+                save_name = os.path.join(part_dir, partial_name)
+                np.save(save_name, opacity_arrays)
                 
                 plt.imshow(opacity_image)
                 plt.title(f"{voxel_name}-CombinedOpacity")
-                save_name = os.path.join(part_dir, str(voxel_name+ '.png'))
+                partial_name = str(part_name_guess + "-{voxel_name}_CombinedOpacity.png")
+                save_name = os.path.join(part_dir, partial_name)
                 plt.imsave(save_name, opacity_image, dpi=600)
                 plt.show()
             
