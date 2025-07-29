@@ -284,21 +284,21 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                     #Make adjustments for f'd up base layer
                     if layer_idx == 1:
                         max_squished_opacity = max_opacity * (1-(squish_factor*base_compaction_ratio))  #assume baselayer squishes all over at max-strand-thickness, by about 'base_compaction_ratio'
-                        layer_image[layer_image>max_squished_opacity]= max_squished_opacity
+                        layer_image[layer_image<max_squished_opacity]= max_squished_opacity
                         opacity_array = layer_image
                     #Make adjustments specifically for second layer (interacts w/ f'd up base layer)
                     elif layer_idx == 2:
                         sum_image = layer_opacity_images[layer_idx-1] * layer_image
                         max_squished_opacity = max_opacity**2 * (1-squish_factor)  #Each overlapping region will be (1-squish_factor) less opaque than expected 
                         max_layer_opacity = max_opacity * (1-squish_factor)
-                        layer_image[sum_image>max_squished_opacity] = max_layer_opacity
+                        layer_image[sum_image<max_squished_opacity] = max_layer_opacity
                         opacity_array = opacity_array * layer_image
 
                     else:
                         sum_image = layer_opacity_images[layer_idx-1] * layer_image
                         max_squished_opacity = max_opacity**2 * (1-squish_factor)  #Each overlapping region will be (1-squish_factor) less opaque than expected 
                         max_layer_opacity = max_opacity * (1-squish_factor)
-                        layer_image[sum_image>max_squished_opacity] = max_layer_opacity
+                        layer_image[sum_image<max_squished_opacity] = max_layer_opacity
                         opacity_array = opacity_array * layer_image
 
                 opacity_image = np.reshape(opacity_array, (n_pixels, n_pixels))
