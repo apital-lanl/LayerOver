@@ -540,7 +540,7 @@ def voxel_stl_from_gcode(filename_lists = None,
         while continue_check:
             # Get the names by user selection
             root = Tk()
-            filenames = filedialog.askopenfilenames(title= 'Select images to stitch')
+            filenames = filedialog.askopenfilenames(title= 'Select files for a single Part', filetypes=[("LayerUp Files", "*.json *.pgm")])
             root.destroy()
     
             # Sort to get images in left-to-right, top-to-bottom order by index (hopefully)
@@ -1052,4 +1052,115 @@ def voxel_stl_from_gcode(filename_lists = None,
             print()
             
             
+    return voxel_dict
+
+
+def get_voxels_from_filelist(file_list, n_voxel_points = 5, 
+                            n_pixels = 100, camera_radius = 3,
+                            size_multiplier =1):
+
+    ''' v0.1.0  created: 2025-07-28  modified:  2025-07-28
+    
+    Description: Take layer gcode files and a configuration file (LayerUp style) and get opacity measures for 
+    
+    INPUT:
+          #voxel/camera parameters
+        n_voxel_points = Number of points for that get evaluated for opacity in a part
+        n_pixels =       Number of pixels in 'Camera'; Number of pixels in final opacity measure
+        camera_radius =  Radius of points around voxel center to consider
+          #Opacity measure parameters
+        threshold =      Distance between pixel vector and layer point (in mm typically) 
+        max_opacity =    Max decrement multiplier of light crossing through thickest part of strand
+        opacity_func =   Function to use for calculating opacity from distance-to-strand-center normal measure
+            'fixed-radial'- assumes a constant, round shape 
+    '''
+
+    try:
+        part = Gcode()
+        part.get_gcode(files = file_list)
+            
+            #get names of layers
+        layer_list = list(part.layers.keys())
+            
+            #auto-generate part name guess and assign directory to save to
+        part_dir = os.path.dirname(part.config_path)
+        part_name_guess = os.path.basename(part_dir)
+            
+            #check if there's a single strand diameter
+        if part.strand_diameter != 0:
+            strand_radius = part.strand_diameter/2*size_multiplier
+            homogenous_strand_size = True
+            radius_list = [size/2*size_multiplier for size in part.layer_strand_diameters]
+        else:
+            homogenous_strand_size = False
+            radius_list = [size/2*size_multiplier for size in part.layer_strand_diameters]
+                
+        #Generate center point, normals, etc. from fibonacci points and near neighbors
+        point_dicts = get_random_point_summaries(part, n_retrieval_points = n_voxel_points, \
+                                            excluded_point_indcs = [], show_iterations = True)
+                
+        # Make voxels and visualize
+        voxel_opacity_images = []
+        for idx, key in enumerate(list(point_dicts.keys())):
+                
+            #generate voxel name
+            voxel_name = str(part_name_guess + "_voxel-" + str(idx))
+            voxel_point_name = str(part_name_guess + "_VoxelPoints" + str(idx))
+            save_name = os.path.join(part_dir, voxel_point_name)
+                
+            #pull voxel features
+            center = point_dicts[idx]['approximate_center']
+            normal_vector = point_dicts[idx]['unit_normal']
+            radius = camera_radius      #TODO: leave option to make this layer-defined
+            #TODO: Radius is currently hard-coded by user or default input; could be made to be more flexible here
+                
+            #get voxel bounds and add to dictionary 
+            voxel_dict = get_voxel(center, normal_vector, radius= radius, voxel_depth= 2*radius, n_pixels=n_pixels)
+            voxel_dict = get_layer_points(part, voxel_dict, boundary_buffer_multiplier = 0.2)
+
+            #update voxel_dict
+            voxel_dict.update({'layer_names': layer_list})
+            voxel_dict.update({'voxel_name': voxel_name})
+            voxel_dict.updtae({'save_filepath': save_name})
+                
+            #Visualize voxel
+            voxel_points_visualize(voxel_dict, 
+                        gif = False,
+                        gif_frames = 4,
+                        gif_integrals = 50,
+                        azim_total_degrees = 360,
+                        azim_step = 0,
+                        save_plot = True)
+                    
+            #Flatten array of coordinates to make it homogenous
+            #   (otherwise it's a list of lists, and each sub-list is a different size; this makes numpy sad)
+            voxel_dict.update( {'flat_layer_coordinates':{} } )
+            for layer_key in list(part.layers.keys()):
+                #flatten coordinate array; kept previously as inhomogenous list to make it easier to parse consecutive strand coordinates
+                    #NOTE: each 'this_list' is a strand of the print
+                flat_coordinates = []
+                for this_list in voxel_dict['layer_coordinates'][layer_key]['coordinates']:
+                    for point in this_list:
+                        flat_coordinates.append(point)
+                
+                #re-wrap these lists as numpy arrays to make the following stuff faster and the syntax clearer (mostly the faster part)
+                flat_coordinates = np.array(flat_coordinates)
+                flat_indices = np.array(voxel_dict['layer_coordinates'][layer_key]['indices'])
+                
+                voxel_dict['flat_layer_coordinates'].update ( {layer_key: {
+                                        'coordinates':flat_coordinates, \
+                                        'indices':flat_indices} })
+
+        voxel_dict.update({'point_dicts': point_dicts})
+        voxel_dict.update({'radius_list': radius_list})
+                
+    except IndexError as IE:
+        print()
+        print(IE)
+        print()
+        print(traceback.format_exc())   
+        print()
+
+        voxel_dict == None
+
     return voxel_dict
