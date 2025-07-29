@@ -73,7 +73,8 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
             'fixed-radial'- assumes a constant, round shape 
     '''
 
-    squish_factor = 0.7
+    squish_factor= 0.3          #compaction ratio vs. ideal stack (0.3 = 30% compaction, i.e. 1" part ends up being 0.7")
+    base_compaction_ratio= 0.2  #ratio of total 'squish_factor' that occurs at the baseplate; i.e. '0.3' means 30% of normal compaction occurs at baseplate
     
     if len(filenames_lists) < 1:
         continue_check = True
@@ -281,12 +282,13 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 #  Adjusts for the fact that strands coallesce to some extent
                 for layer_idx, layer_image in enumerate(layer_opacity_images):
                     if layer_idx == 1:
-                        max_squished_opacity = 0.1 * squish_factor/4  #assume baselayer squishes all over, about 20%
+                        max_squished_opacity = max_opacity * (1-(squish_factor*base_compaction_ratio))  #assume baselayer squishes all over at max-strand-thickness, by about 'base_compaction_ratio'
                         layer_image[layer_image>max_squished_opacity]= max_squished_opacity
                         opacity_array = layer_image
                     elif layer_idx ==2:
-                        sum_image = layer_opacity_images[layer_idx-1] + 
-                        
+                        sum_image = layer_opacity_images[layer_idx-1] * layer_image
+                        max_squished_opacity = max_opacity**2 * (1-squish_factor)  #Each overlapping region will be (1-squish_factor) less opaque than expected 
+
                     else:
 
 
@@ -338,6 +340,8 @@ def opacity_from_voxel_dict(voxel_dict = None, file_list = None, n_voxel_points 
         opacity_func        Function to use for calculating opacity from distance-to-strand-center normal measure
             'fixed-radial'- assumes a constant, round shape 
     '''
+
+    squish_factor = 0.3    #compaction ratio vs. ideal stack (0.3 = 30% compaction, i.e. 1" part ends up being 0.7")
 
     if voxel_dict == None:
         if file_list == None:
