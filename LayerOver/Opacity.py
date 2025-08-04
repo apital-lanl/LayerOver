@@ -303,13 +303,13 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
 
                 opacity_image = np.reshape(opacity_array, (n_pixels, n_pixels))
                 voxel_opacity_images.append(opacity_image)
-                partial_name = str(part_name_guess + "-{voxel_name}_CombinedOpacity.npy")
+                partial_name = str(part_name_guess + f"-{voxel_name}_CombinedOpacity.npy")
                 save_name = os.path.join(part_dir, partial_name)
                 np.save(save_name, opacity_image)
                 
                 plt.imshow(opacity_image)
                 plt.title(f"{voxel_name}-CombinedOpacity")
-                partial_name = str(part_name_guess + "-{voxel_name}_CombinedOpacity.png")
+                partial_name = str(part_name_guess + f"-{voxel_name}_CombinedOpacity.png")
                 save_name = os.path.join(part_dir, partial_name)
                 plt.imsave(save_name, opacity_image, dpi=600)
                 plt.show()
