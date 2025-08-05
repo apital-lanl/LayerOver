@@ -312,13 +312,13 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                 opacity_image = np.reshape(opacity_array, (n_pixels, n_pixels))
                 voxel_opacity_images.append(opacity_image)
                 #Save the numpy array
-                partial_name = f"-{voxel_name}_CombinedOpacity.npy"
+                partial_name = f"_{voxel_name}_CombinedOpacity.npy"
                 save_name = os.path.join(part_dir, partial_name)
                 np.save(save_name, opacity_image)
                 #Show and save the opacity image
                 plt.imshow(opacity_image)
                 plt.title(f"{voxel_name}-CombinedOpacity")
-                partial_name =  f"-{voxel_name}_CombinedOpacity.png"
+                partial_name =  f"_{voxel_name}_CombinedOpacity.png"
                 save_name = os.path.join(part_dir, partial_name)
                 plt.imsave(save_name, opacity_image, dpi=600)
                 plt.show()
@@ -651,13 +651,14 @@ def process_directory_numpy_arrays(directory=None):
         
             #While walking, look for SEAM filetypes
             main_filetype = file.split('.')[-1].lower()
-            if main_filetype == "npy":
-            
+            if (main_filetype == "npy"):
                 #Do the filename stuff
                 this_name = file.replace('.npy', '').lower()
                 this_filepath = os.path.join(root, file)
-                numpy_array_filenames.append(this_name)
-                numpy_array_filepaths.append(this_filepath)
+                #Make sure only the layer files are being added; otherwise things get annoying
+                if ('voxel' in this_name) and ('layer' in this_name):
+                    numpy_array_filenames.append(this_name)
+                    numpy_array_filepaths.append(this_filepath)
    
     #Run through collected numpy arrays and partition results
     for this_name, this_filepath in zip(numpy_array_filenames, numpy_array_filepaths):
@@ -671,16 +672,33 @@ def process_directory_numpy_arrays(directory=None):
                 voxel_name = part
             if 'layer' in part.lower():
                 layer_name = part
+            #Covers case if underscores have been naughty
+            if voxel_name == layer_name:
+                split_name = voxel_name.split('-')
+                voxel_idx = 10  #dummy variable to keep unboundlocalerror happy
+                for idx, part in enumerate(split_name):
+                    if 'voxel' in part:
+                        voxel_name = part
+                        voxel_idx = idx
+                    if 'layer' in part:
+                        layer_name = part
+                    if idx == (voxel_idx +1):
+                        voxel_name = f"{voxel_name}-{part}"
+
 
         #Try adding to dict, update dict if it doesn't work
         try:
-            opacity_dict[structure_name]['numpy_filenames'] = opacity_dict[structure_name]['numpy_filenames'].append(this_name)
-            opacity_dict[structure_name]['numpy_filepaths'] = opacity_dict[structure_name]['numpy_filepaths'].append(this_filepath)
+            name_list = opacity_dict[structure_name]['numpy_filenames'].append(this_name)
+            opacity_dict[structure_name]['numpy_filenames'] = name_list
+            filepath_list = opacity_dict[structure_name]['numpy_filepaths'].append(this_filepath)
+            opacity_dict[structure_name]['numpy_filepaths'] = filepath_list
             
             #Try adding to existing voxel, otherwise add voxel to structure dict
             try:
-                opacity_dict[structure_name][voxel_name]['layer_names'] = opacity_dict[structure_name][voxel_name]['layer_names'].append(layer_name)
-                opacity_dict[structure_name][voxel_name]['layer_filepaths'] = opacity_dict[structure_name][voxel_name]['layer_filepaths'].append(this_filepath)
+                name_list = opacity_dict[structure_name][voxel_name]['layer_names']
+                opacity_dict[structure_name][voxel_name]['layer_names'] = name_list.append(layer_name)
+                filepath_list = opacity_dict[structure_name][voxel_name]['layer_filepaths'].append(this_filepath)
+                opacity_dict[structure_name][voxel_name]['layer_filepaths'] = filepath_list
             except KeyError:
                 opacity_dict[structure_name].update({
                     voxel_name:{
@@ -691,7 +709,18 @@ def process_directory_numpy_arrays(directory=None):
                         }
                     }
                                                     )
+            
         except KeyError:
+            opacity_dict.update({
+                structure_name: {
+                    'numpy_filenames': [this_name],
+                    'numpy_filepaths': [this_filepath]
+                    }
+                }
+                                )
+            
+            
+        except AttributeError:
             opacity_dict.update({
                 structure_name: {
                     'numpy_filenames': [this_name],
