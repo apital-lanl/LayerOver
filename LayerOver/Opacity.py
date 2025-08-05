@@ -13,6 +13,7 @@ version = '0.1.0'
 last_modified_date = '2024-10-08'
 
   #System and built-ins
+from operator import itemgetter
 import os
 import sys
 import json
@@ -43,15 +44,18 @@ blank_spec_dict = {
     'n_pixels': 100,                #Number of pixels in 'Camera'; Number of pixels in final opacity measure
     'camera_radius': 1,             #Radius of points around voxel center to consider
     'distance_cutoff_threshold': 1, #distance between pixel vector and layer point (in mm typically) 
-    'max_opacity': 0.1,             # max decrement multiplier of light crossing through thickest part of strand
+    'max_opacity': 0.1,             #decrease/250um; max decrement multiplier of light crossing through thickest part of strand
     }
-
 general_opacity_func = lambda distance: max_opacity * (math.sqrt(strand_radius**2 - distance**2) / strand_radius)
-
-
+default_full_strand_opacity = 0.1           #decrease/250um; max decrement multiplier of light crossing through thickest part of strand
+default_opacity_function = 'fixed-radial'   #
+default_squish_factor= 0.3                  #compaction ratio vs. ideal stack (0.3 = 30% compaction, i.e. 1" part ends up being 0.7")
+default_base_compaction_ratio= 0.2          #ratio of total 'squish_factor' that occurs at the baseplate; i.e. '0.3' means 30% of normal compaction occurs at baseplate
 
 def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100, camera_radius = 3,
-                    threshold = 1, max_opacity= 0.1, opacity_func = 'fixed-radial', size_multiplier = 1,
+                    max_opacity= default_full_strand_opacity, 
+                    opacity_func = default_opacity_function,
+                    threshold = 1, size_multiplier = 1, 
                     strand_thickness_func = 'circular'):
     
     ''' v1.0.1  created: 2024-10-06  modified:  2025-07-28
@@ -73,8 +77,8 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
             'fixed-radial'- assumes a constant, round shape 
     '''
 
-    squish_factor= 0.3          #compaction ratio vs. ideal stack (0.3 = 30% compaction, i.e. 1" part ends up being 0.7")
-    base_compaction_ratio= 0.2  #ratio of total 'squish_factor' that occurs at the baseplate; i.e. '0.3' means 30% of normal compaction occurs at baseplate
+    squish_factor= default_squish_factor                    #compaction ratio vs. ideal stack (0.3 = 30% compaction, i.e. 1" part ends up being 0.7")
+    base_compaction_ratio= default_base_compaction_ratio    #ratio of total 'squish_factor' that occurs at the baseplate; i.e. '0.3' means 30% of normal compaction occurs at baseplate
     
     if len(filenames_lists) < 1:
         continue_check = True
@@ -250,11 +254,14 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                         #TODO: this is an inelegant solution; need better scoping here
                         except ValueError:
                             min_distance = strand_radius + (strand_radius*0.1)
-                          #check if strand radius is homogenous; if so, use that value, otherwise get layer's individual radius
+                        #check if strand radius is homogenous; if so, use that value, otherwise get layer's individual radius
+                        #TODO: add difference flags if the layers have different strand diameters
                         if homogenous_strand_size:
-                            pass  #strand_radius will already be defined
+                            strand_radius = radius_list[l_idx]
+                            max_opacity = max_opacity * (strand_radius/250) #adjust max opacity to account for 250um nozzle nominal assumption
                         else:
                             strand_radius = radius_list[l_idx]
+                            max_opacity = max_opacity * (strand_radius/250) #adjust max opacity to account for 250um nozzle nominal assumption
                         
                           #get an opacity if there's actually a strand in this pixel
                         if min_distance <= strand_radius:
@@ -274,7 +281,7 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                     plt.imsave(save_name, layer_opacity_image, dpi=600)
                     plt.show()
 
-                    partial_layer_name = str(part_name_guess + f"_{voxel_name}-{layer_key}.npy")
+                    partial_layer_name = f"_{voxel_name}-{layer_key}.npy"
                     save_name = os.path.join(part_dir, partial_layer_name)
                     np.save(save_name, layer_opacity_image)
                 
@@ -300,16 +307,18 @@ def opacity_from_gcode(filenames_lists = [], n_voxel_points = 5, n_pixels = 100,
                         max_layer_opacity = max_opacity * (1-squish_factor)
                         layer_image[sum_image<max_squished_opacity] = max_layer_opacity
                         opacity_array = opacity_array * layer_image
-
+                
+                #Clean up the opacity image
                 opacity_image = np.reshape(opacity_array, (n_pixels, n_pixels))
                 voxel_opacity_images.append(opacity_image)
-                partial_name = str(part_name_guess + f"-{voxel_name}_CombinedOpacity.npy")
+                #Save the numpy array
+                partial_name = f"-{voxel_name}_CombinedOpacity.npy"
                 save_name = os.path.join(part_dir, partial_name)
                 np.save(save_name, opacity_image)
-                
+                #Show and save the opacity image
                 plt.imshow(opacity_image)
                 plt.title(f"{voxel_name}-CombinedOpacity")
-                partial_name = str(part_name_guess + f"-{voxel_name}_CombinedOpacity.png")
+                partial_name =  f"-{voxel_name}_CombinedOpacity.png"
                 save_name = os.path.join(part_dir, partial_name)
                 plt.imsave(save_name, opacity_image, dpi=600)
                 plt.show()
@@ -336,6 +345,8 @@ def opacity_from_voxel_dict(voxel_dict = None, file_list = None, n_voxel_points 
                     strand_thickness_func = 'circular'):
     
     ''' v0.1.0  created: 2025-07-28  modified:  2025-07-28
+
+    NOTE: Not a full alpha; needs substantial work
     
     Description: Get opacity straight from a 'voxel_dict' that includes flattened voxel coordinate lists.
         If no flattened coordinates exist, try to make them. If that fails, make a new voxel_dict from user-defined
@@ -351,7 +362,10 @@ def opacity_from_voxel_dict(voxel_dict = None, file_list = None, n_voxel_points 
         threshold           Distance between pixel vector and layer point (in mm typically) 
         max_opacity         Max decrement multiplier of light crossing through thickest part of strand
         opacity_func        Function to use for calculating opacity from distance-to-strand-center normal measure
-            'fixed-radial'- assumes a constant, round shape 
+            'fixed-radial'- assumes a constant, round shape
+
+    TODO:
+        - fix first pass alpha results
     '''
 
     squish_factor = 0.3    #compaction ratio vs. ideal stack (0.3 = 30% compaction, i.e. 1" part ends up being 0.7")
@@ -516,10 +530,210 @@ def opacity_from_voxel_dict(voxel_dict = None, file_list = None, n_voxel_points 
     return voxel_dict
 
 
-def adjust_opacity_for_squish(layer_array, combined_opacity_array,
-                              full_strand_opacity = 0.1,
-                              opacity_function = 'fixed-radial'):
+def adjust_opacity_for_squish(layer_arrays,
+                              combined_opacity_array = None,
+                              layer_index = None,
+                              max_opacities = None,
+                              full_strand_opacity = default_full_strand_opacity,
+                              opacity_function = default_opacity_function,
+                              squish_factor = default_squish_factor,
+                              compaction_ratio = default_base_compaction_ratio):
+                              
+    
+    ''' v0.1.0  created: 2025-08-05  modified:  2025-08-05
+    
+    Description: Run through opacity arrays for each layer of a print and combine them based on 'squishy' factors. 
+        I.e. strands coallesce with each other and with the underlying substrate, so modify the opacities to reflect that loss of material.
+    
+    INPUT:
+        layer_arrays-      iterable of arrays for each layer; can handle lists or numpy arrays
 
-    pass
+    TODO:
+        - lor
+    '''
 
-    # return new_combined_opacity_array
+    #Make sure 'layer_arrays' is a numpy array and define its shape
+    if type(layer_arrays) == list:
+        layer_arrays = np.array(layer_arrays)
+    layer_arrays_shape = layer_arrays.shape
+    layer_shape = tuple(layer_arrays_shape[1::])
+
+    if combined_opacity_array == None:
+        opacity_array = np.ones(layer_shape)
+
+    #If no layer defined, run the full array
+    if layer_index == None:
+        layer_index = layer_arrays_shape[0]  #Assume first index is the number of layers; otherwise wtf is this array, you know?
+        indices_list = list(range(layer_index+1))
+    #If select layers are defined, pretend first layer is a base layer and just run with it
+    #TODO: have a think about whether this should/could do something useful
+    elif (type(layer_index) == list):
+        indices_list = layer_index
+    else:
+        indices_list = list(range(layer_index+1))
+    
+    #If no 'max_opacity' has been passed, just use the layer values to find a (hopefully) appropriate one
+    if type(max_opacities) == None:
+        max_opacities = []
+        for layer_index in indices_list:
+            this_max = max(layer_arrays[layer_index, ::])
+            max_opacities.append(this_max)
+    #If a list of 'max_opacities' is already defined, try and use them.
+    elif type(max_opacities) == list:
+        if len(max_opacities)==len(indices_list):
+            pass #great
+        else:
+            pass #TODO: handle this case, but it's an edge case and will error out right away
+    #If the max opacitiy is a float or int, just use that for everything
+    #TODO: add case that includes numpy numerical types
+    elif (type(max_opacities)==int) or (type(max_opacities)==float):
+        max_opacities = [max_opacities for idx in (range(len(indices_list)+1))]
+    
+    #Combine each layer opacity into a single voxel's opacity
+    for layer_idx, max_opacity in zip(indices_list, max_opacities):
+
+        layer_image = layer_arrays[layer_idx, ::]
+
+        #Make adjustments for f'd up base layer
+        if layer_idx == 0:
+            max_squished_opacity = max_opacity * (1-(squish_factor * compaction_ratio))  #assume baselayer squishes all over at max-strand-thickness, by about 'base_compaction_ratio'
+            layer_image[layer_image<max_squished_opacity]= max_squished_opacity
+            opacity_array = layer_image
+        #Make adjustments specifically for second layer (interacts w/ f'd up base layer)
+        elif layer_idx == 1:
+            sum_image = layer_arrays[layer_idx-1, ::] * layer_image
+            max_squished_opacity = max_opacity**2 * (1-squish_factor)  #Each overlapping region will be (1-squish_factor) less opaque than expected 
+            max_layer_opacity = max_opacity * (1-squish_factor)
+            layer_image[sum_image<max_squished_opacity] = max_layer_opacity
+            opacity_array = opacity_array * layer_image
+        else:
+            sum_image = layer_arrays[layer_idx-1] * layer_image
+            max_squished_opacity = max_opacity**2 * (1-squish_factor)  #Each overlapping region will be (1-squish_factor) less opaque than expected 
+            max_layer_opacity = max_opacity * (1-squish_factor)
+            layer_image[sum_image<max_squished_opacity] = max_layer_opacity
+            opacity_array = opacity_array * layer_image
+    
+    return opacity_array
+
+
+def process_directory_numpy_arrays(directory=None):
+    ''' v0.1.0  created: 2025-08-05  modified:  2025-08-05
+    
+    Description: 
+    
+    INPUT:
+        directory-      if empty, open a dialog to select a directory to walk
+
+    TODO:
+        - lor
+    '''
+
+    #Initialize variables
+    opacity_dict = {}
+    numpy_array_filenames = []
+    numpy_array_filepaths = []
+
+    #Select directory if none provided or a non-path is provided
+    if directory == None:
+        root = Tk()
+        directory = filedialog.askdirectory(title="Select a directory with numpy layer arrays")
+        root.destroy()
+    elif not os.isdir(directory):
+        root = Tk()
+        directory = filedialog.askdirectory(title="Select a directory with numpy layer arrays")
+        root.destroy()
+
+    #Walk the directory and grab all numpy arrays
+    for root, dirs, files in os.walk(directory, topdown = True):
+        for file in files:
+            this_filepath = os.path.join(root, file)
+            immediate_directory_basename = os.path.basename(root)
+        
+            #While walking, look for SEAM filetypes
+            main_filetype = file.split('.')[-1].lower()
+            if main_filetype == "npy":
+            
+                #Do the filename stuff
+                this_name = file.replace('.npy', '').lower()
+                this_filepath = os.path.join(root, file)
+                numpy_array_filenames.append(this_name)
+                numpy_array_filepaths.append(this_filepath)
+   
+    #Run through collected numpy arrays and partition results
+    for this_name, this_filepath in zip(numpy_array_filenames, numpy_array_filepaths):
+        name_split_list= this_name.split('_')
+        #Assuming structure like "5H-01_5H-01_voxel-X_layer-X"
+        structure_name = name_split_list[0]
+        voxel_name = 'unk'
+        layer_name = 'unk'
+        for part in name_split_list:
+            if 'voxel' in part.lower():
+                voxel_name = part
+            if 'layer' in part.lower():
+                layer_name = part
+
+        #Try adding to dict, update dict if it doesn't work
+        try:
+            opacity_dict[structure_name]['numpy_filenames'] = opacity_dict[structure_name]['numpy_filenames'].append(this_name)
+            opacity_dict[structure_name]['numpy_filepaths'] = opacity_dict[structure_name]['numpy_filepaths'].append(this_filepath)
+            
+            #Try adding to existing voxel, otherwise add voxel to structure dict
+            try:
+                opacity_dict[structure_name][voxel_name]['layer_names'] = opacity_dict[structure_name][voxel_name]['layer_names'].append(layer_name)
+                opacity_dict[structure_name][voxel_name]['layer_filepaths'] = opacity_dict[structure_name][voxel_name]['layer_filepaths'].append(this_filepath)
+            except KeyError:
+                opacity_dict[structure_name].update({
+                    voxel_name:{
+                        'layer_names': [layer_name],
+                        'layer_filepaths': [this_filepath],
+                        'layer_stats':{},
+                        'combined_opacity_stats':{}
+                        }
+                    }
+                                                    )
+        except KeyError:
+            opacity_dict.update({
+                structure_name: {
+                    'numpy_filenames': [this_name],
+                    'numpy_filepaths': [this_filepath]
+                    }
+                }
+                                )
+
+    #Run through partitioned results and generate combined opacity
+    key_list = [this_key for this_key in list(opacity_dict.keys()) if ('numpy' not in this_key)]
+    for voxel_name in key_list:
+        voxel_dict = opacity_dict[voxel_name]
+        layer_names = voxel_dict['layer_names']
+        layer_filepaths = voxel_dict['layer_filepaths']
+        layer_indices = [(name, int(name.split('-')[-1]), filepath) for name, filepath in zip(layer_names, layer_filepaths)]
+        sorted_layers = sorted(layer_indices, key=itemgetter(1))
+        layers_array = []
+        for layer_tuple in sorted_layers:
+            this_name = layer_tuple[0]
+            #Open the numpy array
+            this_filepath = layer_tuple[2]
+            this_layer = np.load(this_filepath)
+            layers_array.append(this_layer)
+            #Run some stats on this layer's opacity alone and add to dictionary
+             #
+             # TODO: run the stats
+             #
+            voxel_dict['layer_stats'].update({
+                this_name:{
+                    'max_opacity': 0,
+                    'min_opacity': 0,
+                    'average_opacity': 0,
+                    }
+                })
+
+        new_layers_array = adjust_opacity_for_squish(layers_array)
+        #Run some stats on this layer's opacity alone and add to dictionary
+        #
+        # TODO: run the stats
+        #
+        voxel_dict['combined_opacity_stats'].update({
+                    'max_opacity': 0,
+                    'min_opacity': 0,
+                    'average_opacity': 0,
+                    })
