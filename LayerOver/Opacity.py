@@ -29,6 +29,7 @@ import matplotlib.pyplot as plt
 
   #Data Handling
 import numpy as np
+import pandas as pd
 
   #Utilities
 from tqdm.auto import tqdm
@@ -538,9 +539,8 @@ def adjust_opacity_for_squish(layer_arrays,
                               opacity_function = default_opacity_function,
                               squish_factor = default_squish_factor,
                               compaction_ratio = default_base_compaction_ratio):
-                              
     
-    ''' v0.1.0  created: 2025-08-05  modified:  2025-08-05
+    ''' v0.1.0  created: 2025-08-05  modified:  2025-08-06
     
     Description: Run through opacity arrays for each layer of a print and combine them based on 'squishy' factors. 
         I.e. strands coallesce with each other and with the underlying substrate, so modify the opacities to reflect that loss of material.
@@ -563,7 +563,7 @@ def adjust_opacity_for_squish(layer_arrays,
 
     #If no layer defined, run the full array
     if layer_index == None:
-        layer_index = layer_arrays_shape[0]  #Assume first index is the number of layers; otherwise wtf is this array, you know?
+        layer_index = layer_arrays_shape[0]-1  #Assume first index is the number of layers; otherwise wtf is this array, you know?
         indices_list = list(range(layer_index+1))
     #If select layers are defined, pretend first layer is a base layer and just run with it
     #TODO: have a think about whether this should/could do something useful
@@ -573,10 +573,10 @@ def adjust_opacity_for_squish(layer_arrays,
         indices_list = list(range(layer_index+1))
     
     #If no 'max_opacity' has been passed, just use the layer values to find a (hopefully) appropriate one
-    if type(max_opacities) == None:
+    if max_opacities == None:
         max_opacities = []
         for layer_index in indices_list:
-            this_max = max(layer_arrays[layer_index, ::])
+            this_max = layer_arrays[layer_index, ::].max()
             max_opacities.append(this_max)
     #If a list of 'max_opacities' is already defined, try and use them.
     elif type(max_opacities) == list:
@@ -616,10 +616,14 @@ def adjust_opacity_for_squish(layer_arrays,
     return opacity_array
 
 
-def process_directory_numpy_arrays(directory=None):
+def process_directory_numpy_arrays(directory=None,
+                                   save_combined_json = True,
+                                   save_combined_csv = True):
+    
     ''' v0.1.0  created: 2025-08-05  modified:  2025-08-05
     
-    Description: 
+    Description: Walk a selected directory, identify all numpy arrays associated with toolpaths for voxel layers, 
+        and create a new combined opacity and associated dictionary of summary stats.
     
     INPUT:
         directory-      if empty, open a dialog to select a directory to walk
@@ -663,7 +667,7 @@ def process_directory_numpy_arrays(directory=None):
     #Run through collected numpy arrays and partition results
     for this_name, this_filepath in zip(numpy_array_filenames, numpy_array_filepaths):
         name_split_list= this_name.split('_')
-        #Assuming structure like "5H-01_5H-01_voxel-X_layer-X"
+        #Assuming structure like "5H-01_5H-01_voxel-X_layerX"
         structure_name = name_split_list[0]
         voxel_name = 'unk'
         layer_name = 'unk'
@@ -688,16 +692,20 @@ def process_directory_numpy_arrays(directory=None):
 
         #Try adding to dict, update dict if it doesn't work
         try:
-            name_list = opacity_dict[structure_name]['numpy_filenames'].append(this_name)
+            name_list = opacity_dict[structure_name]['numpy_filenames']
+            name_list.append(this_name)
             opacity_dict[structure_name]['numpy_filenames'] = name_list
-            filepath_list = opacity_dict[structure_name]['numpy_filepaths'].append(this_filepath)
+            filepath_list = opacity_dict[structure_name]['numpy_filepaths']
+            filepath_list.append(this_filepath)
             opacity_dict[structure_name]['numpy_filepaths'] = filepath_list
             
             #Try adding to existing voxel, otherwise add voxel to structure dict
             try:
                 name_list = opacity_dict[structure_name][voxel_name]['layer_names']
-                opacity_dict[structure_name][voxel_name]['layer_names'] = name_list.append(layer_name)
-                filepath_list = opacity_dict[structure_name][voxel_name]['layer_filepaths'].append(this_filepath)
+                name_list.append(layer_name)
+                opacity_dict[structure_name][voxel_name]['layer_names'] = name_list
+                filepath_list = opacity_dict[structure_name][voxel_name]['layer_filepaths']
+                filepath_list.append(this_filepath)
                 opacity_dict[structure_name][voxel_name]['layer_filepaths'] = filepath_list
             except KeyError:
                 opacity_dict[structure_name].update({
@@ -709,60 +717,180 @@ def process_directory_numpy_arrays(directory=None):
                         }
                     }
                                                     )
-            
         except KeyError:
             opacity_dict.update({
                 structure_name: {
                     'numpy_filenames': [this_name],
-                    'numpy_filepaths': [this_filepath]
-                    }
-                }
-                                )
-            
-            
-        except AttributeError:
-            opacity_dict.update({
-                structure_name: {
-                    'numpy_filenames': [this_name],
-                    'numpy_filepaths': [this_filepath]
+                    'numpy_filepaths': [this_filepath],
+                    voxel_name:{
+                        'layer_names': [layer_name],
+                        'layer_filepaths': [this_filepath],
+                        'layer_stats':{},
+                        'combined_opacity_stats':{}
+                        }
                     }
                 }
                                 )
 
     #Run through partitioned results and generate combined opacity
-    key_list = [this_key for this_key in list(opacity_dict.keys()) if ('numpy' not in this_key)]
-    for voxel_name in key_list:
-        voxel_dict = opacity_dict[voxel_name]
-        layer_names = voxel_dict['layer_names']
-        layer_filepaths = voxel_dict['layer_filepaths']
-        layer_indices = [(name, int(name.split('-')[-1]), filepath) for name, filepath in zip(layer_names, layer_filepaths)]
-        sorted_layers = sorted(layer_indices, key=itemgetter(1))
-        layers_array = []
-        for layer_tuple in sorted_layers:
-            this_name = layer_tuple[0]
-            #Open the numpy array
-            this_filepath = layer_tuple[2]
-            this_layer = np.load(this_filepath)
-            layers_array.append(this_layer)
-            #Run some stats on this layer's opacity alone and add to dictionary
-             #
-             # TODO: run the stats
-             #
-            voxel_dict['layer_stats'].update({
-                this_name:{
-                    'max_opacity': 0,
-                    'min_opacity': 0,
-                    'average_opacity': 0,
-                    }
-                })
+    for structure_name in list(opacity_dict.keys()):
+        
+        key_list = [this_key for this_key in list(opacity_dict[structure_name].keys()) if ('numpy' not in this_key)]
+        for voxel_name in key_list:
+            voxel_dict = opacity_dict[structure_name][voxel_name]
+            layer_names = voxel_dict['layer_names']
+            layer_filepaths = voxel_dict['layer_filepaths']
+            layer_indices = []
+            #Convoluted solution, but accomodates existing layer gcode files and is mildly flexible
+            #TODO: add support for other formats of layer indexing (i.e. "layer-XXX", "layer(X)", etc.)
+            for name, filepath in zip(layer_names, layer_filepaths):
+                last_numerical_idx = 0 
+                for check_idx in range(-1,-4,-1):
+                    if (name[check_idx].isnumeric()) and (last_numerical_idx > check_idx):
+                        last_numerical_idx = check_idx
+                layer_idx = ''
+                for idx in range(last_numerical_idx, 0, 1):
+                    layer_idx = str(layer_idx) + str(name[idx])
+                layer_idx = int(layer_idx)
+                this_tuple = (name, layer_idx, filepath)
+                layer_indices.append(this_tuple)
+    
+            sorted_layers = sorted(layer_indices, key=itemgetter(1))
+            layers_array = []
+            for layer_tuple in sorted_layers:
+                this_layer_name = layer_tuple[0]
+                #Open the numpy array
+                this_filepath = layer_tuple[2]
+                this_layer_array = np.load(this_filepath)
+                layers_array.append(this_layer_array)
+                try:
+                    #Run some stats on this layer's opacity alone and add to dictionary
+                    this_summary_dict = get_opacity_array_statistics(this_layer_array)
+                    voxel_dict['layer_stats'].update({
+                        this_layer_name: this_summary_dict
+                        })
+                #Flagged when an array is zero-size
+                #TODO: find out why array is zero-sized... shouldn't matter much for the following results
+                except ValueError as VE:
+                    print('_'*50)
+                    print(f"Error on {structure_name}-{voxel_name}")
+                    print(f"\t {VE}")
+                    print()
+                    print(f"\t {traceback.format_exc()}") 
+                    print()
+                
+            #Add all the layers together, hopefully accounting for 'squish' factors
+            new_layers_array = adjust_opacity_for_squish(layers_array)
+            
+            try:
+                #Run some stats on this layer's opacity alone and add to dictionary
+                this_summary_dict = get_opacity_array_statistics(new_layers_array)
+                voxel_dict['combined_opacity_stats'].update(this_summary_dict)
+                
+                #Save the combined array
+                part_dir = os.path.dirname(this_filepath)
+                partial_name = f"{structure_name.upper()}_{voxel_name}_CombinedOpacity.npy"
+                save_name = os.path.join(part_dir, partial_name)
+                np.save(save_name, new_layers_array)
+                
+                #Save the 'voxel_dict' as a JSON file
+                partial_name = f"{structure_name.upper()}_{voxel_name}_OpacityDictionary.json"
+                save_name = os.path.join(part_dir, partial_name)
+                with open(save_name, "w") as filename:
+                    json.dump(voxel_dict, filename, indent=4)
+            except ValueError as VE:
+                print('_'*50)
+                print(f"Error on {structure_name}-Full Combined Array")
+                print(f"\t {VE}")
+                print()
+                print(f"\t {traceback.format_exc()}") 
+                print()
+                
+    #Convert the dictionary to a pandas.DataFrame for outputting
+    for structure_idx, structure_name in enumerate(list(opacity_dict.keys())):
+        voxel_names = [key for key in list(opacity_dict[structure_name].keys()) if ('numpy' not in key.lower())]
+        for voxel_idx, voxel_name in enumerate(voxel_names):
+            #Pull individual voxel's combined opacity stats
+            this_dict = opacity_dict[structure_name][voxel_name]['combined_opacity_stats']
+            this_dict.update({'name': f"{structure_name}-{voxel_name}"})
+            bad_columns = [column for column in list(this_dict.keys()) if ('histogram' in column.lower())]
+            for bad_column in bad_columns:
+                this_dict.pop(bad_column)
+            
+            #If it's the first iteration, create a DataFrame with appropriate columns
+            if (voxel_idx == 0) and (structure_idx == 0):
+                opacity_df = pd.DataFrame(this_dict, index = [0])
+            else:
+                new_df = pd.DataFrame(this_dict, index = [0])
+                opacity_df = pd.concat([new_df, opacity_df], axis=0)
+                
+    if save_combined_json:
+        #Save the full 'opacity_dict' as a JSON file
+        partial_name = f"{structure_name.upper()}_AllVoxels_CombinedOpacityDictionary.json"
+        save_name = os.path.join(directory, partial_name)
+        with open(save_name, "w") as filename:
+            json.dump(opacity_dict, filename, indent=4)
+            
+    if save_combined_csv:
+        partial_name = f"{structure_name.upper()}_AllVoxels_CombinedOpacityMetrics.csv"
+        save_name = os.path.join(directory, partial_name)
+        with open(save_name, "w") as filename:
+            opacity_df.to_csv(filename)
 
-        new_layers_array = adjust_opacity_for_squish(layers_array)
-        #Run some stats on this layer's opacity alone and add to dictionary
-        #
-        # TODO: run the stats
-        #
-        voxel_dict['combined_opacity_stats'].update({
-                    'max_opacity': 0,
-                    'min_opacity': 0,
-                    'average_opacity': 0,
-                    })
+    return opacity_df
+        
+        
+def get_opacity_array_statistics(array,
+                                 n_histogram_bins = 50,
+                                 n_rounding_places= 4):
+    ''' v0.1.0  created: 2025-08-06  modified:  2025-08-06
+    
+    Description: Standardized reporting function for an array of opacities.
+    
+    INPUT:
+        array-  Array or numpy.array of opacities for a voxel or voxel-like region
+
+    TODO:
+        - lor
+    '''
+    
+    #Process input and initialize variables
+    summary_dict = {
+        'max_opacity': 0,
+        'min_opacity': 0,
+        'stdev_opacity': 0,
+        'average_opacity': 0,
+        'opacity_sum': 0,
+        'opaque_region_sum': 0,
+        'opaque_fraction': 0,
+        'transmittance': 0,
+        'absorbance': 0,
+        'histogram_bins': [],
+        'histogram_cnts': [],
+        }
+    array = np.array(array)
+    
+    #NOTE: converting everything back to python native formats to allow for exporting dictionary as a JSON; otherwise it will shit itself
+    #Max, min, std dev., avg, sum
+    summary_dict['max_opacity']= float(round(array[array<1].max(), n_rounding_places))
+    summary_dict['min_opacity']= float(round(array.min(), n_rounding_places))
+    summary_dict['stdev_opacity']= float(round(array.std(), n_rounding_places))
+    summary_dict['average_opacity']= float(round(array.mean(), n_rounding_places))
+    opacity_sum = float(round(array.sum(), n_rounding_places))
+    summary_dict['opacity_sum']= float(round(opacity_sum, n_rounding_places))
+    
+    #Calculate other metrics
+    summary_dict['opaque_region_sum']= float(round(array[array<1].sum(), n_rounding_places))
+    array_pixel_count = float(round((array.shape[0]*array.shape[1])))
+    summary_dict['opaque_fraction']= float(round((array[array<1].shape[0]) / (array_pixel_count), n_rounding_places))
+    summary_dict['transmittance']= float(round(opacity_sum / array_pixel_count, n_rounding_places))
+    summary_dict['absorbance']= float(round(-1 * math.log10(opacity_sum / array_pixel_count), n_rounding_places+2))
+    
+    #Generate histogram values and make into JSON-writeable lists
+    cnts, bins = np.histogram(array, bins = n_histogram_bins)
+    cnts = cnts.tolist()
+    bins = np.round(bins[1::], n_rounding_places).tolist()
+    summary_dict['histogram_bins']= bins
+    summary_dict['histogram_cnts']= cnts
+    
+    return summary_dict
