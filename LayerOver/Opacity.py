@@ -835,7 +835,7 @@ def process_directory_numpy_arrays(directory=None,
         partial_name = f"{structure_name.upper()}_AllVoxels_CombinedOpacityMetrics.csv"
         save_name = os.path.join(directory, partial_name)
         with open(save_name, "w") as filename:
-            opacity_df.to_csv(filename)
+            opacity_df.to_csv(filename, index=False)
 
     return opacity_df
         
