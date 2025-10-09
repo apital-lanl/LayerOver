@@ -1,0 +1,4 @@
+[project]
+name = "LayerOver"
+version = "1.0.0"
+description = "Library for handling gcode and producing novel metrics, STL files, and limited visualization."
