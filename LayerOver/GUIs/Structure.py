@@ -13,7 +13,7 @@ class DIW_PSPP:
         
         # Initialize dictionaries and variables
         self.user_defined_structure = "S3HS"
-        self.parsed_user_structure = {"Layer_1": {
+        self.parsed_user_structure = {"ALL": {
             "layer_type": "standard",
             "nozzle_size": 0.25,
             "material": "LL20",
@@ -49,17 +49,59 @@ class DIW_PSPP:
         main_paned = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
         main_paned.pack(fill=tk.BOTH, expand=True)
         
-        # Left panel - Controls
-        left_frame = ttk.Frame(main_paned)
-        main_paned.add(left_frame, weight=1)
+        # Left panel - Controls (with scrollbar)
+        left_container = ttk.Frame(main_paned)
+        main_paned.add(left_container, weight=1)
         
-        # Middle panel - Structure Data
-        middle_frame = ttk.LabelFrame(main_paned, text="Structure Data")
-        main_paned.add(middle_frame, weight=1)
+        # Create canvas and scrollbar for left panel
+        left_canvas = tk.Canvas(left_container)
+        left_scrollbar = ttk.Scrollbar(left_container, orient="vertical", command=left_canvas.yview)
+        left_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        left_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        # Right panel - Data View
-        right_frame = ttk.LabelFrame(main_paned, text="Data View")
-        main_paned.add(right_frame, weight=2)
+        # Create frame inside canvas for content
+        left_frame = ttk.Frame(left_canvas)
+        left_canvas.create_window((0, 0), window=left_frame, anchor="nw")
+        
+        # Configure canvas scrolling
+        left_frame.bind("<Configure>", lambda e: left_canvas.configure(scrollregion=left_canvas.bbox("all")))
+        left_canvas.configure(yscrollcommand=left_scrollbar.set)
+        
+        # Middle panel - Structure Data (with scrollbar)
+        middle_container = ttk.LabelFrame(main_paned, text="Structure Data")
+        main_paned.add(middle_container, weight=1)
+        
+        # Create canvas and scrollbar for middle panel
+        middle_canvas = tk.Canvas(middle_container)
+        middle_scrollbar = ttk.Scrollbar(middle_container, orient="vertical", command=middle_canvas.yview)
+        middle_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        middle_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Create frame inside canvas for content
+        middle_frame = ttk.Frame(middle_canvas)
+        middle_canvas.create_window((0, 0), window=middle_frame, anchor="nw")
+        
+        # Configure canvas scrolling
+        middle_frame.bind("<Configure>", lambda e: middle_canvas.configure(scrollregion=middle_canvas.bbox("all")))
+        middle_canvas.configure(yscrollcommand=middle_scrollbar.set)
+        
+        # Right panel - Data View (with scrollbar)
+        right_container = ttk.LabelFrame(main_paned, text="Data View")
+        main_paned.add(right_container, weight=2)
+        
+        # Create canvas and scrollbar for right panel
+        right_canvas = tk.Canvas(right_container)
+        right_scrollbar = ttk.Scrollbar(right_container, orient="vertical", command=right_canvas.yview)
+        right_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        right_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Create frame inside canvas for content
+        right_frame = ttk.Frame(right_canvas)
+        right_canvas.create_window((0, 0), window=right_frame, anchor="nw")
+        
+        # Configure canvas scrolling
+        right_frame.bind("<Configure>", lambda e: right_canvas.configure(scrollregion=right_canvas.bbox("all")))
+        right_canvas.configure(yscrollcommand=right_scrollbar.set)
         
         # Setup left panel sections
         self.setup_left_panel(left_frame)
@@ -69,6 +111,11 @@ class DIW_PSPP:
         
         # Setup right panel
         self.setup_right_panel(right_frame)
+        
+        # Store canvas references for later use
+        self.left_canvas = left_canvas
+        self.middle_canvas = middle_canvas
+        self.right_canvas = right_canvas
 
     def setup_left_panel(self, parent):
         # Create sections using LabelFrames
@@ -282,11 +329,6 @@ class DIW_PSPP:
         self.structure_tree = ttk.Treeview(parent)
         self.structure_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Add scrollbar
-        tree_scroll = ttk.Scrollbar(parent, orient="vertical", command=self.structure_tree.yview)
-        tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.structure_tree.configure(yscrollcommand=tree_scroll.set)
-        
         # Configure treeview
         self.structure_tree["columns"] = ("type", "value")
         self.structure_tree.column("#0", width=150, minwidth=150)
@@ -304,6 +346,9 @@ class DIW_PSPP:
         
         # Bind selection event
         self.structure_tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+        
+        # Populate with sample data
+        self.populate_experimental_tree()
 
     def setup_right_panel(self, parent):
         # Create notebook for data view tabs
