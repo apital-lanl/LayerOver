@@ -6,14 +6,9 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 class DIW_PSPP:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("DIW PSPP Application")
-        self.root.geometry("1200x800")
-        
-        # Initialize dictionaries and variables
-        self.user_defined_structure = "S3HS"
-        self.parsed_user_structure = {"ALL": {
+
+    default_layer_dict = {
+        "ALL": {
             "layer_type": "standard",
             "nozzle_size": 0.25,
             "material": "LL20",
@@ -21,7 +16,17 @@ class DIW_PSPP:
             "lateral_offset": 0,
             "stochastic_modifiers": {},
             "type_modifiers": {}
-        }}
+            }
+        }
+
+    def __init__(self, root):
+        self.root = root
+        self.root.title("DIW PSPP Application")
+        self.root.geometry("1200x800")
+        
+        # Initialize dictionaries and variables
+        self.user_defined_structure = "S3HS"
+        self.parsed_user_structure = default_layer_dict
         self.current_target_structure = copy.deepcopy(self.parsed_user_structure)
         self.session_considered_structures = {}
         self.structure_data_elements = {}
