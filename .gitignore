@@ -1,5 +1,6 @@
 #Ignore pycache files
-.pyc	
+*.pyc	
 
 #Ignore pycache directories
-/__pychache__
+__pycache__/
+.vs/
