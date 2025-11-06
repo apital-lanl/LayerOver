@@ -5,9 +5,7 @@ import copy
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-class DIW_PSPP:
-
-    default_layer_dict = {
+default_layer_dict = {
         "ALL": {
             "layer_type": "standard",
             "nozzle_size": 0.25,
@@ -18,6 +16,8 @@ class DIW_PSPP:
             "type_modifiers": {}
             }
         }
+
+class DIW_PSPP:
 
     def __init__(self, root):
         self.root = root
