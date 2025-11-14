@@ -26,7 +26,8 @@ class DIW_PSPP:
         
         # Initialize dictionaries and variables
         self.user_defined_structure = "S3HS"
-        self.parsed_user_structure = default_layer_dict
+        # Parse initial structure
+        self.parse_user_defined_structure()
         self.current_target_structure = copy.deepcopy(self.parsed_user_structure)
         self.session_considered_structures = {}
         self.structure_data_elements = {}
@@ -45,9 +46,6 @@ class DIW_PSPP:
         
         # Create menu
         self.create_menu()
-        
-        # Parse initial structure
-        self.parse_user_defined_structure()
 
     def create_panels(self):
         # Create PanedWindow for three main panels
@@ -416,7 +414,7 @@ class DIW_PSPP:
     def parse_user_defined_structure(self):
         structure_name = self.structure_name_var.get()
         self.user_defined_structure = structure_name
-        
+       
         # This is a simplified parsing logic - in a real application, 
         # you would have more sophisticated parsing based on the structure name
         
