@@ -12,6 +12,6 @@ Version:   0.1.0
 
 @author: Aaron Pital (Los Alamos National Lab)
 
-Description: Module for 
+Description: Module to parse and compare DIW structure data with existing records.
 
 """

@@ -16,9 +16,12 @@ Description: Configure a user root folder for LayerOver settings and data.
 
 """
 
-generic_materials_dict = {
-        'll50': {},
-        'll60': {},
-        'SE1700': {},
-        'PDMS': {}
-        }
+def make_root(root_guess):
+
+    if root_guess == None:
+        pass
+
+
+def update_structure_data(structure_name, data_directory):
+
+    pass

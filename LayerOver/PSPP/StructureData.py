@@ -15,3 +15,17 @@ Version:   0.1.0
 Description: 
 
 """
+
+
+
+
+def find_data_by_structure_id(structure_name):
+
+    #Attempt to find LayerOver root
+
+        # if no root is found, create root
+
+
+    #Load structure_dict from root
+
+    pass

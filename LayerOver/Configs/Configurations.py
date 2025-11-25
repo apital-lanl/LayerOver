@@ -16,3 +16,25 @@ Description:
 
 """
 
+generic_materials_dict = {
+        'll50': {},
+        'll60': {},
+        'SE1700': {},
+        'PDMS': {}
+        }
+
+generic_ideality_dict = {
+    'thickness': {},
+    'density': {},
+    'compression': {},
+    }
+
+
+blank_config_file = {
+    'projects': {},
+    'directories': {},
+    'root_data_path': '',
+    'root_logging_path': '',
+    'root_dict_path':''
+    }
+
