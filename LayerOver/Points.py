@@ -438,7 +438,6 @@ def fibonnaci_points(lats, verts, points=1000):
         zs.append(z)
         radii.append(math.sqrt(x**2+y**2+z**2))
     return xs, ys, zs, radii
-    
 
 
 def get_3point_normal(point_coords, show_plot = False):

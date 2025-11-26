@@ -12,10 +12,9 @@ Version:   0.1.0
 
 @author: Aaron Pital (Los Alamos National Lab)
 
-Description: 
+Description: Interact with and analyze data and predictions based on DIW structures.
 
 """
-
 
 
 

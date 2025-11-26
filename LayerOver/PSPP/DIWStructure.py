@@ -12,6 +12,107 @@ Version:   0.1.0
 
 @author: Aaron Pital (Los Alamos National Lab)
 
-Description: Module to parse and compare DIW structure data with existing records.
+Description: Module to parse, homogenize, store, and compare DIW strucuture codes and name handling.
 
 """
+
+blank_structure_dict = {
+    'metadata': {
+        'unique_structure_name':'',
+        'print_name': '',
+        'structure': '',
+        'nozzle_size_um': '',
+        'pitch_offset': 0,
+        'syringe-material': '',
+        'project': '',
+        'machine_name':'',
+        'layerup_file': '',
+        'version_number': '',
+        'notes':'',
+        'mech_data_flag': False,
+        'keyence_data_flag': False,
+        'punch_diameter': '',
+        'mass_g': 0,
+        'thickness_mm': 0,
+        'density_g/cc': 0
+        },
+    'part_structure':'',
+    'part_skin_nozzle_size': 0,
+    'part_layer_nozzle_size': 0,
+    'part_angular_offset': 0,
+    'part_lateral_offset': 0,
+    'part_material': '',
+    'part_pitch': 0,
+    'number_of_layers': 0,
+    'layer_strand_extrusion': 'constant',
+    'layer_strand_diameter': [],
+    'layer_types': [],
+    'layer_type_modifiers': [],
+    'layer_points': [],
+    'layer_steps': [],
+    'layer_angles': [],
+    'layer_lateral_offsets': [],
+    'layer_materials': [],
+    'layer_pitches': []
+    }
+
+'''
+metadata                    Metadata from logbook
+part_structure              Generic 'S-code' structure; can be complete or short; parsed as string
+part_skin_nozzle_size
+part_layer_nozzle_size
+part_angular_offset
+part_lateral_offset
+part_material
+part_pitch
+number_of_layers            number of layers in the part
+layer_strand_extrusion      str ('constant', 'variable') or list (str for each layer ('constant', 'variable'), discreet values)
+layer_strand_diameter       list; parsed based on 'layer_strand_extrusion' strand type
+layer_types                 list of str for each layer ('helicoidal', 'spiral', 'maze')
+    'helicoidal'             - generic layer for parallel strands; includes 'skin' layers; parsed as linear movements unless a 'layer_type_modifier' is used
+    'spiral'                 - special layer type, parsed as an arc
+    'maze'                   - generic flag for grid-based geometries
+layer_type_modifiers        str ('None', 'Perturbed')
+    'Perturbed'              - stochasticity added to the otherwise linear path
+    'None'                   - just printed coordinate-to-coordinate with no perturbation or stochasticity added
+layer_points                list of lists or numpy.array for each layer; initialized as empty list
+layer_steps                 list of int/float; height of each layer from the substrate
+layer_angles                list of int/float; angular offset for each layer relative to a global '0'; 
+    eg. [0, 40, 80] would be a 40 degree offset for each subsequent layer to the previous
+layer_lateral_offsets
+layer_materials
+layer_pitches
+'''
+
+#str literals for structure
+diw_structure_codes = {
+    "s": {
+        'name': 'skin',
+        'parse_flag': 'helicoidal',
+        },
+    "h": {
+        'name': 'helicoidal',
+        'parse_flag': 'helicoidal',
+        },
+    "m": {
+        'name': 'maze',
+        'parse_flag': 'grid',
+        }
+    }
+
+#Pulled straight from logbook entries
+blank_diw_param_dict = {
+    'print_name':'',
+    'structure':'',
+    'strand_diameter':'',
+    'angle_of_rotation':'',
+    'lateral_offset':'',
+    'pitch':'',
+    'syringe-material':'',
+    'project':'',
+    'thickness': '',
+    'density': ''
+    }
+
+def structure_dict_from_param(diw_param_dict):
+    pass
