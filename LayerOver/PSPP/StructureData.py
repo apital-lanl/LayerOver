@@ -17,7 +17,6 @@ Description: Interact with and analyze data and predictions based on DIW structu
 """
 
 
-
 def find_data_by_structure_id(structure_name):
 
     #Attempt to find LayerOver root

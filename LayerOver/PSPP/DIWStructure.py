@@ -114,5 +114,21 @@ blank_diw_param_dict = {
     'density': ''
     }
 
-def structure_dict_from_param(diw_param_dict):
+def structure_dict_from_params(diw_param_dict):
+    '''
+    Description: Given a dictionary with generalized parameters, generate a clean structure dictionary.
+    '''
+    #Attempt to pull 
+
+
+def parse_structure(structure_string, flag = ''):
+    '''
+    Description: 
+    '''
+    
+    #Try to parse 
+    if flag == '':
+        pass
+
+    #Split the structure string by 
     pass
