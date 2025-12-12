@@ -19,6 +19,7 @@ Description: Module for pulling and analyzing mechanical data from Excel and CSV
 #Import libraries
 import csv
 import os
+import pandas as pd
 import re
 from tkinter import filedialog, Tk
 
@@ -28,8 +29,25 @@ from tkinter import filedialog, Tk
 
 #Define variables
 example_namerows = {
+    'mech-generic': ['Load', 'Stress','Strain'],
     'mech-type1': ['Index','Time (sec)', 'Load (kN)', 'Crosshead (mm)', 'PrimaryExtension (mm)', 'Stress (kPa)', 'Strain (mm/mm)', 'Specimen Height (in)'],
     'mech-type2': ['Index','Time (sec)', 'Load (N)', 'Stress (kPa)', 'Gap (mm)', 'GapEx1 (mm)', 'Extension (mm)', 'Extension Ex1 (mm)', 'Strain (mm/mm)', 'Strain Ex1 (mm/mm)']
+    }
+
+blank_mech_file_metadata_dict = {
+    'filename':'',
+    'filepath':'',
+    'filetype':'',
+    'immediate_parent_directory':'',
+    'parse_type':'',
+    'clean_filename':'',
+    'root_print_name?':False,
+    'print_name':'',
+    'print_project_name':'',
+    'thickness': 0,
+    'density': 0,
+    'material': '',
+
     }
 
 
@@ -37,7 +55,24 @@ example_namerows = {
 ##### Generic Utilities  #############################################################################################################
 ######################################################################################################################################
 
+def process_directory_for_mech_files(directory=None):
+    #Initialize variables
+    mech_data_dict = {}
+      # if no directory is added as input, select one
+    if not directory:
+        root = Tk()
+        directory = filedialog.askdirectory(title="Select directory with all the mechanical data.")
+        root.destroy()
+
+
 def walk_directory_for_mech_files(directory=None):
+    '''
+    Description: Capture all CSV and XLSX files within a directory. Parse the spreadsheet and return summary data and metadata.
+    '''
+
+    #Initialize variables
+    mech_filedata_dict = {}
+      # if no directory is added as input, select one
     if not directory:
         root = Tk()
         directory = filedialog.askdirectory(title="Select directory with all the mechanical data.")
@@ -50,77 +85,109 @@ def walk_directory_for_mech_files(directory=None):
                 #Instantialize variables
                 this_filepath = os.path.join(root, file)
                 immediate_directory_basename = os.path.basename(root)
+                this_dict = blank_mech_file_metadata_dict.copy()
 
                 if file.endswith('.csv'):
-            
                     #Do the filename stuff
-                    this_name = file.replace('.csv', '').lower()
+                    this_dict['filetype'] = '.csv'
+                    this_dict['filename'] = file
                     this_filepath = os.path.join(root, file)
-                    csv_filepath_list.append(this_filepath)
-                    csv_directory_basenames.append(immediate_directory_basename)
+                    this_dict['filepath'] = this_filepath
+                    this_dict['immediate_parent_directory'] = immediate_directory_basename
             
                       #try splitting the filename by hyphen or underscore
-                    name_split_type = 'unknown'
-                    name_split_list_under = this_name.split('_')
-                    name_split_list_hyphen = this_name.split('-')
-                    if len(name_split_list_under)<2 and len(name_split_list_hyphen)<2:
-                        #TODO: add a handler here
-                        csv_names_list.append(this_name)
-                        name_parser_list.append(name_split_type)
-                    elif len(name_split_list_under) < len(name_split_list_hyphen):
-                        name_split_type = 'hyphen'
-                        this_name = name_split_list_hyphen[0]
-                        for part in name_split_list_hyphen[1::]:
-                            this_name = str(this_name + str('_'+part))
-                        csv_names_list.append(this_name)
-                        name_parser_list.append(name_split_type)
-                    elif len(name_split_list_under) == len(name_split_list_hyphen):
-                        name_split_type = 'ambiguous'
-                        csv_names_list.append(this_name)
-                        name_parser_list.append(name_split_type)
-                    else:
-                        name_split_type = 'underscore'
-                        csv_names_list.append(this_name)
-                        name_parser_list.append(name_split_type)
+                    parse_dict = parse_mech_data_filename(file)  #returns dict with 'raw_filename', 'parse_type', 'clean_filename'
+                    this_dict['parse_type'] = parse_dict['parse_type']
+                    this_dict['clean_filename'] = parse_dict['clean_filename']
+
+                    #Check CSV contents
+
                 
                 elif file.endswith('.xlsx'):
-
+                    #Do the filename stuff
+                    this_dict['filetype'] = '.xlsx'
+                    this_dict['filename'] = file
+                    this_filepath = os.path.join(root, file)
+                    this_dict['filepath'] = this_filepath
+                    this_dict['immediate_parent_directory'] = immediate_directory_basename
+            
+                      #try splitting the filename by hyphen or underscore
+                    parse_dict = parse_mech_data_filename(file)  #returns dict with 'raw_filename', 'parse_type', 'clean_filename'
+                    this_dict['parse_type'] = parse_dict['parse_type']
+                    this_dict['clean_filename'] = parse_dict['clean_filename']
     else:
         print("Bad directory; please select an appropriate directory with mechanical data.")
         root = Tk()
         directory = filedialog.askdirectory(title="Select directory with all the mechanical data.")
         root.destroy()
 
+    return mech_filedata_dict
 
-def check_for_namerow(csv_filepath, namerow_example = None):
-    result = {
+
+def check_for_namerow(spreadsheet_filepath, namerow_example = None):
+    '''
+    Description: Generic function to open a spreadsheet (CSV or XLSX), find likely namerow based on an example or largest text-containing row, 
+        and return a dict with metadata from the namerow search.
+
+    INPUT:
+        'spreadsheet_filepath'  str; filepath for a CSV or XLSX file. If XLSX, only one sheet will be returned.
+      (optional)
+        'namerow_example'       dict; each key is a type of file, and the list stored at that key is an example namerow       
+    '''
+    
+    #Initialize variables
+    namerow_dict = {
         'likely_name_row': 0,
         'initial_garbage': False,
         'text_rows': {}
-    }
+        }
+    min_text_count = 0   #minimum number of text rows required to be a namespace
+    ideal_text_count = 0   #likely number of namerows based on number of columns is data rows
     
-    with open(csv_filepath, 'r', newline='', encoding='utf-8') as csvfile:
-        reader = csv.reader(csvfile)
-        rows = list(reader)
-        
-    max_text_count = 0
+    if spreadsheet_filepath.endswith('.csv'):
+        with open(spreadsheet_filepath, 'r', newline='', encoding='utf-8') as csvfile:
+            reader = csv.reader(csvfile)
+            rows = list(reader)
     
-    for row_index, row in enumerate(rows):
-        #Check if each cell in the row contains only numbers
-        text_cells = [cell for cell in row if not re.match(r'^-?\d*\.?\d+$', cell.strip())]
+        max_text_count = 0
+            
+        for row_index, row in enumerate(rows):
+            #Check if each cell in the row contains only numbers
+            text_cells = [cell for cell in row if not re.match(r'^-?\d*\.?\d+$', cell.strip())]
         
-        #If there are >0 text cells, check if it's a name row or not and what kind
-        if text_cells:
-            result['text_rows'][row_index] = text_cells
+            #If there are >0 text cells, check if it's a name row or not, and what kind
+            if text_cells:
+                namerow_dict['text_rows'][row_index] = text_cells
 
             
-            if len(text_cells) > max_text_count:
-                max_text_count = len(text_cells)
-                result['likely_name_row'] = row_index
+                if len(text_cells) > max_text_count:
+                    max_text_count = len(text_cells)
+                    namerow_dict['likely_name_row'] = row_index
+        
+        #Set a boolean flag for initial garbage; will 
+        namerow_dict['initial_garbage'] = namerow_dict['likely_name_row'] > 0
     
-    result['initial_garbage'] = result['likely_name_row'] > 0
-    
-    return result
+    elif spreadsheet_filepath.endswith('.xlsx'):
+        pass
+
+    return namerow_dict
+
+
+def pull_last_mechanical_replicate(data_df, data_dict = None):
+    '''
+    Description: Take cyclic load test data and just return the final loading/unloading cycle as separate columns.
+    INPUT:
+        'data_df'       pandas DataFrame; Contains one 'Stress' and one 'Strain' column
+                        if not a dataframe, raise error
+                        if more than one stress or strain column, raise error
+    ACTION:
+        -lorem
+    OUTPUT:
+        'mech_df'       pandas DataFrame; 'Index', 'Stress', 'Strain (loading)', 'Strain (unloading)
+
+    '''
+
+    return mech_df
 
 
 ######################################################################################################################################
@@ -144,10 +211,45 @@ def parse_mech_data_filename(filename):
     filename_dict = {
         'raw_filename': '',
         'parse_type':'',
-
+        'clean_filename':''
         }
-    #Make sure the filename is just the basename
+      # make sure the filename is just the basename
     filename = os.path.basename(filename)
+    filename_dict['raw_filename'] = filename
+      # split out filename from filetype
+    filename = os.path.splitext(filename)[0]
+      # initialize differently parsed names
+    name_split_list_under = this_name.split('_')
+    name_split_list_hyphen = this_name.split('-')
+    if len(name_split_list_under)==0 and len(name_split_list_hyphen)==0:
+        #If for some reason the input string is faulty, report as a failure; should never happen
+        filename_dict['parse_type'] = 'failure'
+        filename_dict['clean_filename'] = filename
 
+    elif len(name_split_list_under)<2 and len(name_split_list_hyphen)<2:
+        #TODO: add a handler here
+        #If both underscore and hyphen parsing have only 1 array element, the filename is a single word or character string
+        filename_dict['parse_type'] = 'direct'
+        filename_dict['clean_filename'] = filename
+
+    elif len(name_split_list_under) < len(name_split_list_hyphen):
+        #At least two parts of the filename are hyphenated and fewer are underscored
+        filename_dict['parse_type'] = 'hyphen'
+          # turn hyphenated into underscored to match logbook
+        this_name = name_split_list_hyphen[0]
+        for part in name_split_list_hyphen[1::]:
+            this_name = str(this_name + str('_'+part))
+        filename_dict['clean_filename'] = this_name
     
+    elif len(name_split_list_under) > len(name_split_list_hyphen):
+        #Should be 'standard' underscored filename
+        filename_dict['parse_type'] = 'underscore'
+        filename_dict['clean_filename'] = filename    #matches logbook format, just pass filename through
+
+    else:
+        #Should be very rare case that there are >2 underscores AND hyphens or other parsing error not captured above
+        filename_dict['parse_type'] = 'ambiguous'
+          # turn hyphenated into underscored to match logbook
+        filename_dict['clean_filename'] = filename
+
     return filename_dict
