@@ -124,7 +124,9 @@ def walk_directory_for_mech_files(directory=None):
     return mech_filedata_dict
 
 
-def check_for_namerow(spreadsheet_filepath, namerow_example = None):
+def check_for_namerow(spreadsheet_filepath, 
+                      namerow_example = example_namerows,
+                      row_limit = 50):
     '''
     Description: Generic function to open a spreadsheet (CSV or XLSX), find likely namerow based on an example or largest text-containing row, 
         and return a dict with metadata from the namerow search.
@@ -132,15 +134,26 @@ def check_for_namerow(spreadsheet_filepath, namerow_example = None):
     INPUT:
         'spreadsheet_filepath'  str; filepath for a CSV or XLSX file. If XLSX, only one sheet will be returned.
       (optional)
-        'namerow_example'       dict; each key is a type of file, and the list stored at that key is an example namerow       
+        'namerow_example'       dict; each key is a type of file, and the list stored at that key is an example namerow
+        'row_limit'             int; maximum number of rows to look for column header text in
+    ACTIONS:
+        - 
     '''
     
     #Initialize variables
     namerow_dict = {
         'likely_name_row': 0,
         'initial_garbage': False,
+        'data_type_guess': '',
+        'data_type_match_count': 0,
         'text_rows': {}
         }
+      # create a dict to hold matches for each example type
+    max_example_matches = {}
+    for key in list(namerow_example.keys()):
+        if 'generic' in key:
+            generic_key = key
+        max_example_matches[key] = 0
     min_text_count = 0   #minimum number of text rows required to be a namespace
     ideal_text_count = 0   #likely number of namerows based on number of columns is data rows
     
@@ -148,27 +161,69 @@ def check_for_namerow(spreadsheet_filepath, namerow_example = None):
         with open(spreadsheet_filepath, 'r', newline='', encoding='utf-8') as csvfile:
             reader = csv.reader(csvfile)
             rows = list(reader)
-    
-        max_text_count = 0
-            
-        for row_index, row in enumerate(rows):
-            #Check if each cell in the row contains only numbers
-            text_cells = [cell for cell in row if not re.match(r'^-?\d*\.?\d+$', cell.strip())]
-        
-            #If there are >0 text cells, check if it's a name row or not, and what kind
-            if text_cells:
-                namerow_dict['text_rows'][row_index] = text_cells
 
-            
-                if len(text_cells) > max_text_count:
-                    max_text_count = len(text_cells)
-                    namerow_dict['likely_name_row'] = row_index
-        
-        #Set a boolean flag for initial garbage; will 
-        namerow_dict['initial_garbage'] = namerow_dict['likely_name_row'] > 0
-    
     elif spreadsheet_filepath.endswith('.xlsx'):
         pass
+        
+    #Not currently used; Hard-coded settings for match quality
+    max_row_index_to_consider = row_limit   #assume any rows below this can't possibly have column labels
+    max_match_similarity = 0
+        
+    #Consider each row for text
+    for row_index, row in enumerate(rows):
+        #Check if each cell in the row contains only numbers
+        text_cells = [cell for cell in row if not re.match(r'^-?\d*\.?\d+$', cell.strip())]
+        
+        #If there are >0 text cells, check if it's a name row or not, and what kind
+        if text_cells and (row_index < max_row_index_to_consider):
+            #Initialize new variables
+            namerow_dict['text_rows'][row_index] = {
+                'text_cels': text_cells,
+                'example_similarities': {} 
+                }
+            match_type_guess = 'unknown'
+            max_similarity_match = 0
+                # make everything lowercase
+            text_cells = [text.lower() for text in text_cells]
+
+            #Pull each example and get a similarity match
+            for this_key in list(namerow_example.keys()):
+                this_match_count = 0
+                these_examples = namerow_example[this_key]
+                #Nested For loops to allow for fuzzy matching and because these are tiny datasets that are only called sparingly
+                #TODO: add fuzzy matching
+                for item in these_examples:
+                    item = item.lower()
+                    for text in text_cells:
+                        if item in text:
+                            this_match_count += 1
+                #Add the results to the growing dict
+                namerow_dict['text_rows'][row_index]['example_similarities'][this_key] = this_match_count
+                if this_match_count > max_similarity_match:
+                    max_similarity_match = this_match_count
+
+            
+        #TODO: add possible flag and recognition for non-text rows (to aid in datatyping later)
+        else:
+            pass
+
+    for text_row_idx in list(namerow_dict['text_rows'].keys()):
+        this_row_dict = namerow_dict['text_rows'][text_row_idx]['example_similarities']
+        for example_type in list(max_example_matches.keys()):
+            if this_row_dict[example_type] > max_example_matches[example_type]:
+                max_example_matches[example_type] = this_row_dict[example_type]
+                if this_row_dict[example_type] > max_match_similarity:
+                    namerow_dict['data_type_guess'] = example_type
+                    namerow_dict['likely_name_row'] = text_row_idx
+                    max_match_similarity = this_row_dict[example_type]
+           
+        
+    
+
+    
+    #Set a boolean flag for initial garbage
+    #TODO: add characterization of the garbage
+    namerow_dict['initial_garbage'] = namerow_dict['likely_name_row'] > 0
 
     return namerow_dict
 
@@ -186,6 +241,19 @@ def pull_last_mechanical_replicate(data_df, data_dict = None):
         'mech_df'       pandas DataFrame; 'Index', 'Stress', 'Strain (loading)', 'Strain (unloading)
 
     '''
+    #Initialize variables
+    mech_dict = {
+        'testing_index': [],
+        'stress_data': [],
+        'strain_data_loading': [],
+        'strain_data_unloading': []
+        }
+    mech_units = {
+        'testing_index': 'int'
+        'stress_data': 'kN',
+        'strain_data_loading': r'mm/mm'
+        'strain_data_unloading': r'mm/mm'
+        }
 
     return mech_df
 
