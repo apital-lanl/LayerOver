@@ -16,6 +16,10 @@ Description: Module to parse, homogenize, store, and compare DIW strucuture code
 
 """
 
+#######################################################################################################################
+#####  Template Variables  ############################################################################################
+#######################################################################################################################
+
 blank_structure_dict = {
     'metadata': {
         'unique_structure_name':'',
@@ -114,16 +118,31 @@ blank_diw_param_dict = {
     'density': ''
     }
 
+
+#######################################################################################################################
+#####  Generic Functions  #############################################################################################
+#######################################################################################################################
+
+
+
+
+#######################################################################################################################
+#####  DIW-specific Functions  ########################################################################################
+#######################################################################################################################
+
+
 def structure_dict_from_params(diw_param_dict):
     '''
-    Description: Given a dictionary with generalized parameters, generate a clean structure dictionary.
+    Description: Given a 'blank_diw_param_dict'-like dictionary, generate a skeleton 'blank_structure_dict'.
     '''
     #Attempt to pull 
+
+    pass
 
 
 def parse_structure(structure_string, flag = ''):
     '''
-    Description: 
+    Description: Take a short, long, or complete structure string and generate a skeleton 'blank_structure_dict'.
     '''
     
     #Try to parse 
@@ -131,4 +150,12 @@ def parse_structure(structure_string, flag = ''):
         pass
 
     #Split the structure string by 
+    pass
+
+
+def match_structure_to_name(structure_dict):
+    '''
+    Description: Take a set of structural parameters and return existing prints that are matches with an associated match score.
+    '''
+    
     pass

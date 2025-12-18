@@ -264,7 +264,7 @@ def pull_last_mechanical_replicate(data_df, data_dict = None):
 
 def parse_mech_data_filename(filename):
     '''
-    Description: Parse a filename to pull DIW-specific identifiers and names
+    Description: Parse a filename to pull DIW-specific identifiers and names.
     INPUT:  
         'filename'      simple filename string; can be whole filepath
     ACTION:
@@ -289,6 +289,8 @@ def parse_mech_data_filename(filename):
       # initialize differently parsed names
     name_split_list_under = this_name.split('_')
     name_split_list_hyphen = this_name.split('-')
+
+    #Try different name parsing schemes
     if len(name_split_list_under)==0 and len(name_split_list_hyphen)==0:
         #If for some reason the input string is faulty, report as a failure; should never happen
         filename_dict['parse_type'] = 'failure'
@@ -321,3 +323,13 @@ def parse_mech_data_filename(filename):
         filename_dict['clean_filename'] = filename
 
     return filename_dict
+
+
+def get_mech_data_for_name(metadata_dict,
+                  target_directory = None,
+                  do_full_walk = False):
+    '''
+    Description: Take a 'filename_dict'-like object and return the available data
+    '''
+
+
