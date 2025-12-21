@@ -249,10 +249,10 @@ def pull_last_mechanical_replicate(data_df, data_dict = None):
         'strain_data_unloading': []
         }
     mech_units = {
-        'testing_index': 'int'
+        'testing_index': 'int',
         'stress_data': 'kN',
-        'strain_data_loading': r'mm/mm'
-        'strain_data_unloading': r'mm/mm'
+        'strain_data_loading': r'mm/mm',
+        'strain_data_unloading': r'mm/mm',
         }
 
     return mech_df
