@@ -94,7 +94,7 @@ def flat_ideal_volume_guess(structure_dict,
     pixel_half_length = voxel_resolution_microns/2
     x_distance_idcs = np.linspace(pixel_half_length, (voxel_side_length *1000)-pixel_half_length, x_array_dim-1)
     y_distance_idcs = np.linspace(pixel_half_length, (voxel_side_length *1000)-pixel_half_length, y_array_dim-1)
-    mesh_x, mesh_y = np.array(np.meshgrid(x_distance_idcs, y_distance_idcs)
+    mesh_x, mesh_y = np.array(np.meshgrid(x_distance_idcs, y_distance_idcs))
       # pull 'structure_dict' keys
     metadata_dict= structure_dict['metadata']
     n_layers= structure_dict['number_of_layers']
@@ -162,7 +162,7 @@ def flat_ideal_volume_guess(structure_dict,
             seed_x_idx = random.randrange(0, x_array_dim)
 
             #Populate array with strand thicknesses
-              # find array edge coordinates for the seed point
+              # find edge coordinates for the seed point
 
 
               # draw initial line based on seed
@@ -186,6 +186,8 @@ def flat_ideal_volume_guess(structure_dict,
               # save the layer image if 'show_layer_images' is False
             elif save_layer_images:
                 pass
+
+            layer_arrays.append(this_layer)
 
 
 

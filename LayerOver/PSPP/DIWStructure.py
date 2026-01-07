@@ -20,7 +20,7 @@ Description: Module to parse, homogenize, store, and compare DIW strucuture code
 #####  Template Variables  ############################################################################################
 #######################################################################################################################
 
-blank_structure_dict = {
+blank_diw_structure_dict = {
     'metadata': {
         'unique_structure_name':'',
         'print_name': '',
@@ -159,3 +159,14 @@ def match_structure_to_name(structure_dict):
     '''
     
     pass
+
+
+def parse_logbook_row_for_structure(row_array):
+    '''
+    Directory:
+        Lorem.
+    '''
+    
+    #Initialize variables
+
+    return structure_dict
