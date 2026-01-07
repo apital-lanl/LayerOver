@@ -592,7 +592,11 @@ def parse_mech_data_fromcsv(mech_data_filepath,
             data_df = pd.read_csv(mech_data_filepath, usecols=[stress_col_idx, strain_col_idx], skiprows=(start_row_idx+1) )
 
             #Make sure the strain is right-side up (i.e. positive values only), ignore lead-in if not at 0, and set minimum at 0
-            strain_series = data_df[strain_col_name].copy()
+            try:
+                strain_series = data_df[strain_col_name].copy()
+            except KeyError:
+                #if keyerror, parsing has failed and take a look at the data_df to see what's going on
+                print(data_df.head(10))
             
               # get info about strain
             pos_strain_sum = sum(strain_series[strain_series>0])
