@@ -221,7 +221,7 @@ def cartesian_ideal_volume_guess(structure_dict,
     pass
 
 
-def get_array_endpoints_for_line(seed_indices, array_dimensions, line_angle):
+def get_array_edges_for_line(seed_indices, array_dimensions, line_angle):
     '''
     Descscription: Get the array edge points for an arbitrary line
     '''
