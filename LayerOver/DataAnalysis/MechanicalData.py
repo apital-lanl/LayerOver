@@ -1,5 +1,5 @@
 """
-2025. Triad National Security, LLC. All rights reserved.
+Copyright 2026. Triad National Security, LLC. All rights reserved.
 This program was produced under U.S. Government contract 89233218CNA000001 for Los Alamos National Laboratory (LANL), 
 which is operated by Triad National Security, LLC for the U.S. Department of Energy/National Nuclear Security 
 Administration. All rights in the program are reserved by Triad National Security, LLC, and the U.S. Department of 
@@ -589,7 +589,7 @@ def parse_mech_data_fromcsv(mech_data_filepath,
                         strain_col_name = cell_text
 
             #Finally, open the data
-            data_df = pd.read_csv(mech_data_filepath, usecols=[stress_col_idx, strain_col_idx], skiprows=(start_row_idx+1) )
+            data_df = pd.read_csv(mech_data_filepath, usecols=[stress_col_idx, strain_col_idx], skiprows=(start_row_idx) )
 
             #Make sure the strain is right-side up (i.e. positive values only), ignore lead-in if not at 0, and set minimum at 0
             try:
