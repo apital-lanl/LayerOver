@@ -18,6 +18,8 @@ Description: Small script utilizing LayerOver modules to parse and open mechanic
 
 #Import outside libraries
 from tkinter import Tk, filedialog
+import os
+import matplotlib.pyplot as plt
   
 #Imports from LayerOver 
 from LayerOver.DataAnalysis import MechanicalData as mech
@@ -41,5 +43,43 @@ for filename in filenames:
     #     'dataframe'                   pandas.DataFrame (hopefully)
 
     data_df = file_output_dict['dataframe']
+    column_names = list(data_df.columns)
+    for column in column_names:
+        if 'stress' in column.lower():
+            stress_col_name = column
+        if 'strain' in column.lower():
+            strain_col_name = column
 
+    print()
+    print("#"*50)
+    print(os.path.basename(filename))
+    print()
     print(data_df.head(7))
+
+    #Plot all the curves
+    # try:
+    #     plt.figure(figsize = (10,10))
+    #     plt.scatter(data_df[strain_col_name], data_df[stress_col_name])
+    #     plt.title(f"{os.path.basename(filename)}")
+    #     plt.show()
+    # except:
+    #     print()
+    #     print("Plot failure (hopefully for obvious reasons)")
+
+
+    last_df = mech.pull_last_mechanical_replicate(data_df, data_dict = None)
+
+    print()
+    print("#"*50)
+    print(os.path.basename(filename))
+    print()
+    print(last_df.head(7))
+
+    try:
+        plt.figure(figsize = (10,10))
+        plt.scatter(data_df[strain_col_name], data_df[stress_col_name])
+        plt.title(f"{os.path.basename(filename)}")
+        plt.show()
+    except:
+        print()
+        print("Plot failure (hopefully for obvious reasons)")

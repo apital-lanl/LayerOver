@@ -44,19 +44,19 @@ namerow_example_parsing_dict = {
     'mech-generic': {
         'stress_columnn_name': 'Stress',
         'strain_column_name': 'Strain',
-        'stress_exclusion_terms': [],
+        'stress_exclusion_terms': ['peak'],
         'strain_exclusion_terms': [' Ex1 ']
         },
     'mech-type1': {
         'stress_columnn_name': 'Stress (kPa)',
         'strain_column_name': 'Strain (mm/mm)',
-        'stress_exclusion_terms': [],
+        'stress_exclusion_terms': ['peak'],
         'strain_exclusion_terms': []
         },
     'mech-type2': {
         'stress_columnn_name': 'Stress (kPa)',
         'strain_column_name': 'Strain (mm/mm)',
-        'stress_exclusion_terms': [],
+        'stress_exclusion_terms': ['peak'],
         'strain_exclusion_terms': []
         }
     }
@@ -115,7 +115,7 @@ default_units_dict = {
         },
     'in': {
         'return':'in',
-        'exact_match':'(in)',
+        'exact_match': '(in)',
         'alternates':[]
         },
     }
@@ -385,8 +385,12 @@ def pull_last_mechanical_replicate(data_df, data_dict = None):
 
     #Try pulling stress and strain data
     for column_name in columns:
-
-        unit_guess = try_and_guess_units(column_name)
+        try:
+            unit_guess = try_and_guess_units(column_name)
+        except:
+            print()
+            print(f"Failure to guess units on column name: {column_name}")
+            unit_guess = 'UNK'
         
         if ('stress' in column_name.lower()) and not stress_flag:
             mech_dict['all_stress_data'] = data_df[column_name]
@@ -577,13 +581,13 @@ def parse_mech_data_fromcsv(mech_data_filepath,
             for col_idx, cell_text in enumerate(header_row):
                 if stress_name in cell_text:
                     #Make sure no exlcusion terms are in the cell text
-                    exclusion_sum = sum([1 for term in stress_name_exclusions if term in cell_text])
+                    exclusion_sum = sum([1 for term in stress_name_exclusions if term.lower() in cell_text.lower()])
                     if exclusion_sum == 0:
                         stress_col_idx = col_idx
                         stress_col_name = cell_text
                 if strain_name in cell_text:
                     #Make sure no exlcusion terms are in the cell text
-                    exclusion_sum = sum([1 for term in strain_name_exclusions if term in cell_text])
+                    exclusion_sum = sum([1 for term in strain_name_exclusions if term.lower() in cell_text.lower()])
                     if exclusion_sum == 0:
                         strain_col_idx = col_idx
                         strain_col_name = cell_text
@@ -605,8 +609,9 @@ def parse_mech_data_fromcsv(mech_data_filepath,
             
               # flip strain if negative
             if neg_strain_sum > pos_strain_sum:
-                adj_strain_series = strain_series -this_min_strain
-                adj_strain_series = abs(this_min_strain)-adj_strain_series
+                # adj_strain_series = strain_series -this_min_strain
+                # adj_strain_series = abs(this_min_strain)-adj_strain_series
+                adj_strain_series = strain_series * -1
                 strain_series = adj_strain_series  #reset series
             
               # check if a lead-in is artificially skewing 0
