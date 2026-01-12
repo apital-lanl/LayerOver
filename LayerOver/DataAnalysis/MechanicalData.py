@@ -906,3 +906,28 @@ def get_latest_logbook(directory):
 
     return logbook_filepath
 
+
+def split_filename_for_printname_guessing(filename,
+                                          printname_examples = None):
+    """
+    Description:
+        Lorem
+
+    INPUT:
+        'filename'          str filepath
+    ACTION:
+        -lorem
+    OUTPUT:
+        'printname_dict'    lorem
+        
+    """
+
+    #Initialize variables
+    printname_dict = {
+        'full_input_name': '',
+        'best_guess_printname': '',
+        'iteration_marker': '',
+
+        }
+
+
