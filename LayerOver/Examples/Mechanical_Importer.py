@@ -12,7 +12,7 @@ Version:   0.1.0
 
 @author: Aaron Pital (Los Alamos National Lab)
 
-Description: Small script utilizing LayerOver modules to parse and open mechanical data files
+Description: Small script utilizing LayerOver modules to parse and open mechanical data files.
 
 """
 

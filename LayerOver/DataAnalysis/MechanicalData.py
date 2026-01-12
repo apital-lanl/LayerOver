@@ -32,6 +32,13 @@ from scipy.signal import find_peaks
 from LayerOver.PSPP.DIWStructure import blank_diw_structure_dict
 
 #Define variables
+#Define hard-coded thresholds and setting values
+default_stress_threshold = 0.2   #in kPa; for silicone elastomers, but should be relatively general
+strain_minimum_mask_threshold = -0.1  #minimum strain to accept (<0 to allow for noise at 0 strain)
+
+#Example column names for various types of report from mechanical testing instruments
+# used to guess which 1) type of mech data is being parsed, 2) which row in the spreadsheet contains the column names, 
+# and 3) which columns to pull for 'stress' and 'strain' data.
 example_namerows = {
     'mech-generic': ['Load', 'Stress', 'Strain'],
     'mech-type1': ['Index','Time (sec)', 'Load (kN)', 'Crosshead (mm)', 'PrimaryExtension (mm)', 'Stress (kPa)', 'Strain (mm/mm)', 'Specimen Height (in)'],
@@ -347,13 +354,27 @@ def check_for_namerow(spreadsheet_filepath,
 
 
 def pull_mechanical_replicates(data_df, data_dict = None,
-                                   show_peaks = True):
+                                   show_peaks = True,
+                                   stress_threshold = None,
+                                   strain_zero_offset = 10,
+                                   strain_min_thresh = None,
+                                   report_nonnegative_strain = False):
     '''
     Description: Take cyclic load test data and just return the final loading/unloading cycle as separate columns.
     INPUT:
-        'data_df'       pandas DataFrame; Contains one 'Stress' and one 'Strain' column
-                        if not a dataframe, raise error
-                        if more than one stress or strain column, raise error
+        'data_df'       
+            pandas DataFrame; Contains one 'Stress' and one 'Strain' column
+            if not a dataframe, raise error
+            if more than one stress or strain column, raise error
+
+        (OPTIONAL)
+        'stress_threshold'
+            Stress value for a moving average at which strain is evaluated as starting to affect material.
+            Strain 0 is reset to a value a little before this threshold is met based on 'strain_zero_offset'.
+        'strain_zero_offset'
+            Number of datapoints before stress is starting to register that is reset as the new '0 strain'
+            Set by first replicate and all future replicates take this strain value.
+                        
     ACTION:
         -lorem
     OUTPUT:
@@ -497,11 +518,47 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         if unload_end_idx > smallest_data_index:
             unload_end_idx = smallest_data_index
 
-        #Extract loading and unloading data
+        #Find strain minimum where stress actually starts increasing above a threshold
+        if replicate_idx == 0:
+              # if no setting is passed, use module default
+            if not stress_threshold:
+                stress_threshold = default_stress_threshold
+
+            #Grap the loading curve for analysis of strain 0 offset
+            strain_loading = raw_df[strain_col_name].iloc[load_start_idx:peak_idx]
+            stress_loading = raw_df[stress_col_name].iloc[load_start_idx:peak_idx]
+
+            #We'll only consider the first loading cycle
+            stress_loading_avg = stress_loading.rolling(3, center=True, min_periods = 1).mean()
+            valid_stress_mask = stress_loading_avg >= stress_threshold
+            first_valid_stress_index = valid_stress_mask.idxmax()
+            first_valid_strain_index = first_valid_stress_index-strain_zero_offset
+            if first_valid_strain_index < 0:
+                first_valid_strain_index = 0
+            #Get the strain value at new predicted '0 strain' value
+            first_valid_strain = raw_df[stress_col_name].iloc[first_valid_strain_index]
+            if first_valid_strain <0:
+                first_valid_strain = 0
+            #Reset the entire strain data
+            raw_df[strain_col_name] = raw_df[strain_col_name]- first_valid_strain
+
+        #Grab cycle data
         strain_loading = raw_df[strain_col_name].iloc[load_start_idx:peak_idx]
         stress_loading = raw_df[stress_col_name].iloc[load_start_idx:peak_idx]
         strain_unloading = raw_df[strain_col_name].iloc[peak_idx:unload_end_idx]
         stress_unloading = raw_df[stress_col_name].iloc[peak_idx:unload_end_idx]
+        if report_nonnegative_strain:
+            #If no min strain threshold is passed, use module default
+            if not strain_min_thresh:
+                strain_min_thresh = strain_minimum_mask_threshold
+            #Get pandas Series mask for values of strain above threshold
+            loading_mask = strain_loading[strain_loading>= strain_min_thresh]
+            unloading_mask = strain_unloading[strain_unloading>= strain_min_thresh]
+            #Apply non-negative mask to get appropriate values only
+            strain_loading = strain_loading[loading_mask]
+            stress_loading = stress_loading[loading_mask]
+            strain_unloading = strain_unloading[unloading_mask]
+            stress_unloading = stress_unloading[unloading_mask]
     
         #Create output DataFrame for this replicate
         output_df = pd.DataFrame({
