@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 #Imports from LayerOver 
 from LayerOver.DataAnalysis import MechanicalData as mech
 
-
+#%% 
 #Select a file(s) to import
 root = Tk()
 filenames = filedialog.askopenfilenames(filetypes = [('CSV Files', '*.csv')])
@@ -67,19 +67,22 @@ for filename in filenames:
     #     print("Plot failure (hopefully for obvious reasons)")
 
 
-    last_df = mech.pull_last_mechanical_replicate(data_df, data_dict = None)
+    last_df, data_dict = mech.pull_last_mechanical_replicate(data_df, data_dict = None)
 
     print()
     print("#"*50)
     print(os.path.basename(filename))
     print()
+    print(list(last_df.columns))
+    print()
     print(last_df.head(7))
 
     try:
         plt.figure(figsize = (10,10))
-        plt.scatter(data_df[strain_col_name], data_df[stress_col_name])
+        plt.scatter(last_df['strain_data_loading'], last_df['stress_data_loading'], color = 'r')
+        plt.scatter(last_df['strain_data_unloading'], last_df['stress_data_unloading'], color = 'g')
         plt.title(f"{os.path.basename(filename)}")
         plt.show()
     except:
         print()
-        print("Plot failure (hopefully for obvious reasons)")
+        print("Plot failure (hopefully for obvious reasons)")v

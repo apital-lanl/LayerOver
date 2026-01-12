@@ -21,6 +21,7 @@ TODO:
 
 #Import libraries
 import csv
+import matplotlib.pyplot as plt
 import os
 import pandas as pd
 import re
@@ -49,13 +50,13 @@ namerow_example_parsing_dict = {
         },
     'mech-type1': {
         'stress_columnn_name': 'Stress (kPa)',
-        'strain_column_name': 'Strain (mm/mm)',
+        'strain_column_name': r'Strain (mm/mm)',
         'stress_exclusion_terms': ['peak'],
         'strain_exclusion_terms': []
         },
     'mech-type2': {
         'stress_columnn_name': 'Stress (kPa)',
-        'strain_column_name': 'Strain (mm/mm)',
+        'strain_column_name': r'Strain (mm/mm)',
         'stress_exclusion_terms': ['peak'],
         'strain_exclusion_terms': []
         }
@@ -240,7 +241,8 @@ def walk_directory_for_mech_files(directory=None):
 
 def check_for_namerow(spreadsheet_filepath, 
                       namerow_example = example_namerows,
-                      row_limit = 50):
+                      row_limit = 50,
+                      show_peaks = True):
     '''
     Description: Generic function to open a spreadsheet (CSV or XLSX), find likely namerow based on an example or largest text-containing row, 
         and return a dict with metadata from the namerow search.
@@ -344,7 +346,8 @@ def check_for_namerow(spreadsheet_filepath,
     return namerow_dict
 
 
-def pull_last_mechanical_replicate(data_df, data_dict = None):
+def pull_last_mechanical_replicate(data_df, data_dict = None,
+                                   show_peaks = False):
     '''
     Description: Take cyclic load test data and just return the final loading/unloading cycle as separate columns.
     INPUT:
@@ -399,24 +402,26 @@ def pull_last_mechanical_replicate(data_df, data_dict = None):
             stress_flag = True
             data_dict['mech_units_info']['stress_units'] = unit_guess
             stress_units = unit_guess
-        else:
+            stress_col_name = f"Stress ({stress_units})"
+        elif ('stress' in column_name.lower()):
             print
             print(f"Multiple stress columns passed. Ignoring {column_name}")
         
         if ('strain' in column_name.lower()) and not strain_flag:
-            mech_dict['all_stress_data'] = data_df[column_name]
+            mech_dict['all_strain_data'] = data_df[column_name]
             print()
             print(f"Added {column_name} as strain data")
             strain_flag = True
             data_dict['mech_units_info']['strain_units'] = unit_guess
             strain_units = unit_guess
-        else:
+            strain_col_name = f"Strain ({strain_units})"
+        elif ('strain' in column_name.lower()):
             print
             print(f"Multiple strain columns passed. Ignoring {column_name}")
 
     #Use peak finding to grab last loading/unloading cycl
-    raw_df = pd.DataFrame(data= {f'Stress ({stress_units})': mech_dict['all_stress_data'],
-                                  f'Strain ({strain_units})': mech_dict['all_strain_data']})
+    raw_df = pd.DataFrame(data= {stress_col_name: mech_dict['all_stress_data'],
+                                  strain_col_name: mech_dict['all_strain_data']})
     
       # find all peaks in strain data
     peaks, _ = find_peaks(raw_df[f'Strain ({strain_units})'].values)
@@ -426,12 +431,22 @@ def pull_last_mechanical_replicate(data_df, data_dict = None):
     
       # find the last peak index
     peak_index = peaks[-1]
+    valley_guess = peak_index - (peaks[-1]-peaks[-2])//2
+    
+    if show_peaks:
+        plt.figure(figsize = (10,10))
+        plt.scatter(list(range(mech_dict['all_strain_data'].shape[0])), mech_dict['all_strain_data'])
+        plt.title(f"Strain peaks found")
+        for peak in peaks:
+            plt.scatter(peak, mech_dict['all_strain_data'][peak], marker = 'x', s = 50, color = 'gray')
+
+        plt.show()
     
       # extract loading and unloading data
-    strain_loading = raw_df['strain'].iloc[:peak_index+1]
-    strain_unloading = raw_df['strain'].iloc[peak_index:]
-    stress_loading = raw_df['stress'].iloc[:peak_index+1]
-    stress_unloading = raw_df['stress'].iloc[peak_index:]
+    strain_loading = raw_df[strain_col_name].iloc[valley_guess:peak_index]
+    strain_unloading = raw_df[strain_col_name].iloc[peak_index::]
+    stress_loading = raw_df[stress_col_name].iloc[valley_guess:peak_index]
+    stress_unloading = raw_df[stress_col_name].iloc[peak_index::]
     
       # create output DataFrame
     output_df = pd.DataFrame({
@@ -442,8 +457,8 @@ def pull_last_mechanical_replicate(data_df, data_dict = None):
         })
     
       # reindex to ensure all columns have the same length
-    max_length = max(len(col) for col in output_df.columns)
-    output_df = output_df.reindex(range(max_length))
+    max_length = max(output_df[col].shape[0] for col in output_df.columns)
+    #output_df = output_df.reindex(range(max_length))
 
     return output_df, data_dict
 
@@ -603,8 +618,8 @@ def parse_mech_data_fromcsv(mech_data_filepath,
                 print(data_df.head(10))
             
               # get info about strain
-            pos_strain_sum = sum(strain_series[strain_series>0])
-            neg_strain_sum = sum(strain_series[strain_series<0])
+            pos_strain_sum = len(strain_series[strain_series>0])
+            neg_strain_sum = len(strain_series[strain_series<0])
             this_min_strain = strain_series.min()
             
               # flip strain if negative
@@ -617,10 +632,13 @@ def parse_mech_data_fromcsv(mech_data_filepath,
               # check if a lead-in is artificially skewing 0
             data_start_idx = round(len(strain_series)*0.25)  #ignore first part
             new_min = strain_series[data_start_idx::].min()  #find real '0' without lead-in garbage
-            strain_series = strain_series - new_min  #reset series minimum to a more useful 0
-              
+            strain_series = strain_series + abs(new_min)  #reset series minimum to a more useful 0
+
               # re-assign strain series
             data_df[strain_col_name] = strain_series
+
+            #Adjust for any 0-stress lead-in
+  
 
             #Assign everything to the output dict
             file_output_dict['dataframe'] = data_df
@@ -732,7 +750,7 @@ def get_latest_logbook(directory):
     '''
     Directory:
         Run through a directory and take a guess at which logbook to use. 
-        Format for latest version is "Logbook_AutomatedAnalysisCopy_YYYY-MM-DD". Should be CSV
+        Format for latest version is "Logbook_AutomatedAnalysisCopy_YYYY-MM-DD". Should be CSV.
     '''
     
     #Initialize variables
