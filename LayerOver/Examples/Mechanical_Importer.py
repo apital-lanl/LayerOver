@@ -67,15 +67,31 @@ for filename in filenames:
     #     print("Plot failure (hopefully for obvious reasons)")
 
 
-    last_df, data_dict = mech.pull_last_mechanical_replicate(data_df, data_dict = None)
+    replicate_dict = mech.pull_mechanical_replicates(data_df, data_dict = None)
+      # pull keys from returned dict
+    replicate_parse_success =  replicate_dict['replicate_parse_success']
+    number_of_replicates = replicate_dict['number_of_replicates']
+    last_strain_peak_index = replicate_dict['last_strain_peak_index']
+    last_strain_valley_index = replicate_dict['last_strain_valley_index']
+    peak_to_valley_index_diff = replicate_dict['peak_to_valley_index_diff']
+      # each value in "replicate_data_dict" is a pandas.DataFrame (hopefully)
+      # replicate numbering starts at 1
+    replicate_data_dict = peak_to_valley_index_diff = replicate_dict['replicate_data']
+    try:
+        last_df = replicate_data_dict[number_of_replicates]
 
-    print()
-    print("#"*50)
-    print(os.path.basename(filename))
-    print()
-    print(list(last_df.columns))
-    print()
-    print(last_df.head(7))
+        print()
+        print("#"*50)
+        print(os.path.basename(filename))
+        print()
+        if replicate_parse_success:
+            print(f"Number of replicates parsed: {number_of_replicates}")
+        else:
+            print("Failure to pull mechanical data replicates.")
+        print()
+    except KeyError:
+        print()
+        print("Failure to parse file (no replicate mechanical data found)")
 
     try:
         plt.figure(figsize = (10,10))
@@ -85,4 +101,4 @@ for filename in filenames:
         plt.show()
     except:
         print()
-        print("Plot failure (hopefully for obvious reasons)")v
+        print("Plot failure (hopefully for obvious reasons)")

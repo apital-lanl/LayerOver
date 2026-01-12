@@ -346,8 +346,8 @@ def check_for_namerow(spreadsheet_filepath,
     return namerow_dict
 
 
-def pull_last_mechanical_replicate(data_df, data_dict = None,
-                                   show_peaks = False):
+def pull_mechanical_replicates(data_df, data_dict = None,
+                                   show_peaks = True):
     '''
     Description: Take cyclic load test data and just return the final loading/unloading cycle as separate columns.
     INPUT:
@@ -364,6 +364,15 @@ def pull_last_mechanical_replicate(data_df, data_dict = None,
 
     '''
     #Initialize variables
+    replicate_dict = {
+        'replicate_parse_success': False,
+        'number_of_replicates': 0,
+        'last_strain_peak_index': 0,
+        'last_strain_valley_index': 0,
+        'peak_to_valley_index_diff': 0,
+        'replicate_data': {
+            }
+        }
     mech_dict = {
         'testing_index': [],
         'all_strain_data': [],
@@ -425,42 +434,92 @@ def pull_last_mechanical_replicate(data_df, data_dict = None,
     
       # find all peaks in strain data
     peaks, _ = find_peaks(raw_df[f'Strain ({strain_units})'].values)
+    replicate_dict['number_of_replicates'] = len(peaks)
     
     if len(peaks) == 0:
-        raise ValueError("No peaks found in strain data")
+        print("No peaks found in strain data")
+    #Use last peak to define variables
+    elif len(peaks) <2:
+        #Find the last peak index
+        last_peak_index = peaks[-1]
+          # assume last peak index is followed by a 'standard' strain region, so the straining cycle indexes can be backed-out 
+        cycle_index_diff_guess = raw_df[f'Strain ({strain_units})'].shape[0] - last_peak_index
+        last_valley_guess_index = last_peak_index - cycle_index_diff_guess
+        #Assign values to the return dict
+        replicate_dict['replicate_parse_success'] = True
+        replicate_dict['last_strain_peak_index'] = last_peak_index
+        replicate_dict['last_strain_valley_index'] = last_valley_guess_index
+        replicate_dict['peak_to_valley_index_diff'] = cycle_index_diff_guess
+    else:
+        #Find the last peak index
+        last_peak_index = peaks[-1]
+        cycle_index_diff_guess = (peaks[-1]-peaks[-2])//2  #get difference between last two peaks
+        last_valley_guess_index = last_peak_index - cycle_index_diff_guess
+        #Assign values to the return dict
+        replicate_dict['replicate_parse_success'] = True
+        replicate_dict['last_strain_peak_index'] = last_peak_index
+        replicate_dict['last_strain_valley_index'] = last_valley_guess_index
+        replicate_dict['peak_to_valley_index_diff'] = cycle_index_diff_guess
     
-      # find the last peak index
-    peak_index = peaks[-1]
-    valley_guess = peak_index - (peaks[-1]-peaks[-2])//2
-    
-    if show_peaks:
+    #Show the peak locations if prompted and replicate parsing was successful
+    if show_peaks and replicate_dict['replicate_parse_success']:
+        #Pull relevant indices and graph values for replicate indices
+        stress_max = mech_dict['all_stress_data'].max()
+        strain_max = mech_dict['all_strain_data'].max()
+
+        #Generate the graph
         plt.figure(figsize = (10,10))
         plt.scatter(list(range(mech_dict['all_strain_data'].shape[0])), mech_dict['all_strain_data'])
         plt.title(f"Strain peaks found")
         for peak in peaks:
-            plt.scatter(peak, mech_dict['all_strain_data'][peak], marker = 'x', s = 50, color = 'gray')
-
+            plt.scatter(peak, mech_dict['all_strain_data'][peak], marker = 'x', s = 200, color = 'gray')
+          # start of last loading replicate
+        plt.plot([last_valley_guess_index, last_valley_guess_index], [0, strain_max], color='r', linewidth=3, alpha=0.6)
+          # start of last unloading replicate
+        plt.plot([last_peak_index, last_peak_index], [0, strain_max], color='g', linewidth=3, alpha=0.6)
+        plt.show()
+    #If replicate parsing not successful, show a graph that might hint at why
+    elif show_peaks:
+        plt.figure(figsize = (10,10))
+        plt.scatter(list(range(mech_dict['all_strain_data'].shape[0])), mech_dict['all_strain_data'])
+        plt.title(f"Failed to find strain peaks")
         plt.show()
     
-      # extract loading and unloading data
-    strain_loading = raw_df[strain_col_name].iloc[valley_guess:peak_index]
-    strain_unloading = raw_df[strain_col_name].iloc[peak_index::]
-    stress_loading = raw_df[stress_col_name].iloc[valley_guess:peak_index]
-    stress_unloading = raw_df[stress_col_name].iloc[peak_index::]
-    
-      # create output DataFrame
-    output_df = pd.DataFrame({
-        'strain_data_loading': strain_loading,
-        'strain_data_unloading': strain_unloading,
-        'stress_data_loading': stress_loading,
-        'stress_data_unloading': stress_unloading
-        })
-    
-      # reindex to ensure all columns have the same length
-    max_length = max(output_df[col].shape[0] for col in output_df.columns)
-    #output_df = output_df.reindex(range(max_length))
+    #Loading cycles start at (peak_idx-valley_idx), Unloading cycles end at (peak_idx+valley_idx)
+    for replicate_idx, peak_idx in enumerate(peaks):
+        load_start_idx = peak_idx-cycle_index_diff_guess
+        unload_end_idx = peak_idx+cycle_index_diff_guess
+        #Make sure indices are in-bounds for data size
+        if load_start_idx<0:
+            load_start_idx = 0
+          # should be the same size, but just in case take the minimum of the two columns dimensions
+        smallest_data_index = min(raw_df[strain_col_name].shape[0], raw_df[stress_col_name].shape[0])-1  #subtract 1 for 0-start indexing
+        if unload_end_idx > smallest_data_index:
+            unload_end_idx = smallest_data_index
 
-    return output_df, data_dict
+        #Extract loading and unloading data
+        strain_loading = raw_df[strain_col_name].iloc[load_start_idx:peak_idx]
+        stress_loading = raw_df[stress_col_name].iloc[load_start_idx:peak_idx]
+        strain_unloading = raw_df[strain_col_name].iloc[peak_idx:unload_end_idx]
+        stress_unloading = raw_df[stress_col_name].iloc[peak_idx:unload_end_idx]
+    
+        #Create output DataFrame for this replicate
+        output_df = pd.DataFrame({
+            'strain_data_loading': strain_loading,
+            'strain_data_unloading': strain_unloading,
+            'stress_data_loading': stress_loading,
+            'stress_data_unloading': stress_unloading
+            })
+    
+        #TODO: fix this; not sure why it kept throwing errors and it doesn't really matter so I've moved on  
+          # reindex to ensure all columns have the same length
+        max_length = max(output_df[col].shape[0] for col in output_df.columns)
+        #output_df = output_df.reindex(range(max_length))
+
+        #Store replicate data with replicate index (starts at 1)
+        replicate_dict['replicate_data'][replicate_idx+1] = output_df
+
+    return replicate_dict
 
 
 ######################################################################################################################################
