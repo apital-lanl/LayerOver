@@ -288,10 +288,25 @@ def check_for_namerow(spreadsheet_filepath,
             rows = list(reader)
 
     elif spreadsheet_filepath.endswith('.xlsx'):
-        #TODO: Implement XLSX parsing
-            #Need to run through each sheet
-            #Check sheet for namerow
-        pass
+        #Open excel file as a pandas object
+        excel_file = pd.ExcelFile(spreadsheet_filepath)
+        #If only one sheet, return the rows from that sheet.
+        if len(excel_file.sheet_names) ==1:
+            sheet_name = list(excel_file.sheet_names)[0]
+            excel_df = pd.read_excel(excel_file, sheet_name = sheet_name)
+            rows = excel_df.values.tolist()
+        elif len(excel_file.sheet_names) ==1:
+            for idx, sheet_name in enumerate(excel_file.sheet_names):
+                this_df = pd.read_excel(excel_file, sheet_name = sheet_name)
+                rows = excel_df.values.tolist()
+                max_match_score = 0
+                for row in rows:
+                    text_cells = [cell for cell in row if not re.match(r'^-?\d*\.?\d+$', cell.strip())]
+        else:
+            print()
+            print(f"Failure to parse {spreadsheet_filepath}")
+            return namerow_dict
+    
         
     #Not currently used; Hard-coded settings for match quality
     max_row_index_to_consider = row_limit   #assume any rows below this can't possibly have column labels
