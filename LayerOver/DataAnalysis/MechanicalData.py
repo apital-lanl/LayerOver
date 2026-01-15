@@ -270,6 +270,8 @@ def check_for_namerow(spreadsheet_filepath,
         'initial_garbage': False,
         'data_type_guess': '',
         'data_type_match_count': 0,
+        'filetype': '',
+        'data_sheetname':'',
         'text_rows': {}
         }
       # create a dict to hold matches for each example type
@@ -286,27 +288,52 @@ def check_for_namerow(spreadsheet_filepath,
         with open(spreadsheet_filepath, 'r', newline='', encoding='utf-8') as csvfile:
             reader = csv.reader(csvfile)
             rows = list(reader)
+        namerow_dict['filetype'] = 'csv'
 
     elif spreadsheet_filepath.endswith('.xlsx'):
         #Open excel file as a pandas object
-        excel_file = pd.ExcelFile(spreadsheet_filepath)
+        namerow_dict['filetype'] = 'xlsx'
+        try:
+            excel_file = pd.ExcelFile(spreadsheet_filepath)
+        except:
+            print("Failure to read Excel file: this usually means it's corrupted.")
+            return namerow_dict
+
         #If only one sheet, return the rows from that sheet.
         if len(excel_file.sheet_names) ==1:
             sheet_name = list(excel_file.sheet_names)[0]
-            excel_df = pd.read_excel(excel_file, sheet_name = sheet_name)
+            excel_df = pd.read_excel(excel_file, sheet_name = sheet_name, nrows=10)
             rows = excel_df.values.tolist()
-        elif len(excel_file.sheet_names) ==1:
+        #If more than one sheet, try and find the best one
+        elif len(excel_file.sheet_names) > 1:
             for idx, sheet_name in enumerate(excel_file.sheet_names):
                 this_df = pd.read_excel(excel_file, sheet_name = sheet_name)
-                rows = excel_df.values.tolist()
-                max_match_score = 0
-                for row in rows:
+                these_rows = this_df.values.tolist()
+                cur_max_match_score = 0
+                default_namerow = example_namerows['mech-generic']
+                namerow_max_score = len(default_namerow)
+                for row_idx, row in enumerate(these_rows):
                     text_cells = [cell for cell in row if not re.match(r'^-?\d*\.?\d+$', cell.strip())]
+                    this_row_score = 0
+                    if len(text_cells) > 0:
+                        for this_cell in text_cells:
+                            this_check = sum([1 for name in default_namerow if this_cell.lower() in name.lower()])
+                            this_row_score += this_check
+                    if this_row_score > cur_max_match_score:
+                        cur_max_match_score = this_row_score
+                #If every default name gets at least 1 match, assume this is the sheet
+                #NOTE: if more than 1 sheet has mech data, this will return the last mech data sheet's info
+                if cur_max_match_score >= namerow_max_score:
+                    namerow_dict['data_sheetname'] = sheet_name
+                    rows = these_rows  #pass to loop below
+                elif cur_max_match_score >0:
+                    #TODO: if some matches are encountered, handle to find best sheet
+                    pass
+
         else:
             print()
             print(f"Failure to parse {spreadsheet_filepath}")
             return namerow_dict
-    
         
     #Not currently used; Hard-coded settings for match quality
     max_row_index_to_consider = row_limit   #assume any rows below this can't possibly have column labels
@@ -662,6 +689,7 @@ def parse_mech_data_filename(filename):
 
 
 def parse_mech_data_fromcsv(mech_data_filepath,
+                            data_dict = None,
                             special_example_namerow_dict = None):
     '''
     Description:
@@ -671,6 +699,7 @@ def parse_mech_data_fromcsv(mech_data_filepath,
     INPUT:
         (optional)
         special_example_namerow_dict    dict; at least one key:list pair with list of column name strings in a special mechanical data file example
+        data_dict                       dict; not used for CSV parsing currently, but added as future option and for consistency with XLSX parsing
 
     '''
 
@@ -777,12 +806,157 @@ def parse_mech_data_fromcsv(mech_data_filepath,
             file_output_dict['parse_status']['namerow_good'] = True
             file_output_dict['parse_status']['namerow_idx'] = start_row_idx
 
+        #Provide cross-compatibility just in case
+        if mech_data_filepath.lower().endswith('.xlsx'):
+            file_output_dict = parse_mech_data_fromxlsx(mech_data_filepath,
+                                                        data_dict = data_dict)
+
+    return file_output_dict
+
+
+def parse_mech_data_fromxlsx(mech_data_filepath,
+                            data_dict = None,
+                            special_example_namerow_dict = None):
+    '''
+    Description:
+        Open an XLSX file, check for stress/strain data, and output a pandas DataFrame if that data exists.
+        Also homogenizes the strain data prior to exporting.
+
+    INPUT:
+        (optional)
+        special_example_namerow_dict    dict; at least one key:list pair with list of column name strings in a special mechanical data file example
+        data_dict                       dict; contains data on which sheet to pull XLSX data from 
+
+    '''
+
+    #Initialize variables
+    file_output_dict = {
+        'parse_status': {
+            'file_pandas_readable': False,
+            'namerow_good': False,
+            'namerow_idx': 0,
+
+            },
+        'filename': os.path.basename(mech_data_filepath),
+        'filepath': mech_data_filepath,
+        'dataframe': None,
+        }
+
+    #Try to open the file, find the namerow, and match to expected mechanical data formats
+      # if a namerow example has been passed, use that. Otherwise use the defualt at the header of this file.
+    if not special_example_namerow_dict:
+        namerow_dict = example_namerows
+    else:
+        namerow_dict = special_example_namerow_dict
+    
+    #Check if passed data_dict exists and contains good info on proper sheet to pull. Otherwise just reprocess the file.
+    if not data_dict:
+        #Dummy check for finding a 'good_sheet_guess' in case previous
+        namerow_dict = check_for_namerow(mech_data_filepath, 
+                                          namerow_example = example_namerows,
+                                          row_limit = 50,
+                                          show_peaks = True)
+        good_sheetname = namerow_dict['data_sheetname']
+    else:
+        try:
+            namerow_dict = data_dict.copy()
+            good_sheetname = data_dict['data_sheetname']
+        except:
+            print(r'\n', "Cannot parse 'data_dict' input; reprocessing file for good sheet location.")
+            namerow_dict = check_for_namerow(mech_data_filepath, 
+                                    namerow_example = example_namerows,
+                                    row_limit = 50,
+                                    show_peaks = True)
+            good_sheetname = namerow_dict['data_sheetname']
+        
+
+      # check for a row with mechanical data column names from the example dict
+    namerow_dict = check_for_namerow(mech_data_filepath, 
+                                    namerow_example = namerow_dict)
+    #'namerow_dict' keys:    successful_parse (bool);   likely_name_row (int);   initial_garbage (bool)
+    #                        data_type_guess (str);  data_type_match_count (int);  text_rows (dict)
+    
+    #Try to open the file if namerow check hasn't completely failed
+    if namerow_dict['successful_parse'] == True:
+        start_row_idx = namerow_dict['likely_name_row']
+        mech_data_archetype_guess = namerow_dict['data_type_guess']
+        #Try to get parsing details for column names from 'namerow_example_parsing_dict' above; default to 'mech-generic' if things get weird
+        try:
+            this_parsing_dict = namerow_example_parsing_dict[mech_data_archetype_guess]
+        except KeyError:
+            this_parsing_dict = namerow_example_parsing_dict['mech-generic']
+        stress_name = this_parsing_dict['stress_columnn_name']
+        strain_name = this_parsing_dict['strain_column_name']
+        stress_name_exclusions = this_parsing_dict['stress_exclusion_terms']
+        strain_name_exclusions = this_parsing_dict['strain_exclusion_terms']
+
         #Handle XLSX
         if mech_data_filepath.lower().endswith('.xlsx'):
-            #TODO: Implement XLSX parsing
-                #Need to run through each sheet
-                #Check sheet for namerow
-            pass
+            #Open the CSV and find the column name row
+            excel_df = pd.read_excel(mech_data_filepath, sheet_name= good_sheetname)
+            rows = excel_df.values.tolist()
+            for row_num, row in enumerate(rows):
+                if row_num == start_row_idx:
+                    header_row = row
+            
+            #Walk through header row and find which column index has the stress and strain columns
+            for col_idx, cell_text in enumerate(header_row):
+                if stress_name in cell_text:
+                    #Make sure no exlcusion terms are in the cell text
+                    exclusion_sum = sum([1 for term in stress_name_exclusions if term.lower() in cell_text.lower()])
+                    if exclusion_sum == 0:
+                        stress_col_idx = col_idx
+                        stress_col_name = cell_text
+                if strain_name in cell_text:
+                    #Make sure no exlcusion terms are in the cell text
+                    exclusion_sum = sum([1 for term in strain_name_exclusions if term.lower() in cell_text.lower()])
+                    if exclusion_sum == 0:
+                        strain_col_idx = col_idx
+                        strain_col_name = cell_text
+
+            #Finally, open the data
+            data_df = pd.read_csv(mech_data_filepath, usecols=[stress_col_idx, strain_col_idx], skiprows=(start_row_idx) )
+
+            #Make sure the strain is right-side up (i.e. positive values only), ignore lead-in if not at 0, and set minimum at 0
+            try:
+                strain_series = data_df[strain_col_name].copy()
+            except KeyError:
+                #if keyerror, parsing has failed and take a look at the data_df to see what's going on
+                print(data_df.head(10))
+            
+              # get info about strain
+            pos_strain_sum = len(strain_series[strain_series>0])
+            neg_strain_sum = len(strain_series[strain_series<0])
+            this_min_strain = strain_series.min()
+            
+              # flip strain if negative
+            if neg_strain_sum > pos_strain_sum:
+                # adj_strain_series = strain_series -this_min_strain
+                # adj_strain_series = abs(this_min_strain)-adj_strain_series
+                adj_strain_series = strain_series * -1
+                strain_series = adj_strain_series  #reset series
+            
+              # check if a lead-in is artificially skewing 0
+            data_start_idx = round(len(strain_series)*0.25)  #ignore first part
+            new_min = strain_series[data_start_idx::].min()  #find real '0' without lead-in garbage
+            strain_series = strain_series + abs(new_min)  #reset series minimum to a more useful 0
+
+              # re-assign strain series
+            data_df[strain_col_name] = strain_series
+
+            #Adjust for any 0-stress lead-in
+  
+
+            #Assign everything to the output dict
+            file_output_dict['dataframe'] = data_df
+            file_output_dict['parse_status']['file_pandas_readable'] = True
+            file_output_dict['parse_status']['namerow_good'] = True
+            file_output_dict['parse_status']['namerow_idx'] = start_row_idx
+        
+        #Provide cross-compatibility just in case
+        elif mech_data_filepath.lower().endswith('.csv'):
+            file_output_dict = parse_mech_data_fromcsv(mech_data_filepath,
+                                                       data_dict = data_dict)
 
     return file_output_dict
 
