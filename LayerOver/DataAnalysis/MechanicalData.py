@@ -302,6 +302,7 @@ def check_for_namerow(spreadsheet_filepath,
         #If only one sheet, return the rows from that sheet.
         if len(excel_file.sheet_names) ==1:
             sheet_name = list(excel_file.sheet_names)[0]
+            namerow_dict['data_sheetname'] = sheet_name
             excel_df = pd.read_excel(excel_file, sheet_name = sheet_name, nrows=10)
             rows = excel_df.values.tolist()
         #If more than one sheet, try and find the best one
@@ -495,8 +496,13 @@ def pull_mechanical_replicates(data_df, data_dict = None,
     raw_df = pd.DataFrame(data= {stress_col_name: mech_dict['all_stress_data'],
                                   strain_col_name: mech_dict['all_strain_data']})
     
+      # get reasonable peak height and distance between peak expectations
+    length = raw_df[f'Strain ({strain_units})'].values.shape[0]
+    distance_guess = length * 0.15
+    height_guess = raw_df[f'Strain ({strain_units})'].values[round(length*0.25)::].max()
       # find all peaks in strain data
-    peaks, _ = find_peaks(raw_df[f'Strain ({strain_units})'].values)
+    # peaks, _ = find_peaks(raw_df[f'Strain ({strain_units})'].values, height = height_guess)
+    peaks, _ = find_peaks(raw_df[f'Strain ({strain_units})'].values, distance = distance_guess)
     replicate_dict['number_of_replicates'] = len(peaks)
     
     if len(peaks) == 0:
@@ -724,8 +730,7 @@ def parse_mech_data_fromcsv(mech_data_filepath,
     else:
         namerow_dict = special_example_namerow_dict
       # check for a row with mechanical data column names from the example dict
-    namerow_dict = check_for_namerow(mech_data_filepath, 
-                                          namerow_example = namerow_dict)
+    namerow_dict = check_for_namerow(mech_data_filepath)
     #'namerow_dict' keys:    successful_parse (bool);   likely_name_row (int);   initial_garbage (bool)
     #                        data_type_guess (str);  data_type_match_count (int);  text_rows (dict)
     
@@ -871,8 +876,7 @@ def parse_mech_data_fromxlsx(mech_data_filepath,
         
 
       # check for a row with mechanical data column names from the example dict
-    namerow_dict = check_for_namerow(mech_data_filepath, 
-                                    namerow_example = namerow_dict)
+    namerow_dict = check_for_namerow(mech_data_filepath)
     #'namerow_dict' keys:    successful_parse (bool);   likely_name_row (int);   initial_garbage (bool)
     #                        data_type_guess (str);  data_type_match_count (int);  text_rows (dict)
     
@@ -895,19 +899,25 @@ def parse_mech_data_fromxlsx(mech_data_filepath,
             #Open the CSV and find the column name row
             excel_df = pd.read_excel(mech_data_filepath, sheet_name= good_sheetname)
             rows = excel_df.values.tolist()
+              # assign header row to column names; if these are superseded by cell text, 'header_row' will be updated
+              # i.e. if 'rows' DataFrame has garbage column names because the first row doesn't contain actual column names, the for loop below will find a better guess
+            header_row = list(excel_df.columns)
+            column_names_good = True
             for row_num, row in enumerate(rows):
-                if row_num == start_row_idx:
+                #Decrement 'start_row_idx' to account to switch in index start values
+                if row_num == (start_row_idx-1):
                     header_row = row
+                    column_names_good = False
             
             #Walk through header row and find which column index has the stress and strain columns
             for col_idx, cell_text in enumerate(header_row):
-                if stress_name in cell_text:
+                if stress_name in str(cell_text):
                     #Make sure no exlcusion terms are in the cell text
                     exclusion_sum = sum([1 for term in stress_name_exclusions if term.lower() in cell_text.lower()])
                     if exclusion_sum == 0:
                         stress_col_idx = col_idx
                         stress_col_name = cell_text
-                if strain_name in cell_text:
+                if strain_name in str(cell_text):
                     #Make sure no exlcusion terms are in the cell text
                     exclusion_sum = sum([1 for term in strain_name_exclusions if term.lower() in cell_text.lower()])
                     if exclusion_sum == 0:
@@ -915,7 +925,12 @@ def parse_mech_data_fromxlsx(mech_data_filepath,
                         strain_col_name = cell_text
 
             #Finally, open the data
-            data_df = pd.read_csv(mech_data_filepath, usecols=[stress_col_idx, strain_col_idx], skiprows=(start_row_idx) )
+            if column_names_good:
+                data_df = excel_df[[stress_col_name, strain_col_name]]
+              # if the column names were found somewhere other than the first row, try and open only the stress/strain columns starting at that row
+              # NOTE: this parsing can be janky on Excel files with specific formatting (i.e. automated instrument output reports)
+            else:
+                data_df = pd.read_excel(mech_data_filepath, usecols=[stress_col_idx, strain_col_idx], skiprows=(start_row_idx), sheet_name= good_sheetname)
 
             #Make sure the strain is right-side up (i.e. positive values only), ignore lead-in if not at 0, and set minimum at 0
             try:

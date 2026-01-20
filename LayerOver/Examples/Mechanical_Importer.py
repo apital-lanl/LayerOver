@@ -134,4 +134,4 @@ for filename in filenames:
             print("Plot failure (hopefully for obvious reasons)")
 
     except:
-        print(r"/n", "Skipping file due to parse failure.")
+        print(r"\n", "Skipping file due to parse failure.")
