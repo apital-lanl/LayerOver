@@ -342,7 +342,7 @@ def check_for_namerow(spreadsheet_filepath,
     #Consider each row for text
     for row_index, row in enumerate(rows):
         #Check if each cell in the row contains only numbers
-        text_cells = [cell for cell in row if not re.match(r'^-?\d*\.?\d+$', cell.strip())]
+        text_cells = [cell for cell in row if not re.match(r'^-?\d*\.?\d+$', str(cell).strip())]
         
         #If there are >0 text cells, check if it's a name row or not, and what kind
         if text_cells and (row_index < max_row_index_to_consider):
@@ -355,7 +355,7 @@ def check_for_namerow(spreadsheet_filepath,
             match_type_guess = 'unknown'
             max_similarity_match = 0
                 # make everything lowercase
-            text_cells = [text.lower() for text in text_cells]
+            text_cells = [str(text).lower() for text in text_cells]
 
             #Pull each example and get a similarity match
             for this_key in list(namerow_example.keys()):
