@@ -15,7 +15,10 @@ Version:   0.1.0
 Description: Module for pulling and analyzing mechanical data from Excel and CSV files.
 
 TODO:
-    -Need to implement XLSX parsing. Sticking point is going through each spreadsheet and I don't want to deal with it right now.
+    -'get_latest_logbook'
+        -add parsing to try and extract date
+        -pull filemetada to get creation and last modified dates
+    - 
 
 """
 
@@ -82,7 +85,7 @@ blank_mech_file_metadata_dict = {
     'thickness': 0,
     'density': 0,
     'material': '',
-
+    'structure_dict': {}
     }
 
 default_units_dict = {
@@ -133,7 +136,9 @@ default_units_dict = {
 ##### Generic Utilities  #############################################################################################################
 ######################################################################################################################################
 
-def process_directory_for_mech_files(directory=None):
+def process_directory_for_mech_files(directory=None, 
+                                     show_each_file_results= False):
+    
     #Initialize variables
     mech_data_dict = {}
       # if no directory is added as input, select one
@@ -141,38 +146,121 @@ def process_directory_for_mech_files(directory=None):
         root = Tk()
         directory = filedialog.askdirectory(title="Select directory with all the mechanical data.")
         root.destroy()
+      # try and find the 'latest' logbook
+    get_latest_logbook(directory)
 
-    #Get all CSVs in the directory
+    #Get all CSV and XLSX files in the directory
     mech_filedata_dict = walk_directory_for_mech_files(directory)
     mech_file_keys = list(mech_filedata_dict.keys())
 
     #Open each file and process
     for filename in mech_file_keys:
         
-        #Pull the values for this particular mechanical data file
-        this_filedata_dict = mech_filedata_dict[filename]
-        #'this_filedata_dict' values: 
-        #   'filename'                      str         populated
-        #   'filepath'                      str         populated
-        #   'filetype'                      str         populated
-        #   'immediate_parent_directory'    str         populated
-        #   'parse_type'                    str         populated
-        #   'clean_filename'                str         populated
-        #   'root_print_name?':False,       bool        defualt
-        #   'print_name':'',                str         defualt
-        #   'print_project_name':'',        str         defualt
-        #   'thickness': 0,                 int         default
-        #   'density': 0,                   int/float   default
-        #   'material': '',                 str         defualt
-        this_filepath = this_filedata_dict['filepath']
-        this_filetype = this_filedata_dict['filetype']
-        this_mechdata_parsetype = this_filedata_dict['filetype']   #what kind of instrument ouput (i.e. column names) should the file be opened with?
-        
-        #Try to open the file, get the data, and compare to 
-        data_dict = parse_mech_data_fromcsv(this_filepath)
-        data_df = data_dict['dataframe']
+        print()
+        print("#"*50)
+        print(f"Parsing {os.path.basename(filename)}")
 
-        logbook_dict = check_logbook_for_printname(printname)
+        #Pull file metadata
+
+        namerow_dict = check_for_namerow(filename, 
+                                         show_peaks = show_each_file_results)
+        # keys in 'namerow_dict':
+            #     'successful_parse'        bool
+            #     'likely_name_row'         int
+            #     'initial_garbage'         bool
+            #     'data_type_guess'         str
+            #     'data_type_match_count'   int
+            #     'filetype'                str; 'csv' or 'xlsx'
+            #     'data_sheetname'          str
+            #     'text_rows'               dict
+        this_filetype = namerow_dict['filetype']
+
+        if 'csv' in this_filetype.lower():
+            file_output_dict = parse_mech_data_fromcsv(filename)\
+            # keys in 'file_output_dict':
+            #     'parse_status'                dict
+            #         'file_pandas_readable'    bool
+            #         'namerow_good'            bool
+            #         'namerow_idx'             int
+            #     'filename'                    str
+            #     'filepath'                    str
+            #     'dataframe'                   pandas.DataFrame (hopefully)
+
+        elif 'xlsx' in this_filetype.lower():
+            good_sheet_check = bool(namerow_dict['successful_parse'] and (namerow_dict['data_sheetname'] != ''))
+            if good_sheet_check:
+                file_output_dict = parse_mech_data_fromxlsx(filename, data_dict=namerow_dict)
+            else:
+                print("Failure to find good sheet in Excel file; check parsing or file contents.")
+                data_df = pd.DataFrame({"Failure":[]})
+    
+        try:
+            data_df = file_output_dict['dataframe']
+            column_names = list(data_df.columns)
+            for column in column_names:
+                if 'stress' in column.lower():
+                    stress_col_name = column
+                if 'strain' in column.lower():
+                    strain_col_name = column
+
+            print()
+            print(data_df.head(7))
+
+            #Plot all the curves
+            if show_each_file_results:
+                plt.figure(figsize = (10,10))
+                plt.scatter(data_df[strain_col_name], data_df[stress_col_name])
+                plt.title(f"All mech data in {os.path.basename(filename)}")
+                plt.xlabel("Strain")
+                plt.ylabel("Stress")
+                plt.show()
+
+            replicate_dict = pull_mechanical_replicates(data_df, data_dict = None, report_nonnegative_strain = False)
+              # pull keys from returned dict
+            replicate_parse_success =  replicate_dict['replicate_parse_success']
+            number_of_replicates = replicate_dict['number_of_replicates']
+            last_strain_peak_index = replicate_dict['last_strain_peak_index']
+            last_strain_valley_index = replicate_dict['last_strain_valley_index']
+            peak_to_valley_index_diff = replicate_dict['peak_to_valley_index_diff']
+              # each value in "replicate_data_dict" is a pandas.DataFrame (hopefully)
+              # replicate numbering starts at 1
+            replicate_data_dict = peak_to_valley_index_diff = replicate_dict['replicate_data']
+            try:
+                last_df = replicate_data_dict[number_of_replicates]
+
+                print()
+                print(" "*5, "#"*15)
+                print()
+                if replicate_parse_success:
+                    print(f"Number of replicates parsed: {number_of_replicates}")
+                else:
+                    print("Failure to pull mechanical data replicates.")
+                print()
+            except KeyError:
+                print()
+                print("Failure to parse file (no replicate mechanical data found)")
+
+            try:
+                if show_each_file_results:
+                    plt.figure(figsize = (10,10))
+                    plt.scatter(last_df['strain_data_loading'], last_df['stress_data_loading'], color = 'r')
+                    plt.scatter(last_df['strain_data_unloading'], last_df['stress_data_unloading'], color = 'g')
+                    plt.title(f"Final replicate cycle for {os.path.basename(filename)}")
+                    plt.xlabel("Strain")
+                    plt.ylabel("Stress")
+                    plt.legend([f"Replicate {number_of_replicates} Loading curve", f"Replicate {number_of_replicates} Unloading curve"])
+                    plt.show()
+            except:
+                print()
+                print("Final replicate plot failure (hopefully for obvious reasons)")
+
+        except Exception as le:
+            #'le' stands for 'loop error'
+            print(le)
+            print("_"*50)
+            print()
+
+        # logbook_dict = check_logbook_for_printname(printname)
 
 
 def walk_directory_for_mech_files(directory=None):
@@ -401,7 +489,7 @@ def pull_mechanical_replicates(data_df, data_dict = None,
                                    stress_threshold = None,
                                    strain_zero_offset = 10,
                                    strain_min_thresh = None,
-                                   report_nonnegative_strain = False):
+                                   report_nonnegative_strain = True):
     '''
     Description: Take cyclic load test data and just return the final loading/unloading cycle as separate columns.
     INPUT:
@@ -501,6 +589,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
     distance_guess = length * 0.15
     height_guess = raw_df[f'Strain ({strain_units})'].values[round(length*0.25)::].max()
       # find all peaks in strain data
+      # NOTE: both distance and height are imperfect proxies for wonky strain peaks, but distance tends to perform better in avoiding multiple non-peak values
+      #       'distance' in this case is an expectation of how far apart peak values should be, set by 'distance_guess' above
     # peaks, _ = find_peaks(raw_df[f'Strain ({strain_units})'].values, height = height_guess)
     peaks, _ = find_peaks(raw_df[f'Strain ({strain_units})'].values, distance = distance_guess)
     replicate_dict['number_of_replicates'] = len(peaks)
@@ -546,11 +636,15 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         plt.plot([last_valley_guess_index, last_valley_guess_index], [0, strain_max], color='r', linewidth=3, alpha=0.6)
           # start of last unloading replicate
         plt.plot([last_peak_index, last_peak_index], [0, strain_max], color='g', linewidth=3, alpha=0.6)
+        plt.xlabel("Index of strain value")
+        plt.ylabel("Strain value (mm/mm)")
         plt.show()
     #If replicate parsing not successful, show a graph that might hint at why
     elif show_peaks:
         plt.figure(figsize = (10,10))
         plt.scatter(list(range(mech_dict['all_strain_data'].shape[0])), mech_dict['all_strain_data'])
+        plt.xlabel("Strain (mm/mm)")
+        plt.ylabel("Stress")
         plt.title(f"Failed to find strain peaks")
         plt.show()
     
@@ -567,7 +661,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             unload_end_idx = smallest_data_index
 
         #Find strain minimum where stress actually starts increasing above a threshold
-        if replicate_idx == 0:
+        strain_offset = 0
+        if (replicate_idx == 0):
               # if no setting is passed, use module default
             if not stress_threshold:
                 stress_threshold = default_stress_threshold
@@ -583,6 +678,7 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             first_valid_strain_index = first_valid_stress_index-strain_zero_offset
             if first_valid_strain_index < 0:
                 first_valid_strain_index = 0
+            strain_offset = strain_loading[first_valid_strain_index]
             #Get the strain value at new predicted '0 strain' value
             first_valid_strain = raw_df[stress_col_name].iloc[first_valid_strain_index]
             if first_valid_strain <0:
@@ -591,10 +687,17 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             raw_df[strain_col_name] = raw_df[strain_col_name]- first_valid_strain
 
         #Grab cycle data
+          # pull cyles
         strain_loading = raw_df[strain_col_name].iloc[load_start_idx:peak_idx]
         stress_loading = raw_df[stress_col_name].iloc[load_start_idx:peak_idx]
         strain_unloading = raw_df[strain_col_name].iloc[peak_idx:unload_end_idx]
         stress_unloading = raw_df[stress_col_name].iloc[peak_idx:unload_end_idx]
+          # apply 0-strain offset; not sure why this isn't handled on import
+        strain_offset = strain_loading.min()
+        strain_loading = strain_loading - strain_offset
+        strain_unloading = strain_unloading - strain_offset
+        
+        #If flagged, make sure non-negative data is reported
         if report_nonnegative_strain:
             #If no min strain threshold is passed, use module default
             if not strain_min_thresh:
@@ -954,13 +1057,12 @@ def parse_mech_data_fromxlsx(mech_data_filepath,
               # check if a lead-in is artificially skewing 0
             data_start_idx = round(len(strain_series)*0.25)  #ignore first part
             new_min = strain_series[data_start_idx::].min()  #find real '0' without lead-in garbage
-            strain_series = strain_series + abs(new_min)  #reset series minimum to a more useful 0
+            strain_series = strain_series - new_min  #reset series minimum to a more useful 0
 
               # re-assign strain series
             data_df[strain_col_name] = strain_series
 
             #Adjust for any 0-stress lead-in
-  
 
             #Assign everything to the output dict
             file_output_dict['dataframe'] = data_df
@@ -1108,7 +1210,7 @@ def get_latest_logbook(directory):
                 #TODO: look through potential results and select the 'latest' option
                 pass
 
-    return logbook_filepath
+    return this_dict
 
 
 def split_filename_for_printname_guessing(filename,

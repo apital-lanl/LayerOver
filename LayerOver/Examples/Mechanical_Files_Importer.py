@@ -91,13 +91,15 @@ for filename in filenames:
                 plt.figure(figsize = (10,10))
                 plt.scatter(data_df[strain_col_name], data_df[stress_col_name])
                 plt.title(f"All mech data in {os.path.basename(filename)}")
+                plt.xlabel("Strain")
+                plt.ylabel("Stress")
                 plt.show()
         except:
             print()
             print("Plot failure (hopefully for obvious reasons)")
 
 
-        replicate_dict = mech.pull_mechanical_replicates(data_df, data_dict = None)
+        replicate_dict = mech.pull_mechanical_replicates(data_df, data_dict = None, report_nonnegative_strain = False)
           # pull keys from returned dict
         replicate_parse_success =  replicate_dict['replicate_parse_success']
         number_of_replicates = replicate_dict['number_of_replicates']
@@ -128,10 +130,13 @@ for filename in filenames:
                 plt.scatter(last_df['strain_data_loading'], last_df['stress_data_loading'], color = 'r')
                 plt.scatter(last_df['strain_data_unloading'], last_df['stress_data_unloading'], color = 'g')
                 plt.title(f"Final replicate cycle for {os.path.basename(filename)}")
+                plt.xlabel("Strain")
+                plt.ylabel("Stress")
+                plt.legend([f"Replicate {number_of_replicates} Loading curve", f"Replicate {number_of_replicates} Unloading curve"])
                 plt.show()
         except:
             print()
             print("Plot failure (hopefully for obvious reasons)")
 
     except:
-        print(r"\n", "Skipping file due to parse failure.")
+        print(f"/n", "Skipping file due to parse failure.")
