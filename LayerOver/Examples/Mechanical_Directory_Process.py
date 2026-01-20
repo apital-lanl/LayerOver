@@ -16,3 +16,14 @@ Description:
 
 """
 
+from LayerOver.DataAnalysis import MechanicalData as mech
+from tkinter import Tk, filedialog
+
+#Select the directory
+root = Tk()
+mech_directory = filedialog.askdirectory()
+root.destroy()
+
+#
+mech.process_directory_for_mech_files(directory= mech_directory, 
+                                     show_each_file_results= False)

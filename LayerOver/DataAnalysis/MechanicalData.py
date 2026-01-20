@@ -154,15 +154,24 @@ def process_directory_for_mech_files(directory=None,
     mech_file_keys = list(mech_filedata_dict.keys())
 
     #Open each file and process
-    for filename in mech_file_keys:
+    for filename_key in mech_file_keys:
         
         print()
         print("#"*50)
-        print(f"Parsing {os.path.basename(filename)}")
+        print(f"Parsing {os.path.basename(filepath)}")
 
         #Pull file metadata
+        this_file_dict = mech_filedata_dict[filename_key]
+        #        this_file_dict keys
+        # filetype                    str
+        # filename                    str
+        # filepath                    str
+        # immediate_partent_directory str
+        # parse_type                  str
+        # clean_filename              str
+        filepath = this_file_dict['filepath']
 
-        namerow_dict = check_for_namerow(filename, 
+        namerow_dict = check_for_namerow(filepath, 
                                          show_peaks = show_each_file_results)
         # keys in 'namerow_dict':
             #     'successful_parse'        bool
@@ -176,7 +185,7 @@ def process_directory_for_mech_files(directory=None,
         this_filetype = namerow_dict['filetype']
 
         if 'csv' in this_filetype.lower():
-            file_output_dict = parse_mech_data_fromcsv(filename)\
+            file_output_dict = parse_mech_data_fromcsv(filepath)
             # keys in 'file_output_dict':
             #     'parse_status'                dict
             #         'file_pandas_readable'    bool
@@ -189,7 +198,7 @@ def process_directory_for_mech_files(directory=None,
         elif 'xlsx' in this_filetype.lower():
             good_sheet_check = bool(namerow_dict['successful_parse'] and (namerow_dict['data_sheetname'] != ''))
             if good_sheet_check:
-                file_output_dict = parse_mech_data_fromxlsx(filename, data_dict=namerow_dict)
+                file_output_dict = parse_mech_data_fromxlsx(filepath, data_dict=namerow_dict)
             else:
                 print("Failure to find good sheet in Excel file; check parsing or file contents.")
                 data_df = pd.DataFrame({"Failure":[]})
@@ -210,7 +219,7 @@ def process_directory_for_mech_files(directory=None,
             if show_each_file_results:
                 plt.figure(figsize = (10,10))
                 plt.scatter(data_df[strain_col_name], data_df[stress_col_name])
-                plt.title(f"All mech data in {os.path.basename(filename)}")
+                plt.title(f"All mech data in {os.path.basename(filepath)}")
                 plt.xlabel("Strain")
                 plt.ylabel("Stress")
                 plt.show()
@@ -245,7 +254,7 @@ def process_directory_for_mech_files(directory=None,
                     plt.figure(figsize = (10,10))
                     plt.scatter(last_df['strain_data_loading'], last_df['stress_data_loading'], color = 'r')
                     plt.scatter(last_df['strain_data_unloading'], last_df['stress_data_unloading'], color = 'g')
-                    plt.title(f"Final replicate cycle for {os.path.basename(filename)}")
+                    plt.title(f"Final replicate cycle for {os.path.basename(filepath)}")
                     plt.xlabel("Strain")
                     plt.ylabel("Stress")
                     plt.legend([f"Replicate {number_of_replicates} Loading curve", f"Replicate {number_of_replicates} Unloading curve"])
@@ -759,8 +768,8 @@ def parse_mech_data_filename(filename):
       # split out filename from filetype
     filename = os.path.splitext(filename)[0]
       # initialize differently parsed names
-    name_split_list_under = this_name.split('_')
-    name_split_list_hyphen = this_name.split('-')
+    name_split_list_under = filename.split('_')
+    name_split_list_hyphen = filename.split('-')
 
     #Try different name parsing schemes
     if len(name_split_list_under)==0 and len(name_split_list_hyphen)==0:
@@ -1177,7 +1186,7 @@ def get_latest_logbook(directory):
     
     #Initialize variables
     logbook_filepath = None
-    potential_logbook_dicts = []
+    potential_logbook_dicts = {}
     
     #Walk the directory and try to find a logbook
     for root, dirs, files in os.walk(directory, topdown = True):
