@@ -1,5 +1,5 @@
 """
-Copyright 2026. Triad National Security, LLC. All rights reserved.
+Copyright 2025. Triad National Security, LLC. All rights reserved.
 This program was produced under U.S. Government contract 89233218CNA000001 for Los Alamos National Laboratory (LANL), 
 which is operated by Triad National Security, LLC for the U.S. Department of Energy/National Nuclear Security 
 Administration. All rights in the program are reserved by Triad National Security, LLC, and the U.S. Department of 
@@ -7,28 +7,33 @@ Energy/National Nuclear Security Administration. The Government is granted for i
 a nonexclusive, paid-up, irrevocable worldwide license in this material to reproduce, prepare. derivative works, 
 distribute copies to the public, perform publicly and display publicly, and to permit others to do so.
 
-Created:   2025-11-25
+Created:   20YY-MM-DD
 Version:   0.1.0
 
 @author: Aaron Pital (Los Alamos National Lab)
 
-Description: Module for definition, storage, and retrieval of LayerOver-specific configuration 
+Description: Short script to open a digital logbook instance as a Pandas DataFrame.
 
 """
 
-default_root_folder_dict = {
-    'logs': 'logs',
-    'pointers': {
-        },
-    'projects':{
-        }
-    }
+#Import libraries and functions
+import os
+from tkinter import Tk, filedialog
 
-blank_config_file = {
-    'projects': {},
-    'directories': {},
-    'root_data_path': '',
-    'root_logging_path': '',
-    'root_dict_path':''
-    }
+from LayerOver.DataAnalysis.MechanicalData import open_logbook
+
+#Select the file to open
+root = Tk()
+logbook_filepath = filedialog.askopenfilename()
+root.destroy()
+
+#Open the file as a pd.DataFrame
+logbook_df = open_logbook(logbook_filepath,
+                          target_excel_sheetname = None)
+
+print(logbook_df.head(50))
+
+print(f"Columns: ")
+for column_name in list(logbook_df.columns):
+    print(f"\t {column_name}")
 

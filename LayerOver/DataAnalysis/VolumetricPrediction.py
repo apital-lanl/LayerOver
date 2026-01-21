@@ -39,12 +39,6 @@ generic_punch_sizes = {
         'diameter': 5/8
         }
     }
-generic_materials = {
-    'll50': {},
-    'll60': {},
-    'SE1700': {},
-    'PDMS': {}
-    }
 
 # 'print_type'-  'flat'; 'hemi'; 'shaped-special'
 generic_volume_dict = {

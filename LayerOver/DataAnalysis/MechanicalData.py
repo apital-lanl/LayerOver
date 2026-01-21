@@ -12,13 +12,17 @@ Version:   0.1.0
 
 @author: Aaron Pital (Los Alamos National Lab)
 
-Description: Module for pulling and analyzing mechanical data from Excel and CSV files.
+Description: Module for pulling and analyzing mechanical data (stress/strain exclusively at the moment) from Excel and CSV files.
 
 TODO:
     -'get_latest_logbook'
         -add parsing to try and extract date
         -pull filemetada to get creation and last modified dates
-    - 
+    -'open_logbook'
+        -Add 'skin nozzle diameter' and 'layer nozzle diameter' columns
+        -Split nozzle diameter column by / and populate
+        -Check 'Pitch' column for 'x' (i.e. "1.25x") and replace with actual value
+        -Add "Pitch as strand fraction" column and populate
 
 """
 
@@ -38,6 +42,8 @@ from LayerOver.PSPP.DIWStructure import blank_diw_logbook_row_dict
 #Define hard-coded thresholds and setting values
 default_stress_threshold = 0.2   #in kPa; for silicone elastomers, but should be relatively general
 strain_minimum_mask_threshold = -0.1  #minimum strain to accept (<0 to allow for noise at 0 strain)
+  # default name for the digital logbook sheet with all the actual logbook data
+default_digital_logbok_sheetname = 'Digital Logbook'   #Appropriate sheet as of 2026-01-21
 
 #Example column names for various types of report from mechanical testing instruments
 # used to guess which 1) type of mech data is being parsed, 2) which row in the spreadsheet contains the column names, 
@@ -146,8 +152,23 @@ def process_directory_for_mech_files(directory=None,
         root = Tk()
         directory = filedialog.askdirectory(title="Select directory with all the mechanical data.")
         root.destroy()
-      # try and find the 'latest' logbook
-    get_latest_logbook(directory)
+    #Try and find the 'latest' logbook
+      # brute-force a logbook search for a couple of levels of parent directory if none is found in analysis directory
+    logbook_filepath = get_latest_logbook(directory)   #Returns a str if successful and NONE if not successful
+      # immediate parent directory
+    if not logbook_filepath:
+        parent_directory = os.path.basename(os.path.dirname(directory))
+        logbook_filepath = get_latest_logbook(parent_directory)
+      # grand-parent directory
+    if not logbook_filepath:
+        parent_directory = os.path.basename(os.path.dirname(parent_directory))
+        logbook_filepath = get_latest_logbook(parent_directory)
+      # open the logbook as
+    if logbook_filepath:
+        logbook_df = open_logbook(logbook_filepath,
+                                  target_excel_sheetname = None)
+    else:
+        pass
 
     #Get all CSV and XLSX files in the directory
     mech_filedata_dict = walk_directory_for_mech_files(directory)
@@ -155,55 +176,62 @@ def process_directory_for_mech_files(directory=None,
 
     #Open each file and process
     for filename_key in mech_file_keys:
+
+        #Initialize this file's return dict
+        this_file_dict = {
+            'filename': None,
+            'filepath': None,
+            'filetype': None,
+            'immediate_partent_directory': None,
+            'parse_type': None,
+            'clean_filename': None,
+            }
         
         print()
         print("#"*50)
         print(f"Parsing {os.path.basename(filepath)}")
 
         #Pull file metadata
-        this_file_dict = mech_filedata_dict[filename_key]
-        #        this_file_dict keys
-        # filetype                    str
-        # filename                    str
-        # filepath                    str
-        # immediate_partent_directory str
-        # parse_type                  str
-        # clean_filename              str
-        filepath = this_file_dict['filepath']
+        filedata_dict = mech_filedata_dict[filename_key]
+        filepath = filedata_dict['filepath']
+          # assign values to output dict
+        this_file_dict['filetype'] = filedata_dict['filetype']
+        this_file_dict['filename'] = filedata_dict['filename']
+        this_file_dict['filepath'] = filedata_dict['filepath']
+        this_file_dict['immediate_partent_directory'] = filedata_dict['immediate_partent_directory']
+        this_file_dict['parse_type'] = filedata_dict['parse_type']
+        this_file_dict['clean_filename'] = filedata_dict['clean_filename']
 
+        #Validate namerow location for column names
         namerow_dict = check_for_namerow(filepath, 
                                          show_peaks = show_each_file_results)
-        # keys in 'namerow_dict':
-            #     'successful_parse'        bool
-            #     'likely_name_row'         int
-            #     'initial_garbage'         bool
-            #     'data_type_guess'         str
-            #     'data_type_match_count'   int
-            #     'filetype'                str; 'csv' or 'xlsx'
-            #     'data_sheetname'          str
-            #     'text_rows'               dict
+          # assign values to output dict
         this_filetype = namerow_dict['filetype']
+        this_file_dict['data_namerow_dict'] = namerow_dict
 
+        #Load and parse the actual raw data from the file
         if 'csv' in this_filetype.lower():
             file_output_dict = parse_mech_data_fromcsv(filepath)
-            # keys in 'file_output_dict':
-            #     'parse_status'                dict
-            #         'file_pandas_readable'    bool
-            #         'namerow_good'            bool
-            #         'namerow_idx'             int
-            #     'filename'                    str
-            #     'filepath'                    str
-            #     'dataframe'                   pandas.DataFrame (hopefully)
+            data_df = file_output_dict['dataframe']
 
         elif 'xlsx' in this_filetype.lower():
             good_sheet_check = bool(namerow_dict['successful_parse'] and (namerow_dict['data_sheetname'] != ''))
             if good_sheet_check:
                 file_output_dict = parse_mech_data_fromxlsx(filepath, data_dict=namerow_dict)
+                data_df = file_output_dict['dataframe']
             else:
                 print("Failure to find good sheet in Excel file; check parsing or file contents.")
                 data_df = pd.DataFrame({"Failure":[]})
-    
+        
+        #Assign data and parse status to output dict
+        this_file_dict['pandas_readable'] = file_output_dict['parse_status']['file_pandas_readable']
+        this_file_dict['raw_data'] = data_df
+
+        #Take mechanical data and populate a return dictionary from various processing steps
+        #  NOTE: these are the steps that sometimes fail, so they're wrapped into a Try loop
+        #  TODO: add error reporting functionality 
         try:
+            #Assign data and find correct columns
             data_df = file_output_dict['dataframe']
             column_names = list(data_df.columns)
             for column in column_names:
@@ -233,7 +261,10 @@ def process_directory_for_mech_files(directory=None,
             peak_to_valley_index_diff = replicate_dict['peak_to_valley_index_diff']
               # each value in "replicate_data_dict" is a pandas.DataFrame (hopefully)
               # replicate numbering starts at 1
-            replicate_data_dict = peak_to_valley_index_diff = replicate_dict['replicate_data']
+            replicate_data_dict = replicate_dict['replicate_data']
+            this_file_dict['replicate_data'] = replicate_dict['replicate_data']
+
+            #Try and pull, plot the last replicate if desired
             try:
                 last_df = replicate_data_dict[number_of_replicates]
 
@@ -243,12 +274,12 @@ def process_directory_for_mech_files(directory=None,
                 if replicate_parse_success:
                     print(f"Number of replicates parsed: {number_of_replicates}")
                 else:
-                    print("Failure to pull mechanical data replicates.")
+                    print("Failure to resolve individual mechanical data replicates.")
                 print()
             except KeyError:
                 print()
-                print("Failure to parse file (no replicate mechanical data found)")
-
+                print("Failure to resolve individual mechanical data replicates")
+                print("     (no replicate mechanical data found for last index)")
             try:
                 if show_each_file_results:
                     plt.figure(figsize = (10,10))
@@ -262,14 +293,27 @@ def process_directory_for_mech_files(directory=None,
             except:
                 print()
                 print("Final replicate plot failure (hopefully for obvious reasons)")
+                
+            #
+
+
+            #
+                
+            #Write the results to the global directory return dictionary    
+            mech_data_dict[filename_key] = this_file_dict
 
         except Exception as le:
             #'le' stands for 'loop error'
             print(le)
+            print()
+            print("Failure to parse; moving on to next file.")
             print("_"*50)
             print()
 
-        # logbook_dict = check_logbook_for_printname(printname)
+            #Write the results to the global directory return dictionary    
+            mech_data_dict[filename_key] = this_file_dict
+
+        
 
 
 def walk_directory_for_mech_files(directory=None):
@@ -1192,6 +1236,7 @@ def get_latest_logbook(directory):
     #Initialize variables
     logbook_filepath = None
     potential_logbook_dicts = {}
+    automatedanalysis_versions = []
     
     #Walk the directory and try to find a logbook
     for root, dirs, files in os.walk(directory, topdown = True):
@@ -1206,6 +1251,7 @@ def get_latest_logbook(directory):
 
             if ('logbook' in file.lower()) and ('automatedanalysis' in file.lower()):
                 logbook_filepath = os.path.join(root, file)
+                automatedanalysis_versions.append(os.path.join(root, file))
 
             elif ('logbook' in file.lower()):
                 #Instantialize variables
@@ -1220,11 +1266,65 @@ def get_latest_logbook(directory):
 
                 potential_logbook_dicts.update({file: this_dict})
 
-            if not logbook_filepath:
-                #TODO: look through potential results and select the 'latest' option
-                pass
+    if len(automatedanalysis_versions) ==1:
+        #Congrats! You found the only appropriate version
+        pass
+    #If no single 'automatedanalysis' logbook is found, look through the options
+    #TODO: finish this
+    elif len(automatedanalysis_versions) >1:
+        best_latest_logbook_guess = None
+        for potential_logbook_filename in list(potential_logbook_dicts.keys()):
+            underscore_split = potential_logbook_filename.split('_')
+        if len(underscore_split) >1:
+            pass
+    
+    #If there's still no filepath, loop through all found logbooks and try to ID the most appropriate one (latest version)
+    elif not best_latest_logbook_guess:
+        #TODO: look through potential results and select the 'latest' option
+        pass
 
-    return this_dict
+    return logbook_filepath
+
+
+def open_logbook(logbook_filepath,
+                 target_excel_sheetname = None):
+    """
+    Description:
+        Open a logbook copy and return a DataFrame 
+
+    INPUT:
+        'logbook_filepath'  str (filepath); 
+    ACTION:
+        -lorem
+    OUTPUT:
+        'logbook_df'        pd.DataFrame; 'cleaned' logbook
+    """
+
+    #Initialize variables
+    logbook_df = pd.DataFrame([])
+    if not target_excel_sheetname:
+        target_sheetname =  default_digital_logbok_sheetname
+
+    #Open the logbook
+    if logbook_filepath.lower().endswith('.csv'):
+        logbook_df = pd.read_csv(logbook_filepath, encoding_errors= 'ignore')
+    if logbook_filepath.lower().endswith('.xlsx'):
+        try:
+            logbook_df = pd.read_excel(logbook_filepath, sheet_name= target_sheetname)
+        except:
+            #TODO: add functionality to look for appropriate sheet if 'target_sheetname' fails
+            pass
+        rows = excel_df.values.tolist()
+            # assign header row to column names; if these are superseded by cell text, 'header_row' will be updated
+            # i.e. if 'rows' DataFrame has garbage column names because the first row doesn't contain actual column names, the for loop below will find a better guess
+        header_row = list(excel_df.columns)
+    
+    #Clean the dataframe
+    
+
+    #Split nozzle diameter rows into 'skin' and 'layer'
+
+    return logbook_df
 
 
 def split_filename_for_printname_guessing(filename,
