@@ -105,7 +105,7 @@ diw_structure_codes = {
     }
 
 #Pulled straight from logbook entries
-blank_diw_param_dict = {
+blank_diw_logbook_row_dict = {
     'print_name':'',
     'structure':'',
     'strand_diameter':'',

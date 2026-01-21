@@ -32,7 +32,7 @@ from tkinter import filedialog, Tk
 from scipy.signal import find_peaks
 
   # import other LayerOver modules or module parts
-from LayerOver.PSPP.DIWStructure import blank_diw_structure_dict
+from LayerOver.PSPP.DIWStructure import blank_diw_logbook_row_dict
 
 #Define variables
 #Define hard-coded thresholds and setting values
@@ -1128,13 +1128,18 @@ def try_and_guess_units(column_name):
     return unit_guess
 
 
-def check_logbook_for_printname(printname, logbook):
+def check_logbook_for_printname(printname, logbook,
+                                row_dict_template = None):
     '''
     Description:
         Take filename or explicit part print name and return a dictionary of matching printnames from a logbook.
     '''
     #Initialize variables
     matching_rows_dict = {}
+    if not row_dict_template:
+        blank_row_dict = blank_diw_logbook_row_dict
+    else:
+        blank_row_dict = row_dict_template
 
     #Parse 'logbook' to make sure it's a DataFrame
     if type(logbook) == str:
