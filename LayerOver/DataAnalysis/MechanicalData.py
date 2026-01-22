@@ -1308,19 +1308,24 @@ def open_logbook(logbook_filepath,
     #Open the logbook
     if logbook_filepath.lower().endswith('.csv'):
         logbook_df = pd.read_csv(logbook_filepath, encoding_errors= 'ignore')
+        header_row = list(logbook_df.columns)
     if logbook_filepath.lower().endswith('.xlsx'):
         try:
             logbook_df = pd.read_excel(logbook_filepath, sheet_name= target_sheetname)
         except:
             #TODO: add functionality to look for appropriate sheet if 'target_sheetname' fails
             pass
-        rows = excel_df.values.tolist()
-            # assign header row to column names; if these are superseded by cell text, 'header_row' will be updated
-            # i.e. if 'rows' DataFrame has garbage column names because the first row doesn't contain actual column names, the for loop below will find a better guess
         header_row = list(excel_df.columns)
     
     #Clean the dataframe
-    
+      # split out skin vs. layer nozzle size if different
+      # Logbook column name as of 2026-01-22 = "Strand Diameter, nominal (skin/heli)"
+    for column_name in header_row:
+        if 'strand diameter' in column_name.lower():
+            diameter_column_name = column_name
+    logbook_df['Strand Diameter, Skin'] = [entry[0] if (len(entry>1)) else entry for entry in logbook_df['diameter_column_name'].apply(lambda s: s.split(r'/'))]
+    logbook_df['Strand Diameter, Layer'] = [entry[1] if (len(entry>1)) else entry for entry in logbook_df['diameter_column_name'].apply(lambda s: s.split(r'/'))]
+   
 
     #Split nozzle diameter rows into 'skin' and 'layer'
 
@@ -1347,7 +1352,9 @@ def split_filename_for_printname_guessing(filename,
         'full_input_name': '',
         'best_guess_printname': '',
         'iteration_marker': '',
-
         }
+
+    pass
+
 
 
