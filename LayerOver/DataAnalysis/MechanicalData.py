@@ -19,8 +19,6 @@ TODO:
         -add parsing to try and extract date
         -pull filemetada to get creation and last modified dates
     -'open_logbook'
-        -Add 'skin nozzle diameter' and 'layer nozzle diameter' columns
-        -Split nozzle diameter column by / and populate
         -Check 'Pitch' column for 'x' (i.e. "1.25x") and replace with actual value
         -Add "Pitch as strand fraction" column and populate
 
@@ -29,6 +27,7 @@ TODO:
 #Import libraries
 import csv
 import matplotlib.pyplot as plt
+import numpy as np
 import os
 import pandas as pd
 import re
@@ -1297,7 +1296,7 @@ def open_logbook(logbook_filepath,
     ACTION:
         -lorem
     OUTPUT:
-        'logbook_df'        pd.DataFrame; 'cleaned' logbook
+        'logbook_df'        pd.DataFrame; 'cleaned' logbook with standardized column data and column names
     """
 
     #Initialize variables
@@ -1318,18 +1317,34 @@ def open_logbook(logbook_filepath,
         header_row = list(excel_df.columns)
     
     #Clean the dataframe
-      # split out skin vs. layer nozzle size if different
-      # Logbook column name as of 2026-01-22 = "Strand Diameter, nominal (skin/heli)"
+      # get the column names for columns to be cleaned
     for column_name in header_row:
         if 'strand diameter' in column_name.lower():
             diameter_column_name = column_name
-    logbook_df['Strand Diameter, Skin'] = [entry[0] if (len(entry>1)) else entry for entry in logbook_df['diameter_column_name'].apply(lambda s: s.split(r'/'))]
-    logbook_df['Strand Diameter, Layer'] = [entry[1] if (len(entry>1)) else entry for entry in logbook_df['diameter_column_name'].apply(lambda s: s.split(r'/'))]
-   
+        if 'pitch' in column_name.lower():
+            pitch_column_name = column_name
 
-    #Split nozzle diameter rows into 'skin' and 'layer'
+      # split out skin vs. layer nozzle size if different
+      # Logbook column name as of 2026-01-22 = "Strand Diameter, nominal (skin/heli)"
+    logbook_df['Strand Diameter, Skin'] = [entry[0] if (len(entry)>1) else entry[0] for entry in logbook_df[diameter_column_name].apply(lambda s: str(s).split(r'/'))]
+    logbook_df['Strand Diameter, Layer'] = [entry[1] if (len(entry)>1) else entry[0] for entry in logbook_df[diameter_column_name].apply(lambda s: str(s).split(r'/'))]
+
+      # if pitch column as an 'x', replace cell value with layer nozzle size times 'x' ammount (i.e. '1.25x' becomes "1.25 * layer_nozzle_size")
+    logbook_df[pitch_column_name] = logbook_df[pitch_column_name].astype(str)
+    x_mask = logbook_df[pitch_column_name].str.contains('x', case=False, na=False)
+    logbook_df.loc[x_mask, pitch_column_name] = (
+        logbook_df.loc[x_mask, pitch_column_name].str.replace('x', '', case=False).astype(float) * 
+        logbook_df.loc[x_mask, 'Strand Diameter, Layer']
+        )
 
     return logbook_df
+
+
+def parse_pitch_to_layer_list(pitch_cell_string):
+    """
+    Description:
+        Take the cell contents for "Pitch (um)" column in digital logbook and return a list of pitch values for each layer
+    """
 
 
 def split_filename_for_printname_guessing(filename,

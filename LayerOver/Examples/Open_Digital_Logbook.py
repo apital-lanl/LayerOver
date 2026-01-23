@@ -31,8 +31,11 @@ root.destroy()
 logbook_df = open_logbook(logbook_filepath,
                           target_excel_sheetname = None)
 
+#Get a glance at the logbook
 print(logbook_df.head(50))
+print()
 
+#Check column names
 print(f"Columns: ")
 for column_name in list(logbook_df.columns):
     print(f"\t {column_name}")
