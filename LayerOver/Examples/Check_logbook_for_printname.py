@@ -7,7 +7,7 @@ Energy/National Nuclear Security Administration. The Government is granted for i
 a nonexclusive, paid-up, irrevocable worldwide license in this material to reproduce, prepare. derivative works, 
 distribute copies to the public, perform publicly and display publicly, and to permit others to do so.
 
-Created:   20YY-MM-DD
+Created:   20YY-01-26
 Version:   0.1.0
 
 @author: Aaron Pital (Los Alamos National Lab)
@@ -24,6 +24,9 @@ from tkinter import Tk, filedialog
 from LayerOver.DataAnalysis.MechanicalData import open_logbook
 from LayerOver.DataAnalysis.MechanicalData import split_filename_for_printname_guessing
 
+#String to check for
+check_string = "20240813-SJS-01-C.csv"
+
 #Select the file to open
 root = Tk()
 logbook_filepath = filedialog.askopenfilename()
@@ -33,19 +36,21 @@ root.destroy()
 logbook_df = open_logbook(logbook_filepath,
                           target_excel_sheetname = None)
 
-#Get a glance at the logbook
-print(logbook_df.head(50))
-print()
+#Check against logbook
+printname_guess_dict = split_filename_for_printname_guessing(check_string, logbook_df)
+    # Dict keys:
+    # 'full_input_name': filename,
+    # 'best_guess_printname': '',
+    # 'printname_parse_bool': False,
+    # 'iteration_marker': '',
+    # 'all_potential_matches': [],
+    # 'all_match_scores': []
 
-#Check column names
-print(f"Columns: ")
-for column_name in list(logbook_df.columns):
-    print(f"\t {column_name}")
+matches = printname_guess_dict['all_matches']
+scores = printname_guess_dict['all_match_scores']
+best_guess = printname_guess_dict['best_guess_printname']
 
-#Save DataFrame to CSV with a similar name
-savebook_filename = os.path.basename(logbook_filepath).replace('AutomatedAnalysis', 'AutomatedResults')
-savebook_filepath = os.path.join(os.path.dirname(logbook_filepath), savebook_filename)
-with open(savebook_filepath, 'w') as file:
-    logbook_df.to_csv(file, index= False, lineterminator='\n')
-
-
+print(f"The string '{check_string}' has the following matches:")
+for match, score in zip(matches, scores):
+    print(f"\t {match} \t\t\t {score}")
+print(f"\n Best printname guess: {best_guess} \n")

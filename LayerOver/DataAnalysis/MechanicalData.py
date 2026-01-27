@@ -26,6 +26,7 @@ TODO:
 
 #Import libraries
 import csv
+import math
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -162,11 +163,12 @@ def process_directory_for_mech_files(directory=None,
     if not logbook_filepath:
         parent_directory = os.path.basename(os.path.dirname(parent_directory))
         logbook_filepath = get_latest_logbook(parent_directory)
-      # open the logbook as
+      # open the logbook as a pandas DataFrame
     if logbook_filepath:
         logbook_df = open_logbook(logbook_filepath,
                                   target_excel_sheetname = None)
     else:
+        #TODO: need to add final recourse here if no logbook has been found
         pass
 
     #Get all CSV and XLSX files in the directory
@@ -293,8 +295,8 @@ def process_directory_for_mech_files(directory=None,
                 print()
                 print("Final replicate plot failure (hopefully for obvious reasons)")
                 
-            #
-
+            #Clean the filename to check against logbook
+            printname_guess_dict =   split_filename_for_printname_guessing(this_file_dict['filename'], printname_examples= logbook_df['Name'])
 
             #
                 
@@ -1314,7 +1316,7 @@ def open_logbook(logbook_filepath,
         except:
             #TODO: add functionality to look for appropriate sheet if 'target_sheetname' fails
             pass
-        header_row = list(excel_df.columns)
+        header_row = list(logbook_df.columns)
     
     #Clean the dataframe
       # get the column names for columns to be cleaned
@@ -1322,12 +1324,17 @@ def open_logbook(logbook_filepath,
         if 'strand diameter' in column_name.lower():
             diameter_column_name = column_name
         if 'pitch' in column_name.lower():
-            pitch_column_name = column_name
+            if 'layer list' in column_name.lower():
+                pitch_list_column_name = column_name
+            else:
+                pitch_column_name = column_name
 
       # split out skin vs. layer nozzle size if different
       # Logbook column name as of 2026-01-22 = "Strand Diameter, nominal (skin/heli)"
     logbook_df['Strand Diameter, Skin'] = [entry[0] if (len(entry)>1) else entry[0] for entry in logbook_df[diameter_column_name].apply(lambda s: str(s).split(r'/'))]
     logbook_df['Strand Diameter, Layer'] = [entry[1] if (len(entry)>1) else entry[0] for entry in logbook_df[diameter_column_name].apply(lambda s: str(s).split(r'/'))]
+    logbook_df['Strand Diameter, Skin'] = logbook_df['Strand Diameter, Skin'].astype(float)
+    logbook_df['Strand Diameter, Layer'] = logbook_df['Strand Diameter, Layer'].astype(float)
 
       # if pitch column as an 'x', replace cell value with layer nozzle size times 'x' ammount (i.e. '1.25x' becomes "1.25 * layer_nozzle_size")
     logbook_df[pitch_column_name] = logbook_df[pitch_column_name].astype(str)
@@ -1336,25 +1343,20 @@ def open_logbook(logbook_filepath,
         logbook_df.loc[x_mask, pitch_column_name].str.replace('x', '', case=False).astype(float) * 
         logbook_df.loc[x_mask, 'Strand Diameter, Layer']
         )
+    logbook_df.loc[x_mask, pitch_list_column_name] = logbook_df.loc[x_mask, pitch_column_name]
 
     return logbook_df
 
 
-def parse_pitch_to_layer_list(pitch_cell_string):
-    """
-    Description:
-        Take the cell contents for "Pitch (um)" column in digital logbook and return a list of pitch values for each layer
-    """
-
-
-def split_filename_for_printname_guessing(filename,
+def split_filename_for_printname_guessing(filename, logbook_df,
                                           printname_examples = None):
     """
     Description:
         Lorem
 
     INPUT:
-        'filename'          str filepath
+        'filename'              str filepath
+        'printname_examples'    list, pd.Series, np.array; take an iterable and make an np.array of lowrcase strings out of it
     ACTION:
         -lorem
     OUTPUT:
@@ -1363,13 +1365,112 @@ def split_filename_for_printname_guessing(filename,
     """
 
     #Initialize variables
+      # format examples as an array from whatever iterable is passed (should be short iterable so speed doesn't matter)
+    if printname_examples:
+        printname_examples = np.array([str(entry).lower() for entry in printname_examples])
+        printname_sets = [set(str(entry).lower()) for entry in printname_examples]
+    else:
+        printname_examples = logbook_df['Name']
+        printname_examples = np.array([str(entry).lower() for entry in printname_examples])
+        printname_sets = [set(str(entry).lower()) for entry in printname_examples]
+      # make sure 'filename' isn't a filepath and format for comparison
+    filename = os.path.basename(filename)
+    filename = filename.lower().replace(".csv","").replace(".xlsx","")
+      # initalize the return dict
     printname_dict = {
-        'full_input_name': '',
-        'best_guess_printname': '',
+        'full_input_name': filename,
+        'best_guess_printname': None,
+        'printname_parse_bool': False,
         'iteration_marker': '',
+        'all_matches': [],
+        'all_match_scores': []
         }
+      # regular expression pattern definitions for better printname parsing
+    datetime_pattern = r"^\d{8}$"
+    operator_pattern = r"[a-zA-Z]{3}"
+    datetime_string = ''
+    operator_strings = []
+    iterator_strings = []
 
-    pass
+
+    #Split the filename to match patterns
+    hyphen_list = filename.split('-')
+    underscore_list = filename.split('_')
+
+    #Check for formatting to match underscore format in logbook
+    if len(hyphen_list) > len(underscore_list):
+        #Run through each part of the filename and try to find components of a printname
+        for idx, name_part in enumerate(hyphen_list):
+            if re.match(datetime_pattern, name_part):
+                datetime_string = name_part
+            elif re.match(operator_pattern, name_part):
+                operator_strings.append(name_part)
+            else:
+                iterator_strings.append(name_part)
+    #Explicitly check for more underscores in case both split lists are short (i.e. 0 or 1)
+    elif len(hyphen_list) < len(underscore_list):
+        #Run through each part of the filename and try to find components of a printname
+        for idx, name_part in enumerate(underscore_list):
+            if re.match(datetime_pattern, name_part):
+                datetime_string = name_part
+            elif re.match(operator_pattern, name_part):
+                operator_strings.append(name_part)
+            else:
+                iterator_strings.append(name_part)
+
+    #Put together combinations of printname and check logbook print names for a match
+    # set is faster than alternatives, so do a quick pass
+    best_name_guesses = []
+    max_score = 0
+    potential_matches = []
+    match_scores = []
+    for operator_string in operator_strings:
+        for iterator_string in iterator_strings:
+            this_name_guess = f"{datetime_string}_{operator_string}_{iterator_string}"
+            this_name_set = set(this_name_guess)
+            for idx, print_set in enumerate(printname_sets):
+                bool_check = bool(
+                    (len(this_name_set.intersection(print_set))>5) and
+                    (datetime_string in printname_examples[idx])
+                    )
+                if bool_check:
+                    this_score = len(this_name_set.intersection(print_set))/len(this_name_set)
+                    potential_matches.append(printname_examples[idx])
+                    match_scores.append(this_score)
+                    if this_score >= max_score:
+                        best_name_guesses.append(this_name_guess)
+                        max_score = this_score
+
+    #Run through matches and try to find the best one
+    # use entropy here because the list is much shorter
+    # NOTE: this is portional entropy (i.e. it's non-negative and not zero)
+    min_diff_score = 100
+    best_name_guess = ''
+    ent_matches = []
+    ent_scores = []
+    for print_name_guess in best_name_guesses:
+        guess_set = set(print_name_guess)
+        guess_set_cnts = [print_name_guess.count(character) for character in guess_set]
+        guess_set_probs = [cnt/sum(guess_set_cnts) for cnt in guess_set_cnts]
+        guess_port_ent = sum([prob*math.log(cnt) for prob, cnt in zip(guess_set_probs, guess_set_cnts)])
+        for match in potential_matches:
+            match_set_cnts = [match.count(character) for character in guess_set]
+            match_set_probs = [cnt/sum(match_set_cnts) for cnt in match_set_cnts]
+            match_port_ent = sum([prob*math.log(cnt) for prob, cnt in zip(match_set_probs, match_set_cnts)])
+            relative_ent_diff = 1-(match_port_ent/guess_port_ent)
+            ent_matches.append(match)
+            ent_scores.append(relative_ent_diff)
+            if abs(relative_ent_diff) < min_diff_score:
+                min_diff_score = relative_ent_diff
+                best_name_guess = print_name_guess
+
+    printname_dict['all_matches'] = ent_matches
+    printname_dict['all_match_scores'] = ent_scores
+    if len(ent_matches) >0:
+        printname_dict['printname_parse_bool'] = True
+    printname_dict['best_guess_printname'] = best_name_guess
+
+    return printname_dict
 
 
 
