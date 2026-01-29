@@ -295,8 +295,12 @@ def process_directory_for_mech_files(directory=None,
                 print()
                 print("Final replicate plot failure (hopefully for obvious reasons)")
                 
-            #Clean the filename to check against logbook
-            printname_guess_dict =   split_filename_for_printname_guessing(this_file_dict['filename'], printname_examples= logbook_df['Name'])
+            #Clean the filename and check against logbook
+            printname_guess_dict =   split_filename_for_printname_guessing(this_file_dict['filename'], logbook_df)
+            matches = printname_guess_dict['all_matches']
+            scores = printname_guess_dict['all_match_scores']
+            best_guess = printname_guess_dict['best_guess_printname']
+            printname_match = printname_guess_dict['printname_parse_bool']
 
             #
                 
@@ -1352,7 +1356,7 @@ def split_filename_for_printname_guessing(filename, logbook_df,
                                           printname_examples = None):
     """
     Description:
-        Lorem
+        Take a mechanical data filename (CSV or XLSX), clean it up for comparison, and compare against the logbook to find a printname.
 
     INPUT:
         'filename'              str filepath
@@ -1383,11 +1387,12 @@ def split_filename_for_printname_guessing(filename, logbook_df,
         'printname_parse_bool': False,
         'iteration_marker': '',
         'all_matches': [],
-        'all_match_scores': []
+        'all_match_scores': [],
+        'logbook_entry': None
         }
       # regular expression pattern definitions for better printname parsing
     datetime_pattern = r"^\d{8}$"
-    operator_pattern = r"[a-zA-Z]{3}"
+    operator_pattern = r"[a-zA-Z]{2,3}"
     datetime_string = ''
     operator_strings = []
     iterator_strings = []
@@ -1419,7 +1424,7 @@ def split_filename_for_printname_guessing(filename, logbook_df,
                 iterator_strings.append(name_part)
 
     #Put together combinations of printname and check logbook print names for a match
-    # set is faster than alternatives, so do a quick pass
+    # set is faster than alternatives, so do a quick first pass
     best_name_guesses = []
     max_score = 0
     potential_matches = []
@@ -1441,10 +1446,10 @@ def split_filename_for_printname_guessing(filename, logbook_df,
                         best_name_guesses.append(this_name_guess)
                         max_score = this_score
 
-    #Run through matches and try to find the best one
+    #Run through matches and try to find the best one (second pass)
     # use entropy here because the list is much shorter
     # NOTE: this is portional entropy (i.e. it's non-negative and not zero)
-    min_diff_score = 100
+    min_diff_score = 1   #hard-coded minimum score based on testing; anything higher than this is usually garbage
     best_name_guess = ''
     ent_matches = []
     ent_scores = []
@@ -1459,33 +1464,82 @@ def split_filename_for_printname_guessing(filename, logbook_df,
             #Get letter counts and entropy for match string
             match_set_cnts = [match.count(character) for character in guess_set]
             match_set_probs = [cnt/sum(match_set_cnts) for cnt in match_set_cnts]
-            match_port_ent = sum([prob*math.log(cnt) for prob, cnt in zip(match_set_probs, match_set_cnts)])
+              # calculate the log if cnt isn't 0, return 0 if the cnt is <1 and math.log has a domain error
+            match_set_logs = [math.log(cnt) if (cnt>0) else 0 for cnt in match_set_cnts ]
+            match_port_ent = sum([prob*log for prob, log in zip(match_set_probs, match_set_logs)])
             #Get letter counts from the match letter set for the target string
             guess_set_cnts = [print_name_guess.count(character) for character in guess_set]
             guess_set_probs = [cnt/sum(guess_set_cnts) for cnt in guess_set_cnts]
-            guess_port_ent = sum([prob*math.log(cnt) for prob, cnt in zip(guess_set_probs, guess_set_cnts)])
+            guess_set_logs = [math.log(cnt) if (cnt>0) else 0 for cnt in guess_set_cnts]
+            guess_port_ent = sum([prob*log for prob, log in zip(guess_set_probs, guess_set_logs)])
             #Calculate a separate score metric based on how many of the target letter cnts are the same in the 'match' string
             cnt_diffs = [round((match_cnt/guess_cnt), 5) for match_cnt, guess_cnt in zip(match_set_cnts, guess_set_cnts)]
-              # ideally 'cnt_diffs' is [1,1,1, ...] for a perfect match, so divide by length of 'guess_set' to get ideal match value of 1
-            cnt_diff_total = sum(cnt_diffs)/len(guess_set)
             #Compare entropies 
             relative_ent_diff = 1-(guess_port_ent/match_port_ent)
+              # ideally 'cnt_diffs' is [1,1,1, ...] for a perfect match, so subtract length of 'guess_set' to get ideal match value of 0
               # deviation for each character from ideal could be >1 or <1, so 'relative_cnt_diff' magnitude is important
               # sign of 'cnt_diff_total' is a function of mostly string length; + if 'match' has a lot more characters but is a match, - if 'match' is shorter than expected
-            relative_cnt_diff = 1-(cnt_diff_total)
+            relative_cnt_diff = sum(cnt_diffs)-len(guess_set)
             this_score = relative_cnt_diff
-            #Save the scores and matches
-            ent_matches.append(match)
-            ent_scores.append(this_score)
-            if abs(this_score) < min_diff_score:
-                min_diff_score = this_score
+            #If score is better than threshold or previous best, add to everything important
+            #   Adding in a buffer to catch close but off cases (i.e. the '1.2' value means close +/- 20%)
+            if abs(this_score) <= (min_diff_score*2):
+                #Save the scores and matches
+                ent_matches.append(match)
+                ent_scores.append(this_score)
+                #Set best guess
+                min_diff_score = abs(this_score)
                 best_name_guess = print_name_guess
 
+    #Set final return dict values as appropriate
     printname_dict['all_matches'] = ent_matches
     printname_dict['all_match_scores'] = ent_scores
+    printname_dict['best_guess_printname'] = best_name_guess  #initial guess; return this guess if logbook lookup fails
+    
+    #Final printname guess and logbook lookup (third pass through printnames)
     if len(ent_matches) >0:
-        printname_dict['printname_parse_bool'] = True
-    printname_dict['best_guess_printname'] = best_name_guess
+        #Take 'best_name_guess' printname, split, and find datacode index
+        split_guess_name_list = best_name_guess.split('_')
+        
+        #Final format check before making assumptions about which data is in which spot
+        datetime_idx = -1
+        for idx, name_part in enumerate(split_guess_name_list):
+            if re.match(datetime_pattern, name_part):
+                datetime_string = name_part
+                datetime_idx = idx
+        clean_printname_iterator = ''
+        iterator_junk_list = []
+        if datetime_idx == 0:
+            printname_iterator = split_guess_name_list[2]
+            for idx, character in enumerate(printname_iterator):
+                #look for last iterator format of "00"
+                #   i.e. for '20260101_acp_01b', '_01' should be parsed as '01'
+                if character.isdigit() and (idx <2):
+                    clean_printname_iterator = clean_printname_iterator + str(character)
+                else:
+                    iterator_junk_list.append(character)
+            #Finalize guess name
+            clean_printname_guess = f"{split_guess_name_list[0]}_{split_guess_name_list[1]}_{clean_printname_iterator}"
+            printname_dict['best_guess_printname'] = clean_printname_guess
+
+            #Finalize logbook lookup
+            try:
+                if clean_printname_guess in printname_examples:
+                    logbook_df['Name'] = logbook_df['Name'].str.lower()
+                    printname_dict['logbook_entry'] = logbook_df[logbook_df['Name']==clean_printname_guess]
+                printname_dict['printname_parse_bool'] = True
+            except:
+                pass
+        
+        #Finish up mechanical testing iterator guessing
+        if len(iterator_junk_list) == 1:
+            printname_dict['iteration_marker'] = iterator_junk_list[0]
+          # if there's still junk left at this point, give up, assume the mechanical testing iteration marker is complicated, and just report it
+        else:
+            junk_string = ''
+            for characater in iterator_junk_list:
+                junk_string = junk_string + str(character)
+            printname_dict['iteration_marker'] = junk_string
 
     return printname_dict
 

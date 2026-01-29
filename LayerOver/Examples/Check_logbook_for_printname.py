@@ -25,7 +25,16 @@ from LayerOver.DataAnalysis.MechanicalData import open_logbook
 from LayerOver.DataAnalysis.MechanicalData import split_filename_for_printname_guessing
 
 #String to check for
-check_string = "20240813-SJS-02-C.csv"
+test_strings = [
+    "20240708_JRT_01a.csv",
+    "20240708_JRT_02a.csv",
+    "20241031-JRT-01-A.csv",
+    "20241008-JRT-02-A.csv",
+    "LL50unfilled5.xlsx",
+    "LL50-HF2.xlsx",
+    "HF_150noz_45deg_1.5xpit_1.xlsx",
+    "LL50+HFreruns-Test Run 2-ES Report Template.xlsx"
+    ]
 
 #Select the file to open
 root = Tk()
@@ -36,21 +45,27 @@ root.destroy()
 logbook_df = open_logbook(logbook_filepath,
                           target_excel_sheetname = None)
 
-#Check against logbook
-printname_guess_dict = split_filename_for_printname_guessing(check_string, logbook_df)
-    # Dict keys:
-    # 'full_input_name': filename,
-    # 'best_guess_printname': '',
-    # 'printname_parse_bool': False,
-    # 'iteration_marker': '',
-    # 'all_potential_matches': [],
-    # 'all_match_scores': []
+for test_filename_string in test_strings:
+    #Check against logbook
+    printname_guess_dict = split_filename_for_printname_guessing(test_filename_string, logbook_df)
+        # Dict keys:
+        # 'full_input_name': filename,
+        # 'best_guess_printname': '',
+        # 'printname_parse_bool': False,
+        # 'iteration_marker': '',
+        # 'all_matches': [],
+        # 'all_match_scores': []
+        # 'logbook_entry': None
 
-matches = printname_guess_dict['all_matches']
-scores = printname_guess_dict['all_match_scores']
-best_guess = printname_guess_dict['best_guess_printname']
+    matches = printname_guess_dict['all_matches']
+    scores = printname_guess_dict['all_match_scores']
+    best_guess = printname_guess_dict['best_guess_printname']
+    parse_check = printname_guess_dict['printname_parse_bool']
+    log_book_entry = printname_guess_dict['logbook_entry']
 
-print(f"The string '{check_string}' has the following matches:")
-for match, score in zip(matches, scores):
-    print(f"\t {match} \t\t\t {score}")
-print(f"\n Best printname guess: {best_guess} \n")
+    print(f"Parse check flag: {parse_check}")
+    print(f"The string '{test_filename_string}' has the following matches:")
+    for match, score in zip(matches, scores):
+        print(f"\t {match} \t\t\t {score}")
+    print(f"\n Best printname guess: {best_guess} \n")
+    print(log_book_entry)
