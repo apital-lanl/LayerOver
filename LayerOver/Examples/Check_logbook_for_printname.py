@@ -25,7 +25,7 @@ from LayerOver.DataAnalysis.MechanicalData import open_logbook
 from LayerOver.DataAnalysis.MechanicalData import split_filename_for_printname_guessing
 
 #String to check for
-check_string = "20240813-SJS-01-C.csv"
+check_string = "20240813-SJS-02-C.csv"
 
 #Select the file to open
 root = Tk()

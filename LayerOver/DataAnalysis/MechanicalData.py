@@ -1449,19 +1449,36 @@ def split_filename_for_printname_guessing(filename, logbook_df,
     ent_matches = []
     ent_scores = []
     for print_name_guess in best_name_guesses:
-        guess_set = set(print_name_guess)
-        guess_set_cnts = [print_name_guess.count(character) for character in guess_set]
-        guess_set_probs = [cnt/sum(guess_set_cnts) for cnt in guess_set_cnts]
-        guess_port_ent = sum([prob*math.log(cnt) for prob, cnt in zip(guess_set_probs, guess_set_cnts)])
+        #Get portional entropies (values are 0-pos_inf theoretically, i.e. non-negative) of the target string ('print_name_guess')
+        #   relative to the portional entropy of the matches.
+        #   Use the match string characters to calculate entropy, otherwise two close matches could have the same entropy.
         for match in potential_matches:
+            #Get character sets
+            guess_set = set(print_name_guess)
+            match_set = set(match)
+            #Get letter counts and entropy for match string
             match_set_cnts = [match.count(character) for character in guess_set]
             match_set_probs = [cnt/sum(match_set_cnts) for cnt in match_set_cnts]
             match_port_ent = sum([prob*math.log(cnt) for prob, cnt in zip(match_set_probs, match_set_cnts)])
-            relative_ent_diff = 1-(match_port_ent/guess_port_ent)
+            #Get letter counts from the match letter set for the target string
+            guess_set_cnts = [print_name_guess.count(character) for character in guess_set]
+            guess_set_probs = [cnt/sum(guess_set_cnts) for cnt in guess_set_cnts]
+            guess_port_ent = sum([prob*math.log(cnt) for prob, cnt in zip(guess_set_probs, guess_set_cnts)])
+            #Calculate a separate score metric based on how many of the target letter cnts are the same in the 'match' string
+            cnt_diffs = [round((match_cnt/guess_cnt), 5) for match_cnt, guess_cnt in zip(match_set_cnts, guess_set_cnts)]
+              # ideally 'cnt_diffs' is [1,1,1, ...] for a perfect match, so divide by length of 'guess_set' to get ideal match value of 1
+            cnt_diff_total = sum(cnt_diffs)/len(guess_set)
+            #Compare entropies 
+            relative_ent_diff = 1-(guess_port_ent/match_port_ent)
+              # deviation for each character from ideal could be >1 or <1, so 'relative_cnt_diff' magnitude is important
+              # sign of 'cnt_diff_total' is a function of mostly string length; + if 'match' has a lot more characters but is a match, - if 'match' is shorter than expected
+            relative_cnt_diff = 1-(cnt_diff_total)
+            this_score = relative_cnt_diff
+            #Save the scores and matches
             ent_matches.append(match)
-            ent_scores.append(relative_ent_diff)
-            if abs(relative_ent_diff) < min_diff_score:
-                min_diff_score = relative_ent_diff
+            ent_scores.append(this_score)
+            if abs(this_score) < min_diff_score:
+                min_diff_score = this_score
                 best_name_guess = print_name_guess
 
     printname_dict['all_matches'] = ent_matches
