@@ -21,9 +21,10 @@ from tkinter import Tk, filedialog
 
 #Select the directory
 root = Tk()
-mech_directory = filedialog.askdirectory()
+mech_directory = filedialog.askdirectory(title = "Select the directory with stress-strain data")
 root.destroy()
 
 #
-mech.process_directory_for_mech_files(directory= mech_directory, 
-                                     show_each_file_results= False)
+mech.process_directory_for_mech_files(directory = mech_directory, 
+                                     show_each_file_results = True,
+                                     save_last_replicate_graph = True)

@@ -33,6 +33,7 @@ import os
 import pandas as pd
 import re
 from tkinter import filedialog, Tk
+import traceback
 from scipy.signal import find_peaks
 
   # import other LayerOver modules or module parts
@@ -137,16 +138,46 @@ default_units_dict = {
         },
     }
 
+standard_logbook_columnnames = [
+    'Name',	
+    'Structure',
+    r'Strand Diameter, nominal (skin/heli)',
+    'Angle of Rotation (deg)',
+    'Lateral Offset (m)',	
+    'Pitch (m)',	
+    'Pitch Layer List',	
+    r'Syringe/Material',	
+    'Project',	
+    'Machine Name',	
+    'LayerUp File',	
+    'Version #',
+    'Notes',	
+    'Mechanical Data? (initals)',	
+    'Keyence? (initials)',	
+    'Punch Diameter',	
+    'Mass (g)',	
+    'Thickness (Checkline) (mm)',	
+    'Thickness (Confocal) (mm)',
+    'Thickness (Fancy KCNSC) (mm)',	
+    r'Density (g/cc)',	
+    'Thickness (Additional) (mm)',	
+    r'Thickness/ Density Initials',	
+    'Humidity',	
+    'Column1',	
+    ]
+
 
 ######################################################################################################################################
 ##### Generic Utilities  #############################################################################################################
 ######################################################################################################################################
 
 def process_directory_for_mech_files(directory=None, 
-                                     show_each_file_results= False):
+                                     show_each_file_results = False,
+                                     save_last_replicate_graph = False):
     
     #Initialize variables
     mech_data_dict = {}
+    meta_data_df_list = []
       # if no directory is added as input, select one
     if not directory:
         root = Tk()
@@ -187,10 +218,6 @@ def process_directory_for_mech_files(directory=None,
             'parse_type': None,
             'clean_filename': None,
             }
-        
-        print()
-        print("#"*50)
-        print(f"Parsing {os.path.basename(filepath)}")
 
         #Pull file metadata
         filedata_dict = mech_filedata_dict[filename_key]
@@ -199,9 +226,13 @@ def process_directory_for_mech_files(directory=None,
         this_file_dict['filetype'] = filedata_dict['filetype']
         this_file_dict['filename'] = filedata_dict['filename']
         this_file_dict['filepath'] = filedata_dict['filepath']
-        this_file_dict['immediate_partent_directory'] = filedata_dict['immediate_partent_directory']
+        this_file_dict['immediate_parent_directory'] = filedata_dict['immediate_parent_directory']
         this_file_dict['parse_type'] = filedata_dict['parse_type']
         this_file_dict['clean_filename'] = filedata_dict['clean_filename']
+
+        print()
+        print("#"*50)
+        print(f"Parsing {os.path.basename(this_file_dict['filename'])}")
 
         #Validate namerow location for column names
         namerow_dict = check_for_namerow(filepath, 
@@ -226,7 +257,7 @@ def process_directory_for_mech_files(directory=None,
         
         #Assign data and parse status to output dict
         this_file_dict['pandas_readable'] = file_output_dict['parse_status']['file_pandas_readable']
-        this_file_dict['raw_data'] = data_df
+        # this_file_dict['raw_data'] = data_df  #not sure we actually want to return this, but we could
 
         #Take mechanical data and populate a return dictionary from various processing steps
         #  NOTE: these are the steps that sometimes fail, so they're wrapped into a Try loop
@@ -263,7 +294,7 @@ def process_directory_for_mech_files(directory=None,
               # each value in "replicate_data_dict" is a pandas.DataFrame (hopefully)
               # replicate numbering starts at 1
             replicate_data_dict = replicate_dict['replicate_data']
-            this_file_dict['replicate_data'] = replicate_dict['replicate_data']
+            # this_file_dict['replicate_data'] = replicate_dict['replicate_data']   #not sure we actually want to return this, but we could
 
             #Try and pull, plot the last replicate if desired
             try:
@@ -290,7 +321,23 @@ def process_directory_for_mech_files(directory=None,
                     plt.xlabel("Strain")
                     plt.ylabel("Stress")
                     plt.legend([f"Replicate {number_of_replicates} Loading curve", f"Replicate {number_of_replicates} Unloading curve"])
+                    if save_last_replicate_graph:
+                        plot_save_directory = os.path.join(directory, "Extracted Mechanical Summary Data", "Last Stress-Strain Replicate Graphs")
+                        plot_save_name = os.path.join(plot_save_directory, f"LastMechReplicateGraph_{os.path.basename(filepath)}")
+                        plt.savefig(plot_save_name, dpi=300)
                     plt.show()
+                elif save_last_replicate_graph:
+                    plt.figure(figsize = (10,10))
+                    plt.scatter(last_df['strain_data_loading'], last_df['stress_data_loading'], color = 'r')
+                    plt.scatter(last_df['strain_data_unloading'], last_df['stress_data_unloading'], color = 'g')
+                    plt.title(f"Final replicate cycle for {os.path.basename(filepath)}")
+                    plt.xlabel("Strain")
+                    plt.ylabel("Stress")
+                    plt.legend([f"Replicate {number_of_replicates} Loading curve", f"Replicate {number_of_replicates} Unloading curve"])
+                    plot_save_directory = os.path.join(directory, "Extracted Mechanical Summary Data", "Last Stress-Strain Replicate Graphs")
+                    plot_save_name = os.path.join(plot_save_directory, f"LastMechReplicateGraph_{os.path.basename(filepath)}")
+                    plt.savefig(plot_save_name, dpi=300)
+
             except:
                 print()
                 print("Final replicate plot failure (hopefully for obvious reasons)")
@@ -300,16 +347,34 @@ def process_directory_for_mech_files(directory=None,
             matches = printname_guess_dict['all_matches']
             scores = printname_guess_dict['all_match_scores']
             best_guess = printname_guess_dict['best_guess_printname']
-            printname_match = printname_guess_dict['printname_parse_bool']
+            best_iterator_guess = printname_guess_dict['iteration_marker']
+            parse_check = printname_guess_dict['printname_parse_bool']
+            log_book_entry = printname_guess_dict['logbook_entry']
 
-            #
-                
+            #Add results to the return row for this file
+            this_file_dict['logbook_entry_found'] = parse_check
+            if parse_check:
+                this_file_dict['logbook_entry_found'] = best_iterator_guess
+                for logbook_column in standard_logbook_columnnames:
+                    this_file_dict[logbook_column] = log_book_entry[logbook_column]
+            else:
+                this_file_dict['mechanical_data_iteration'] = best_iterator_guess
+                for logbook_column in standard_logbook_columnnames:
+                    this_file_dict[logbook_column] = ''
+
             #Write the results to the global directory return dictionary    
+            meta_data_df = meta_data_df.append(this_file_dict, ignore_index = True)
             mech_data_dict[filename_key] = this_file_dict
+
+            print()
+            print("Entry added.")
+            print("_"*50)
+            print()
 
         except Exception as le:
             #'le' stands for 'loop error'
-            print(le)
+            print(f"Exception thrown: {le}")
+            print(traceback.format_exc())
             print()
             print("Failure to parse; moving on to next file.")
             print("_"*50)
@@ -317,8 +382,14 @@ def process_directory_for_mech_files(directory=None,
 
             #Write the results to the global directory return dictionary    
             mech_data_dict[filename_key] = this_file_dict
+            meta_data_df_list.append(this_file_dict)
 
-        
+        #Make the final dataframe
+        meta_data_df = pd.DataFrame(meta_data_df_list)
+
+        #Save the final dictionary
+        save_directory = os.path.join(directory, "Extracted Mechanical Summary Data")
+        csv_save_name = os.path.join(save_directory, "Summary of Directory Mechanical Data")
 
 
 def walk_directory_for_mech_files(directory=None):
@@ -708,7 +779,7 @@ def pull_mechanical_replicates(data_df, data_dict = None,
     
     #Loading cycles start at (peak_idx-valley_idx), Unloading cycles end at (peak_idx+valley_idx)
     for replicate_idx, peak_idx in enumerate(peaks):
-        load_start_idx = peak_idx-cycle_index_diff_guess
+        load_start_idx = peak_idx-cycle_index_diff_guess-strain_zero_offset
         unload_end_idx = peak_idx+cycle_index_diff_guess
         #Make sure indices are in-bounds for data size
         if load_start_idx<0:
@@ -933,8 +1004,17 @@ def parse_mech_data_fromcsv(mech_data_filepath,
                         strain_col_idx = col_idx
                         strain_col_name = cell_text
 
-            #Finally, open the data
-            data_df = pd.read_csv(mech_data_filepath, usecols=[stress_col_idx, strain_col_idx], skiprows=(start_row_idx) )
+            #Finally, try to open the data
+            try:
+                data_df = pd.read_csv(mech_data_filepath, usecols=[stress_col_idx, strain_col_idx], skiprows=(start_row_idx) )
+            except UnboundLocalError:
+                #If you don't find a 'stress_column_name' or 'strain_column_name', assume this isn't a good mechanical file
+                file_output_dict['dataframe'] = pd.DataFrame({})
+                file_output_dict['parse_status']['file_pandas_readable'] = False
+                file_output_dict['parse_status']['namerow_good'] = False
+                file_output_dict['parse_status']['namerow_idx'] = 0
+                
+                return file_output_dict
 
             #Make sure the strain is right-side up (i.e. positive values only), ignore lead-in if not at 0, and set minimum at 0
             try:
@@ -1325,10 +1405,12 @@ def open_logbook(logbook_filepath,
     #Clean the dataframe
       # get the column names for columns to be cleaned
     for column_name in header_row:
+        #Set some default column names
+
         if 'strand diameter' in column_name.lower():
             diameter_column_name = column_name
         if 'pitch' in column_name.lower():
-            if 'layer list' in column_name.lower():
+            if 'list' in column_name.lower():
                 pitch_list_column_name = column_name
             else:
                 pitch_column_name = column_name
@@ -1347,6 +1429,7 @@ def open_logbook(logbook_filepath,
         logbook_df.loc[x_mask, pitch_column_name].str.replace('x', '', case=False).astype(float) * 
         logbook_df.loc[x_mask, 'Strand Diameter, Layer']
         )
+
     logbook_df.loc[x_mask, pitch_list_column_name] = logbook_df.loc[x_mask, pitch_column_name]
 
     return logbook_df
@@ -1530,15 +1613,22 @@ def split_filename_for_printname_guessing(filename, logbook_df,
                 printname_dict['printname_parse_bool'] = True
             except:
                 pass
-        
+
+            #Filename remainder following logbook lookup
+            remaining_junk = filename.replace(f"{split_guess_name_list[0]}", "")
+            remaining_junk = remaining_junk.replace(f"{split_guess_name_list[1]}", "")
+            remaining_junk = remaining_junk.replace(f"{clean_printname_iterator}", "")
+            remaining_junk = remaining_junk.replace("-", "_")
+            iterator_junk_list = [part for part in remaining_junk.split("_") if (len(part)>0)]
+
         #Finish up mechanical testing iterator guessing
         if len(iterator_junk_list) == 1:
             printname_dict['iteration_marker'] = iterator_junk_list[0]
           # if there's still junk left at this point, give up, assume the mechanical testing iteration marker is complicated, and just report it
         else:
             junk_string = ''
-            for characater in iterator_junk_list:
-                junk_string = junk_string + str(character)
+            for part in iterator_junk_list:
+                junk_string = junk_string + '_' + str(character)
             printname_dict['iteration_marker'] = junk_string
 
     return printname_dict

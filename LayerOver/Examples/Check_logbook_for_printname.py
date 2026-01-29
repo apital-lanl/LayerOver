@@ -60,12 +60,16 @@ for test_filename_string in test_strings:
     matches = printname_guess_dict['all_matches']
     scores = printname_guess_dict['all_match_scores']
     best_guess = printname_guess_dict['best_guess_printname']
+    best_iterator_guess = printname_guess_dict['iteration_marker']
     parse_check = printname_guess_dict['printname_parse_bool']
     log_book_entry = printname_guess_dict['logbook_entry']
 
+    print()
+    print('#'*50)
     print(f"Parse check flag: {parse_check}")
     print(f"The string '{test_filename_string}' has the following matches:")
     for match, score in zip(matches, scores):
         print(f"\t {match} \t\t\t {score}")
-    print(f"\n Best printname guess: {best_guess} \n")
+    print(f"\nBest printname guess: {best_guess} \n")
+    print(f"\nBest iterator string guess: {best_iterator_guess} \n")
     print(log_book_entry)

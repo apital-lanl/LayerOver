@@ -99,7 +99,7 @@ for filename in filenames:
             print("Plot failure (hopefully for obvious reasons)")
 
 
-        replicate_dict = mech.pull_mechanical_replicates(data_df, data_dict = None, report_nonnegative_strain = False)
+        replicate_dict = mech.pull_mechanical_replicates(data_df, data_dict = None, report_nonnegative_strain = True)
           # pull keys from returned dict
         replicate_parse_success =  replicate_dict['replicate_parse_success']
         number_of_replicates = replicate_dict['number_of_replicates']
