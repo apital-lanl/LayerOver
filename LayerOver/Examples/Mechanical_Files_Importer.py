@@ -21,6 +21,7 @@ from tkinter import Tk, filedialog
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import traceback
   
 #Imports from LayerOver 
 from LayerOver.DataAnalysis import MechanicalData as mech
@@ -32,111 +33,65 @@ show_each_file_results = True       #show outputs from each file that's read
 
 #Select a file(s) to import
 root = Tk()
-filenames = filedialog.askopenfilenames(filetypes = [('Spredsheet files', '*.csv *.xlsx')])
+filenames = filedialog.askopenfilenames(title= "Select mech data files to import", filetypes = [('Spredsheet files', '*.csv *.xlsx')])
 root.destroy()
 
-#
+#Select a logbook to import
+root = Tk()
+directory = filedialog.askdirectory(title= "Select a folder with an updated logbook for comparison")
+root.destroy()
+
+#Try and find the 'latest' logbook
+    # brute-force a logbook search for a couple of levels of parent directory if none is found in analysis directory
+logbook_filepath = mech.get_latest_logbook(directory)   #Returns a str if successful and NONE if not successful
+    # immediate parent directory
+if not logbook_filepath:
+    parent_directory = os.path.dirname(os.path.dirname(directory))
+    logbook_filepath = mech.get_latest_logbook(parent_directory)
+    # grand-parent directory
+if not logbook_filepath:
+    parent_directory = os.path.dirname(os.path.dirname(parent_directory))
+    logbook_filepath = mech.get_latest_logbook(parent_directory)
+    # open the logbook as a pandas DataFrame
+
+#Try and open the latest filepath
+if logbook_filepath:
+    logbook_df = mech.open_logbook(logbook_filepath,
+                                target_excel_sheetname = None)
+else:
+    #TODO: need to add final recourse here if no logbook has been found
+    print("Can't find a logbook to open.")
+
+#Run each selected file
 for filename in filenames:
     print()
     print("#"*50)
     print(os.path.basename(filename))
-
-    namerow_dict = mech.check_for_namerow(filename, 
-                                          show_peaks = show_each_file_results)
-    # keys in 'namerow_dict':
-        #     'successful_parse'        bool
-        #     'likely_name_row'         int
-        #     'initial_garbage'         bool
-        #     'data_type_guess'         str
-        #     'data_type_match_count'   int
-        #     'filetype'                str; 'csv' or 'xlsx'
-        #     'data_sheetname'          str
-        #     'text_rows'               dict
-    this_filetype = namerow_dict['filetype']
-
-    if 'csv' in this_filetype.lower():
-        file_output_dict = mech.parse_mech_data_fromcsv(filename)\
-        # keys in 'file_output_dict':
-        #     'parse_status'                dict
-        #         'file_pandas_readable'    bool
-        #         'namerow_good'            bool
-        #         'namerow_idx'             int
-        #     'filename'                    str
-        #     'filepath'                    str
-        #     'dataframe'                   pandas.DataFrame (hopefully)
-
-    elif 'xlsx' in this_filetype.lower():
-        good_sheet_check = bool(namerow_dict['successful_parse'] and (namerow_dict['data_sheetname'] != ''))
-        if good_sheet_check:
-            file_output_dict = mech.parse_mech_data_fromxlsx(filename, data_dict=namerow_dict)
-        else:
-            print("Failure to find good sheet in Excel file; check parsing or file contents.")
-            data_df = pd.DataFrame({"Failure":[]})
     
     try:
-        data_df = file_output_dict['dataframe']
-        column_names = list(data_df.columns)
-        for column in column_names:
-            if 'stress' in column.lower():
-                stress_col_name = column
-            if 'strain' in column.lower():
-                strain_col_name = column
+        this_file_dict = mech.process_mechanical_file_against_logbook(filename, logbook_df,
+                                                                alternate_save_directory = directory,
+                                                                show_each_file_results = show_each_file_results,
+                                                                save_last_replicate_graph = show_each_file_results)
 
+        # 'this_file_dict' keys and values:
+        #-----------------------------------------------------------
+        # 'filename'                    str
+        # 'filepath'                    str
+        # 'filetype'                    str; 'csv' or 'xlsx'
+        # 'immediate_parent_directory'  str
+        # 'parse_type'                  str; 'hyphen', 'underscore', 'UNK'
+        # 'clean_filename'              str
+        # 'data_namerow_dict'           dict; info on which (if any) rows contain likely column names for mechanical data (i.e. 'stress', 'strain')
+        # 'pandas_readable'             bool; did parsing into a pd.DataFrame work?
+        # ''
+
+
+    except Exception as le:
+        #'le' stands for 'loop error'
+        print(f"Exception thrown: {le}")
+        print(traceback.format_exc())
         print()
-        print(data_df.head(7))
-
-        #Plot all the curves
-        try:
-            if show_each_file_results:
-                plt.figure(figsize = (10,10))
-                plt.scatter(data_df[strain_col_name], data_df[stress_col_name])
-                plt.title(f"All mech data in {os.path.basename(filename)}")
-                plt.xlabel("Strain")
-                plt.ylabel("Stress")
-                plt.show()
-        except:
-            print()
-            print("Plot failure (hopefully for obvious reasons)")
-
-
-        replicate_dict = mech.pull_mechanical_replicates(data_df, data_dict = None, report_nonnegative_strain = True)
-          # pull keys from returned dict
-        replicate_parse_success =  replicate_dict['replicate_parse_success']
-        number_of_replicates = replicate_dict['number_of_replicates']
-        last_strain_peak_index = replicate_dict['last_strain_peak_index']
-        last_strain_valley_index = replicate_dict['last_strain_valley_index']
-        peak_to_valley_index_diff = replicate_dict['peak_to_valley_index_diff']
-          # each value in "replicate_data_dict" is a pandas.DataFrame (hopefully)
-          # replicate numbering starts at 1
-        replicate_data_dict = peak_to_valley_index_diff = replicate_dict['replicate_data']
-        try:
-            last_df = replicate_data_dict[number_of_replicates]
-
-            print()
-            print(" "*5, "#"*15)
-            print()
-            if replicate_parse_success:
-                print(f"Number of replicates parsed: {number_of_replicates}")
-            else:
-                print("Failure to pull mechanical data replicates.")
-            print()
-        except KeyError:
-            print()
-            print("Failure to parse file (no replicate mechanical data found)")
-
-        try:
-            if show_each_file_results:
-                plt.figure(figsize = (10,10))
-                plt.scatter(last_df['strain_data_loading'], last_df['stress_data_loading'], color = 'r')
-                plt.scatter(last_df['strain_data_unloading'], last_df['stress_data_unloading'], color = 'g')
-                plt.title(f"Final replicate cycle for {os.path.basename(filename)}")
-                plt.xlabel("Strain")
-                plt.ylabel("Stress")
-                plt.legend([f"Replicate {number_of_replicates} Loading curve", f"Replicate {number_of_replicates} Unloading curve"])
-                plt.show()
-        except:
-            print()
-            print("Plot failure (hopefully for obvious reasons)")
-
-    except:
-        print(f"/n", "Skipping file due to parse failure.")
+        print("Failure to parse; moving on to next file.")
+        print("_"*50)
+        print()

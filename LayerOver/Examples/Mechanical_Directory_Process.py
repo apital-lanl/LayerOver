@@ -25,6 +25,6 @@ mech_directory = filedialog.askdirectory(title = "Select the directory with stre
 root.destroy()
 
 #
-mech.process_directory_for_mech_files(directory = mech_directory, 
-                                     show_each_file_results = True,
-                                     save_last_replicate_graph = True)
+mech_data_df = mech.process_directory_for_mech_files(directory = mech_directory, 
+                                                     show_each_file_results = False,
+                                                     save_last_replicate_graph = True)
