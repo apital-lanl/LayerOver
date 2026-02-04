@@ -944,7 +944,7 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         #Find strain minimum where stress actually starts increasing above a threshold
         strain_offset = 0
           # Use first 'replicate' to avoid lead-in garbage data
-        if (replicate_idx == 1):
+        if (replicate_idx == 0):
               # if no setting is passed, use module default
             if not stress_threshold:
                 stress_threshold = default_stress_threshold
@@ -954,7 +954,7 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             stress_loading = raw_df[stress_col_name].iloc[load_start_idx:peak_idx]
 
             #We'll only consider the first loading cycle
-            stress_loading_avg = stress_loading.rolling(3, center=True, min_periods = 1).mean()
+            stress_loading_avg = stress_loading.rolling(5, center=True, min_periods = 1).mean()
             valid_stress_mask = stress_loading_avg >= stress_threshold
             first_valid_stress_index = valid_stress_mask.idxmax()
             first_valid_strain_index = first_valid_stress_index-strain_zero_offset
