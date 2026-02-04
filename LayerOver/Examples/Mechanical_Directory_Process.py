@@ -17,6 +17,7 @@ Description:
 """
 
 from LayerOver.DataAnalysis import MechanicalData as mech
+import pandas as pd
 from tkinter import Tk, filedialog
 
 #Select the directory
@@ -24,7 +25,10 @@ root = Tk()
 mech_directory = filedialog.askdirectory(title = "Select the directory with stress-strain data")
 root.destroy()
 
-#
+#Do the stuff
 mech_data_df = mech.process_directory_for_mech_files(directory = mech_directory, 
                                                      show_each_file_results = False,
                                                      save_last_replicate_graph = True)
+
+pd.set_option('display.max_columns', None)  #Make displayed columns full-width
+mech_data_df.head(25)
