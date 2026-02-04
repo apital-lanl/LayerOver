@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-? 2025. Triad National Security, LLC. All rights reserved.
+Copyright 2025. Triad National Security, LLC. All rights reserved.
 This program was produced under U.S. Government contract 89233218CNA000001 for Los Alamos National Laboratory (LANL), 
 which is operated by Triad National Security, LLC for the U.S. Department of Energy/National Nuclear Security 
 Administration. All rights in the program are reserved by Triad National Security, LLC, and the U.S. Department of 
@@ -14,10 +14,13 @@ Version:   0.1.0
 
 @author: Aaron Pital (Los Alamos National Lab)
 
-Description: Wrapper class for opacity generating and analysis utilities.
+Description: Wrapper class for opacity generating and analysis utilities. Version 1 defines a voxel based on LayerUp substrate def, 
+    pulls gcode points from that voxel region, defines a 'light source' and a 'detector' plane, and 'shines' from pixel-to-pixel
+    between the two planes to draw an image. Not optimized and very slow. Considered legacy as of 2026, but useful for 
+    rendering and related calculation-intensive applications and so this module will not be deprecated.
 
 """
-version = '0.1.0'
+version = '1.3.0'
 last_modified_date = '2024-10-08'
 
   #System and built-ins

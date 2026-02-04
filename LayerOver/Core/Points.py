@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-© 2025. Triad National Security, LLC. All rights reserved.
+? 2025. Triad National Security, LLC. All rights reserved.
 This program was produced under U.S. Government contract 89233218CNA000001 for Los Alamos National Laboratory (LANL), 
 which is operated by Triad National Security, LLC for the U.S. Department of Energy/National Nuclear Security 
 Administration. All rights in the program are reserved by Triad National Security, LLC, and the U.S. Department of 
@@ -438,7 +438,6 @@ def fibonnaci_points(lats, verts, points=1000):
         zs.append(z)
         radii.append(math.sqrt(x**2+y**2+z**2))
     return xs, ys, zs, radii
-    
 
 
 def get_3point_normal(point_coords, show_plot = False):
