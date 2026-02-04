@@ -177,7 +177,6 @@ def process_directory_for_mech_files(directory=None,
     
     #Initialize variables
     mech_data_dict = {}
-    meta_data_df_list = []
       # if no directory is added as input, select one
     if not directory:
         root = Tk()
@@ -218,7 +217,6 @@ def process_directory_for_mech_files(directory=None,
             'parse_type': None,
             'clean_filename': None,
             }
-        mech_data_dict = {}
 
         #Pull file metadata
         filedata_dict = mech_filedata_dict[filename_key]
@@ -240,31 +238,7 @@ def process_directory_for_mech_files(directory=None,
         #  NOTE: these are the steps that sometimes fail, so they're wrapped into a Try loop
         #  TODO: add error reporting functionality 
         try:
-            #Validate namerow location for column names
-            namerow_dict = check_for_namerow(data_filepath, 
-                                             show_peaks = show_each_file_results)
-              # assign values to output dict
-            this_filetype = namerow_dict['filetype']
-            this_file_dict['data_namerow_dict'] = namerow_dict
-
-            #Load and parse the actual raw data from the file
-            if 'csv' in this_filetype.lower():
-                file_output_dict = parse_mech_data_fromcsv(data_filepath)
-                data_df = file_output_dict['dataframe']
-
-            elif 'xlsx' in this_filetype.lower():
-                good_sheet_check = bool(namerow_dict['successful_parse'] and (namerow_dict['data_sheetname'] != ''))
-                if good_sheet_check:
-                    file_output_dict = parse_mech_data_fromxlsx(data_filepath, data_dict=namerow_dict)
-                    data_df = file_output_dict['dataframe']
-                else:
-                    print("Failure to find good sheet in Excel file; check parsing or file contents.")
-                    data_df = pd.DataFrame({"Failure":[]})
-        
-            #Assign data and parse status to output dict
-            this_file_dict['pandas_readable'] = file_output_dict['parse_status']['file_pandas_readable']
-            # this_file_dict['raw_data'] = data_df  #not sure we actually want to return this, but we could
-
+            #Process the actual file
             process_dict = process_mechanical_file_against_logbook(data_filepath, logbook_df,
                                                                     alternate_save_directory = directory,
                                                                     show_each_file_results = show_each_file_results,
@@ -280,10 +254,11 @@ def process_directory_for_mech_files(directory=None,
             # 'clean_filename'              str
             # 'data_namerow_dict'           dict; info on which (if any) rows contain likely column names for mechanical data (i.e. 'stress', 'strain')
             # 'pandas_readable'             bool; did parsing into a pd.DataFrame work?
-
+              # write results to the output row
             this_file_dict['successful_columname_parse'] = process_dict['data_namerow_dict']['successful_parse']
             this_file_dict['file_namerow_index'] = process_dict['data_namerow_dict']['likely_name_row']
             this_file_dict['pandas_readable'] = process_dict['pandas_readable']
+            # this_file_dict['raw_data'] = data_df  #not sure we actually want to return this, but we could
             
             #Clean the filename and check against logbook
             printname_guess_dict =   split_filename_for_printname_guessing(this_file_dict['filename'], logbook_df)
@@ -299,7 +274,12 @@ def process_directory_for_mech_files(directory=None,
             if parse_check:
                 this_file_dict['logbook_entry_found'] = best_iterator_guess
                 for logbook_column in standard_logbook_columnnames:
-                    this_file_dict[logbook_column] = log_book_entry[logbook_column]
+                    #Flag that logbooks might be altered by user (i.e. u instead of micron symbol)
+                    try:
+                        this_file_dict[logbook_column] = log_book_entry[logbook_column].values
+                    except:
+                        this_file_dict[logbook_column] = ''
+                        this_file_dict[logbook_column] = ''
             else:
                 this_file_dict['mechanical_data_iteration'] = best_iterator_guess
                 for logbook_column in standard_logbook_columnnames:
@@ -333,7 +313,7 @@ def process_directory_for_mech_files(directory=None,
     #Save the final dictionary
     save_directory = os.path.join(directory, "Extracted Mechanical Summary Data")
     csv_save_name = os.path.join(save_directory, "Summary of Directory Mechanical Data.csv")
-    meta_data_df.to_csv(csv_save_name)
+    meta_data_df.to_csv(csv_save_name, index = False)
 
     return meta_data_df
 
@@ -400,7 +380,6 @@ def process_mechanical_file_against_logbook(data_filepath, logbook_df,
         else:
             print("Failure to find good sheet in Excel file; check parsing or file contents.")
             data_df = pd.DataFrame({"Failure":[]})
-    
 
     #Validate namerow location for column names
     namerow_dict = check_for_namerow(data_filepath, 
@@ -410,7 +389,7 @@ def process_mechanical_file_against_logbook(data_filepath, logbook_df,
         
     #Assign data and parse status to output dict
     this_file_dict['pandas_readable'] = file_output_dict['parse_status']['file_pandas_readable']
-    # this_file_dict['raw_data'] = data_df  #not sure we actually want to return this, but we could
+    this_file_dict['raw_data'] = data_df  #not sure we actually want to return this, but we could
 
     #Take mechanical data and populate a return dictionary from various processing steps
     #  NOTE: these are the steps that sometimes fail, so they're wrapped into a Try loop
@@ -521,11 +500,10 @@ def process_mechanical_file_against_logbook(data_filepath, logbook_df,
         #Add results to the return row for this file
         this_file_dict['logbook_entry_found'] = parse_check
         if parse_check:
-            this_file_dict['logbook_entry_found'] = best_iterator_guess
+            this_file_dict['mechanical_data_iteration'] = best_iterator_guess
             for logbook_column in standard_logbook_columnnames:
                 this_file_dict[logbook_column] = log_book_entry[logbook_column]
         else:
-            this_file_dict['mechanical_data_iteration'] = best_iterator_guess
             for logbook_column in standard_logbook_columnnames:
                 this_file_dict[logbook_column] = ''
 
@@ -944,7 +922,7 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         #Find strain minimum where stress actually starts increasing above a threshold
         strain_offset = 0
           # Use first 'replicate' to avoid lead-in garbage data
-        if (replicate_idx == 1):
+        if (replicate_idx == 0):
               # if no setting is passed, use module default
             if not stress_threshold:
                 stress_threshold = default_stress_threshold
@@ -954,7 +932,7 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             stress_loading = raw_df[stress_col_name].iloc[load_start_idx:peak_idx]
 
             #We'll only consider the first loading cycle
-            stress_loading_avg = stress_loading.rolling(3, center=True, min_periods = 1).mean()
+            stress_loading_avg = stress_loading.rolling(5, center=True, min_periods = 1).mean()
             valid_stress_mask = stress_loading_avg >= stress_threshold
             first_valid_stress_index = valid_stress_mask.idxmax()
             first_valid_strain_index = first_valid_stress_index-strain_zero_offset
