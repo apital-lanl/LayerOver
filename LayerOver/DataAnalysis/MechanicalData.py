@@ -38,6 +38,7 @@ from scipy.signal import find_peaks
 
   # import other LayerOver modules or module parts
 from LayerOver.PSPP.DIWStructure import blank_diw_logbook_row_dict
+from LayerOver.PSPP.DIWStructure import standard_logbook_columnnames
 
 #Define variables
 #Define hard-coded thresholds and setting values
@@ -138,33 +139,7 @@ default_units_dict = {
         },
     }
 
-standard_logbook_columnnames = [
-    'Name',	
-    'Structure',
-    r'Strand Diameter, nominal (skin/heli)',
-    'Angle of Rotation (deg)',
-    'Lateral Offset (um)',	            #encoding errors are a pain, so assume "um" always means micro-meters (10^-6 m)
-    'Pitch (um)',	
-    'Pitch Layer List',	
-    r'Syringe/Material',	
-    'Project',	
-    'Machine Name',	
-    'LayerUp File',	
-    'Version #',
-    'Notes',	
-    'Mechanical Data? (initals)',	
-    'Keyence? (initials)',	
-    'Punch Diameter',	
-    'Mass (g)',	
-    'Thickness (Checkline) (mm)',	
-    'Thickness (Confocal) (mm)',
-    'Thickness (Fancy KCNSC) (mm)',	
-    r'Density (g/cc)',	
-    'Thickness (Additional) (mm)',	
-    r'Thickness/ Density Initials',	
-    'Humidity',	
-    'Column1',	
-    ]
+
 
 
 ######################################################################################################################################
@@ -197,6 +172,7 @@ def process_directory_for_mech_files(directory=None,
     if logbook_filepath:
         logbook_df = open_logbook(logbook_filepath,
                                   target_excel_sheetname = None)
+        logbook_df_column_names = list(logbook_df.columns)
     else:
         #TODO: need to add final recourse here if no logbook has been found
         pass
@@ -272,18 +248,20 @@ def process_directory_for_mech_files(directory=None,
             #Add results to the return row for this file
             this_file_dict['logbook_entry_found'] = parse_check
             if parse_check:
-                this_file_dict['logbook_entry_found'] = best_iterator_guess
-                for logbook_column in standard_logbook_columnnames:
+                this_file_dict['mechanical_data_iteration'] = best_iterator_guess
+                for logbook_column in logbook_df_column_names:
                     #Flag that logbooks might be altered by user (i.e. u instead of micron symbol)
                     try:
-                        this_file_dict[logbook_column] = log_book_entry[logbook_column].values
+                        these_logbook_entries = log_book_entry[logbook_column]
+                        #Rare, but if a print fails there may be more than one entry for the same print name
+                        if these_logbook_entries.shape[0] == 1:
+                            this_file_dict[logbook_column] = these_logbook_entries.values[0]
+                          # if there's more than one entry for a printname, assume the last entry is the 'good' one
+                        else:
+                            #TODO: add functionality to actually parse the row for 'failure' and find proper print if it exists
+                            this_file_dict[logbook_column] = these_logbook_entries.values[-1] 
                     except:
                         this_file_dict[logbook_column] = ''
-                        this_file_dict[logbook_column] = ''
-            else:
-                this_file_dict['mechanical_data_iteration'] = best_iterator_guess
-                for logbook_column in standard_logbook_columnnames:
-                    this_file_dict[logbook_column] = ''
 
             #Write the results to the global directory return dictionary    
             mech_data_dict[filename_key] = this_file_dict
@@ -351,6 +329,7 @@ def process_mechanical_file_against_logbook(data_filepath, logbook_df,
         'parse_type': None,
         'clean_filename': None,
         }
+    logbook_df_column_names = list(logbook_df.columns)
       # if filepath is bad, return trivial file dictionary
     if not os.path.isfile(data_filepath):
         print(f"Bad filepath; {data_filepath}")
@@ -501,10 +480,22 @@ def process_mechanical_file_against_logbook(data_filepath, logbook_df,
         this_file_dict['logbook_entry_found'] = parse_check
         if parse_check:
             this_file_dict['mechanical_data_iteration'] = best_iterator_guess
-            for logbook_column in standard_logbook_columnnames:
-                this_file_dict[logbook_column] = log_book_entry[logbook_column]
+            for logbook_column in logbook_df_column_names:
+                #Flag that logbooks might be altered by user (i.e. u instead of micron symbol)
+                try:
+                    these_logbook_entries = log_book_entry[logbook_column]
+                    #Rare, but if a print fails there may be more than one entry for the same print name
+                    if these_logbook_entries.shape[0] == 1:
+                        this_file_dict[logbook_column] = these_logbook_entries.values[0]
+                      # if there's more than one entry for a printname, assume the last entry is the 'good' one
+                    else:
+                        #TODO: add functionality to actually parse the row for 'failure' and find proper print if it exists
+                        this_file_dict[logbook_column] = these_logbook_entries.values[-1] 
+                except:
+                    this_file_dict[logbook_column] = ''
         else:
-            for logbook_column in standard_logbook_columnnames:
+            this_file_dict['mechanical_data_iteration'] = best_iterator_guess
+            for logbook_column in logbook_df_column_names:
                 this_file_dict[logbook_column] = ''
 
         #Write the results to the global directory return dictionary    

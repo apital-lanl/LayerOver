@@ -118,6 +118,34 @@ blank_diw_logbook_row_dict = {
     'density': ''
     }
 
+standard_logbook_columnnames = [
+    'Name',	
+    'Structure',
+    r'Strand Diameter, nominal (skin/heli)',
+    'Angle of Rotation (deg)',
+    'Lateral Offset (um)',	            #encoding errors are a pain, so assume "um" always means micro-meters (10^-6 m)
+    'Pitch (um)',	
+    'Pitch Layer List',	
+    r'Syringe/Material',	
+    'Project',	
+    'Machine Name',	
+    'LayerUp File',	
+    'Version #',
+    'Notes',	
+    'Mechanical Data? (initals)',	
+    'Keyence? (initials)',	
+    'Punch Diameter',	
+    'Mass (g)',	
+    'Thickness (Checkline) (mm)',	
+    'Thickness (Confocal) (mm)',
+    'Thickness (Fancy KCNSC) (mm)',	
+    r'Density (g/cc)',	
+    'Thickness (Additional) (mm)',	
+    r'Thickness/ Density Initials',	
+    'Humidity',	
+    'Column1',	
+    ]
+
 
 #######################################################################################################################
 #####  Generic Functions  #############################################################################################

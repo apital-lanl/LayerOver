@@ -14,7 +14,7 @@ Version:   0.1.0
 
 Description: Module for handling conversions between ideal structure assumptions and physical measurements of as-printed structures.
     NOTE: Code below is for specific nomenclature and testing conventions. An attempt has been made to highlight hard-coded assumptions 
-          and segregate these to the headers of classes and the full module. Specific use cases will require modifications.
+          and segregate these to the headers of classes and the full module. Other (specific) use cases will require modifications.
 
 """
 #from Points import
