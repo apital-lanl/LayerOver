@@ -220,3 +220,24 @@ def get_array_edges_for_line(seed_indices, array_dimensions, line_angle):
     Descscription: Get the array edge points for an arbitrary line
     '''
     pass
+
+
+def apply_layer_slump(layers_array, 
+                      compression_factor= None, 
+                      structure_dict = None):
+    """
+    Description:
+        Lorem
+    INPUT:
+        ''              lorem
+    ACTION:
+        -lorem
+    OUTPUT:
+        ''
+
+    """
+
+    #Initialize variables
+
+
+    pass
