@@ -148,12 +148,12 @@ def flat_ideal_volume_guess(structure_dict,
             this_pitch = layer_pitches[layer_idx]
 
             #Create layer blank
-              # (Y,X) format to align with image libraries (i.e. Matplotlib and Scikits)
+              # (Y,X) format to align with image libraries (i.e. CV2, Matplotlib, etc.)
             this_layer = np.zeros((y_array_dim, x_array_dim))
 
             #Create a seed point 
-            seed_y_idx = random.randrange(0, y_array_dim)
-            seed_x_idx = random.randrange(0, x_array_dim)
+            seed_y_idx = random.randrange(0, y_array_dim-1)
+            seed_x_idx = random.randrange(0, x_array_dim-1)
 
             #Populate array with strand thicknesses
               # find edge coordinates for the seed point
@@ -174,14 +174,16 @@ def flat_ideal_volume_guess(structure_dict,
             
             #Handle images for each layer (ideal, no compression)
             if show_layer_images:
-                
                 if save_layer_images:
                     pass
+                
               # save the layer image if 'show_layer_images' is False
             elif save_layer_images:
                 pass
 
             layer_arrays.append(this_layer)
+
+        #
 
 
 
@@ -215,10 +217,14 @@ def cartesian_ideal_volume_guess(structure_dict,
     pass
 
 
-def get_array_edges_for_line(seed_indices, array_dimensions, line_angle):
+def get_array_edges_for_line(seed_indices, 
+                             array_dimensions, 
+                             line_angle):
     '''
     Descscription: Get the array edge points for an arbitrary line
     '''
+
+
     pass
 
 

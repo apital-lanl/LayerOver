@@ -22,6 +22,46 @@ Description: Module to parse, homogenize, store, and compare DIW strucuture code
 
 blank_diw_structure_dict = {
     'metadata': {
+        'unique_structure_name': None,
+        'print_name': None,
+        'structure': None,
+        'nozzle_size_um': None,
+        'pitch_offset': None,
+        'syringe-material': None,
+        'project': None,
+        'machine_name': None,
+        'layerup_file': None,
+        'version_number': None,
+        'notes': None,
+        'mech_data_flag': None,
+        'keyence_data_flag': None,
+        'punch_diameter': None,
+        'mass_g': None,
+        'thickness_mm': None,
+        'density_g/cc': None
+        },
+    'part_structure': None,
+    'part_skin_nozzle_size': None,
+    'part_layer_nozzle_size': None,
+    'part_angular_offset': None,
+    'part_lateral_offset': None,
+    'part_material': '',
+    'part_pitch': None,
+    'number_of_layers': None,
+    'layer_strand_extrusion': None,
+    'layer_strand_diameter': None,
+    'layer_types': None,
+    'layer_type_modifiers': None,
+    'layer_points': None,
+    'layer_steps': None,
+    'layer_angles': None,
+    'layer_lateral_offsets': None,
+    'layer_materials': None,
+    'layer_pitches': None
+    }
+
+default_diw_structure_dict = {
+    'metadata': {
         'unique_structure_name':'',
         'print_name': '',
         'structure': '',
@@ -61,7 +101,7 @@ blank_diw_structure_dict = {
     }
 
 '''
-metadata                    Metadata from logbook
+metadata                    Metadata from logbook; if more than one entry exists for the given structure, lists are passed. Othewise str, int, or bool
 part_structure              Generic 'S-code' structure; can be complete or short; parsed as string
 part_skin_nozzle_size
 part_layer_nozzle_size
@@ -159,7 +199,19 @@ standard_logbook_columnnames = [
 #######################################################################################################################
 
 
-def structure_dict_from_params(diw_param_dict):
+def structure_dict_from_param_dict(diw_param_dict):
+    '''
+    Description: Given a 'blank_diw_param_dict'-like dictionary, generate a skeleton 'blank_structure_dict'.
+    '''
+    #Attempt to pull 
+
+    pass
+
+def structure_dict_from_param_kwargs(structure_code = None,
+                                     nozzle_size = None,
+                                     skin_nozzle_size = None,
+                                     layer_nozzle_size = None,
+                                     ):
     '''
     Description: Given a 'blank_diw_param_dict'-like dictionary, generate a skeleton 'blank_structure_dict'.
     '''
