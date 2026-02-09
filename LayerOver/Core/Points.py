@@ -813,5 +813,146 @@ def curve_interpolate(xs, zs, desired_number_of_points,
 
     return xsnew, zsnew
 
+
+def draw_2D_strand_line_bythickness(interior_points,
+                        angle,
+                        line_radius,
+                        array_dim,
+                        length = None,
+                        line_type = 'simple'):
+    """
+    Description:
+        Interpret line points as a strand of radius 'line_radius' and draw in an array
+    INPUTS:
+        'interior_point'    array, tuple, or list of iterables; interpret as tuple of array indices (Y,X)
+        'angle'             float or int; angle between 'interior_point' and array horizontal axis
+                            if 'length' is None or 0, assume line is drawn across entire array with center at 'interior_point'
+                            otherwise, assume line is drawn in only one direction from 'interior_point' at 'angle'
+        'array_dim'         int, tuple, or list; dimensions of 2D array to draw line on
+      (optional)
+        'line_radius'       float or int; stand radius in number of pixels (i.e. array indices distance)
+                            NOTE: thickness will be 2*'line_radius' at center of line, so by default 3 lines will be drawn on average; centerline and parallel radial lines 1 pixel over, one on each side
+        'length'            float or int; if NONE, assume line fills the screen edge-to-edge; othewise, assume 'interior_point' is the starting point
+                            NOTE: only option for drawing a line in both directions is if 'length'= None. Otherwise 'angle' determines a 2-D line direction.
+        'line_type'         str; 'simple'- 2D line from point-to-point
+                            'bezier'- bezier curve; control points will be interpolated
+    ACTIONS:
+        -lorem
+    OUTPUTS:
+        'control_point_dict'    dict; specifics of line end points and the 
+    """
+
+    #Initialize variables
+    control_point_dict = {
+        'control_points': {},
+        'interior_only': True,
+        'drawn_array': None
+        }
+    point_dict = {
+        'coordinates': [],
+        'radius_values': [],
+
+        }
+    start_points = []
+    end_points = []
+    
+    #Condition input coordinates
+    if type(interior_points) == tuple:
+        interior_points = np.array([[interior_points[0], interior_points[1]]])
+    if type(interior_points) == list:
+        #TODO: check that list elements are actually (Y,X) formatted
+        if type(interior_points[0])== list:
+            interior_points = np.array(interior_points)
+        elif (type(interior_points[0]==int) or (type(interior_points[0]==float))):
+            interior_points = np.array([interior_points])
+      # coerce to int because these are array indices
+    interior_points = interior_points.astype(np.int)
+    
+    #Make sure angle is appropriate
+    if angle >360:
+        coerced_angle = angle
+        while coerced_angle >360:
+            coerced_angle = coerced_angle%360
+        angle= coerced_angle
+
+    #Condition array
+    if (type(array_dim) == int) or (type(array_dim) == float):
+        array_x_dim = int(array_dim)
+        array_y_dim = int (array_dim)
+    elif type(array_dim) == tuple:
+        if len(array_dim) == 2:
+            array_x_dim = array_dim[1]
+            array_y_dim = array_dim[0]
+        else:
+            print()
+            print("Bad input values for 'array_dim'; check values")
+            print()
+    elif type(array_dim) == list:
+        if len(array_dim) == 2:
+            array_x_dim = array_dim[1]
+            array_y_dim = array_dim[0]
+        else:
+            print()
+            print("Bad input values for 'array_dim'; check values")
+            print()
+    return_array = np.zeros((array_y_dim, array_x_dim))
+
+    #Set conditions for drawing lines
+      # set edge-finding conditions
+    if (not length) and (line_type == 'simple'):
+        #In this case, assume a line should be drawn across the entire screen
+        control_point_dict['interior_only'] = False
+        #Find closest array edges
+        for idx, point in enumerate(interior_points):
+            this_y = point[0]
+            this_x = point[1]
+            #Get upper line angle
+            if angle >180:
+                upper_angle = angle%180
+            #Get slope of line
+            slope = math.tan(math.radians(upper_angle))
+            #Get max_y at max_y and vice versa
+            y_at_right = ((array_x_dim-this_x) * slope * -1) + this_y  #Flip sign of slope for delta-y
+            x_at_right = this_x + abs(this_y/slope) 
+            y_at_left = ((this_x) * slope) + this_y
+            x_at_left = this_x - abs((array_y_dim- this_y)/slope) 
+            y_right_bool = bool((y_at_right >=0) and (y_at_right<=(array_y_dim-1)))
+            x_right_bool = bool((x_at_right >=0) and (x_at_right<=(array_x_dim-1)))
+            y_left_bool = bool((y_at_left >=0) and (y_at_left<=(array_y_dim-1)))
+            x_left_bool = bool((x_at_left >=0) and (x_at_left<=(array_x_dim-1)))
+
+          # top/right check
+          
+
+          #left/bottom check
+
+        #
+
+    elif (not length) and (line_type == 'bezier'):
+        #TODO: add special bezier flags; not currently implemented
+        control_point_dict['interior_only'] = False
+    
+    elif length and (line_type == 'simple') and (len(interior_points)==1):
+        #Find endpoint and coerce to array dimensions
+        start_point = interior_points[0]
+        y_change = start_point[0] * math.sin(math.radians(angle)) *-1  #Flip 'y_change' to match traditional system ((Y,X) with origin at top-left of image)
+        x_change = start_point[1] * math.cos(math.radians(angle))
+        end_point = [[round(start_point[0] + y_change), 
+                        round(start_point[1] + x_change)]]
+        start_points.append(start_point)
+        end_points.append(end_point)
+
+      # get equation of the line
+    
+      # get orthogonal line and normalize
+
+    #Find closest 
+
+
+
+
+
+    return control_point_dict
+
     
 

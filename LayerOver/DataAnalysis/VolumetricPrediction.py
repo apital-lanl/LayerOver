@@ -21,6 +21,8 @@ Description: Module for handling conversions between ideal structure assumptions
 import numpy as np
 import random
 import skimage.draw as draw
+from LayerOver.Core.Points import draw_2D_strand_line_bythickness
+
 
 #Hard-coded assumptions and conversion ratios
 
@@ -146,14 +148,27 @@ def flat_ideal_volume_guess(structure_dict,
             this_lateral_offset = layer_lateral_offsets[layer_idx]
             this_material = layer_materials[layer_idx]
             this_pitch = layer_pitches[layer_idx]
-
+              # convert strand_diameter to # of pixels
+            strand_radius_in_pixels = round(strand_diameter/2/voxel_resolution_microns, 5)
+            
             #Create layer blank
               # (Y,X) format to align with image libraries (i.e. CV2, Matplotlib, etc.)
             this_layer = np.zeros((y_array_dim, x_array_dim))
 
-            #Create a seed point 
-            seed_y_idx = random.randrange(0, y_array_dim-1)
-            seed_x_idx = random.randrange(0, x_array_dim-1)
+            #Populate array with lines 
+            if these_layer_point_coordinates:
+                #If explicit coordinates are passed, use those to draw strands
+                draw_2D_strand_line_bythickness(these_layer_point_coordinates,
+                                                this_angular_offset,
+                                                strand_radius_in_pixels,
+                                                (y_array_dim, x_array_dim),
+                                                length = None,
+                                                line_type = 'simple')
+            #If no explicit coordinates are passed, assume this is a generic layer and populate with strands as appropriate
+            else:
+                #Create a seed point 
+                seed_y_idx = random.randrange(0, y_array_dim-1)
+                seed_x_idx = random.randrange(0, x_array_dim-1)
 
             #Populate array with strand thicknesses
               # find edge coordinates for the seed point
