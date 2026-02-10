@@ -1066,14 +1066,23 @@ def draw_2D_strand_line_bythickness(interior_points,
     return control_point_dict
 
     
+
+
 def get_radial_neighbor_array_data(initial_start_coord,
-                               initial_end_coord, 
-                               array_dims,
-                               pix_to_um_conv = 1,
-                               thickness_fcn = 'cylinder'):
+                                   initial_end_coord,
+                                   angle,
+                                   strand_diameter,
+                                   array_dim,
+                                   pix_to_um_conv = 1,
+                                   thickness_fcn = 'cylinder'):
     """
     Description:
-        lorem
+        Handle stepping 1 pixel from centerline to produce a dict of line coordinates and associated thicknesses for radial neighboring points 
+        on a strand. I.e. the strand centerline is full thickness, walk 1 pixel to each side and draw a line of that thickness until you reach the
+        edge of the strand.
+
+        NOTE: There's probably a better way to do this (at least more elegant), but handling index edge cases is a pain.
+    
     INPUTS:
         ''
         ''
@@ -1085,11 +1094,48 @@ def get_radial_neighbor_array_data(initial_start_coord,
     """
 
     #Initialize variables
-    neighbor_dict = {
-        'starting_points': [],
-        'ending_points': [],
-        ''
-        }
+    starting_points_list = []
+    ending_points_list = []
+    thickness_list = []
+    #Pull array dimensions
+    array_y_dim = array_dim[0]
+    array_x_dim = array_dim[1]
+    strand_radius = strand_diameter/2
+    #Not sure whether 'end' or 'start' is to the right, so find that out and call the 'right' the end
+    x_diff = initial_end_coord[1]-initial_start_coord[1]
+    y_diff = initial_end_coord[0]-initial_start_coord[0]
+    if (x_diff > 0) and (y_diff>=1):
+        slope = (initial_end_coord[0]-initial_start_coord[0])/(initial_end_coord[1]-initial_start_coord[1])
+        right_coord = initial_end_coord
+        left_coord = initial_start_coord
+        if slope>0:
+            line_orient = 'up'
+        elif slope<0:
+            line_orient = 'down'
+    elif (x_diff < 0) and (y_diff>=1):
+        slope = (initial_start_coord[0]-initial_end_coord[0])/(initial_start_coord[1]-initial_end_coord[1])
+        right_coord = initial_start_coord
+        left_coord = initial_end_coord
+        if slope>0:
+            line_orient = 'up'
+        elif slope<0:
+            line_orient = 'down'
+      # purely vertical
+    elif x_diff == 0:
+        slope = 1e8
+        line_orient = 'vertical'
+        right_coord = initial_start_coord
+        left_coord = initial_end_coord
+      # purely horizontal
+    elif y_diff <1:
+        slope = 0
+        line_orient = 'horizontal'
+        if x_diff>0:
+            right_coord = initial_end_coord
+            left_coord = initial_start_coord
+        elif x_diff<0:
+            right_coord = initial_start_coord
+            left_coord = initial_end_coord
 
     #TODO: add options in the future
       #if 'strand_thickness_func' is already a callable object, assume it's a function and just use it
@@ -1100,6 +1146,98 @@ def get_radial_neighbor_array_data(initial_start_coord,
     elif thickness_fcn == 'cylinder':
         strand_thickness_func = lambda distance: 2* math.sqrt(strand_radius**2 - distance**2)
 
-
+    #####################################################
     #Check for edge coordinates
+    # start coordinates
+    start_y = initial_start_coord[0]
+    start_x = initial_start_coord[1]
+    if (start_y == 0) and ((start_x>0) and (start_x < array_x_dim)):
+        start_edge_pos = 'north'
+    elif (start_y == 0) and (start_x == 0):
+        start_edge_pos = 'northwest'
+    elif (start_y == 0) and (start_x== (array_x_dim-1)):
+        start_edge_pos = 'northeast'
 
+    elif (start_y == (array_y_dim-1)) and ((start_x>0) and (start_x < array_x_dim)):
+        start_edge_pos = 'south'
+    elif (start_y == (array_y_dim-1)) and (start_x == 0):
+        start_edge_pos = 'southwest'
+    elif (start_y == (array_y_dim-1)) and (start_x== (array_x_dim-1)):
+        start_edge_pos = 'southeast'
+
+    elif (start_x == 0) and ((start_y>0) and (start_y < array_y_dim)):
+        start_edge_pos = 'west'
+    elif (start_x == 0) and (start_y == 0):
+        start_edge_pos = 'northwest'
+    elif (start_x == 0) and (start_y== (array_y_dim-1)):
+        start_edge_pos = 'southwest'
+
+    elif (start_x == (array_x_dim-1)) and ((start_y>0) and (start_y < array_y_dim)):
+        start_edge_pos = 'east'
+    elif (start_x == (array_x_dim-1)) and (start_y == 0):
+        start_edge_pos = 'northeast'
+    elif (start_x == (array_x_dim-1)) and (start_y== (array_y_dim-1)):
+        start_edge_pos = 'southeast'
+    else:
+        start_edge_pos = 'interior'
+
+    # end coordinates
+    end_y = initial_end_coord[0]
+    end_x = initial_end_coord[1]
+    if (end_y == 0) and ((end_x>0) and (end_x < array_x_dim)):
+        end_edge_pos = 'north'
+    elif (end_y == 0) and (end_x == 0):
+        end_edge_pos = 'northwest'
+    elif (end_y == 0) and (end_x== (array_x_dim-1)):
+        end_edge_pos = 'northeast'
+
+    elif (end_y == (array_y_dim-1)) and ((end_x>0) and (end_x < array_x_dim)):
+        end_edge_pos = 'south'
+    elif (end_y == (array_y_dim-1)) and (end_x == 0):
+        end_edge_pos = 'southwest'
+    elif (end_y == (array_y_dim-1)) and (end_x== (array_x_dim-1)):
+        end_edge_pos = 'southeast'
+
+    elif (start_x == 0) and ((end_y>0) and (end_y < array_y_dim)):
+        end_edge_pos = 'west'
+    elif (start_x == 0) and (end_y == 0):
+        end_edge_pos = 'northwest'
+    elif (start_x == 0) and (end_y== (array_y_dim-1)):
+        end_edge_pos = 'southwest'
+
+    elif (start_x == (array_x_dim-1)) and ((end_y>0) and (end_y < array_y_dim)):
+        end_edge_pos = 'east'
+    elif (start_x == (array_x_dim-1)) and (end_y == 0):
+        end_edge_pos = 'northeast'
+    elif (start_x == (array_x_dim-1)) and (end_y== (array_y_dim-1)):
+        end_edge_pos = 'southeast'
+    else:
+        end_edge_pos = 'interior'
+
+    #####################################################
+
+    #If points are on edges, proceeed with edge calcs
+    if (end_edge_pos != 'interior') and (start_edge_pos != 'interior'):
+        while 
+
+    #If points are interior, proceed with interior calcs
+    elif (end_edge_pos == 'interior') and (start_edge_pos == 'interior'):
+        pass
+    
+    #If points are mixed, do both interior and edge calcs
+    #TODO: fill in these cases
+      # end pos only edge
+    elif (end_edge_pos != 'interior'):
+        pass
+      # start pos only edge
+    elif (start_edge_pos != 'interior'):
+        pass
+
+
+    neighbor_dict = {
+        'starting_points': starting_points_list,
+        'ending_points': ending_points_list,
+        'thicnkess': thickness_list
+        }
+
+    return neighbor_dict
