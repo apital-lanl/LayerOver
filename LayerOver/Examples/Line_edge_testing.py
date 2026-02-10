@@ -34,7 +34,7 @@ interior_point_list = [
     [149, 30],
     ]
 angle_list = [
-    0,1,40,89,90,135,179,180]
+    0,1,40,90,135,179,180]
     
 """
 Description:
@@ -196,5 +196,5 @@ for interior_points in interior_point_list:
         plt.plot([left_edge_point[1], right_edge_point[1]],[left_edge_point[0], right_edge_point[0]], color = 'r')
         plt.title(f"Point {interior_points[0]} at angle of {angle}")
         plt.xlim(0, array_x_dim)
-        plt.ylim(0, array_y_dim)
+        plt.ylim(array_y_dim, 0)
         plt.show()
