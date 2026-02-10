@@ -40,6 +40,7 @@ from matplotlib import animation
 
   #Data Handling
 import numpy as np
+from skimage.draw import line
 
   #Scientifiic algorithm packages
 from scipy.interpolate import interp1d
@@ -816,26 +817,33 @@ def curve_interpolate(xs, zs, desired_number_of_points,
 
 def draw_2D_strand_line_bythickness(interior_points,
                         angle,
-                        line_radius,
+                        strand_diam,
                         array_dim,
+                        pix_to_um_conv = 1,
                         length = None,
-                        line_type = 'simple'):
+                        line_type = 'simple',
+                        thickness_fcn = 'cylinder',
+                        show_points = False,
+                        show_array_iterations = False,
+                        show_final_array = True):
     """
     Description:
-        Interpret line points as a strand of radius 'line_radius' and draw in an array
+        Interpret line points as an ideal strand of radius 'strand_radius' and draw thickness on array with values of microns. 
     INPUTS:
-        'interior_point'    array, tuple, or list of iterables; interpret as tuple of array indices (Y,X)
+        'interior_points'   array, tuple, or list of iterables; interpret as tuple of array indices (Y,X)
+        'strand_diam'       float or int; stand radius in number of pixels (i.e. array indices distance)
+                            NOTE: thickness will be 'strand_diam' at center of line; 
         'angle'             float or int; angle between 'interior_point' and array horizontal axis
                             if 'length' is None or 0, assume line is drawn across entire array with center at 'interior_point'
                             otherwise, assume line is drawn in only one direction from 'interior_point' at 'angle'
         'array_dim'         int, tuple, or list; dimensions of 2D array to draw line on
       (optional)
-        'line_radius'       float or int; stand radius in number of pixels (i.e. array indices distance)
-                            NOTE: thickness will be 2*'line_radius' at center of line, so by default 3 lines will be drawn on average; centerline and parallel radial lines 1 pixel over, one on each side
+        'pix_to_um_conv'    float or int; side-length of a pixel in microns; used to convert radius      
         'length'            float or int; if NONE, assume line fills the screen edge-to-edge; othewise, assume 'interior_point' is the starting point
                             NOTE: only option for drawing a line in both directions is if 'length'= None. Otherwise 'angle' determines a 2-D line direction.
         'line_type'         str; 'simple'- 2D line from point-to-point
                             'bezier'- bezier curve; control points will be interpolated
+        'drop_off_function' str; function defining how 'cylinder' is only function implemented currently
     ACTIONS:
         -lorem
     OUTPUTS:
@@ -844,17 +852,25 @@ def draw_2D_strand_line_bythickness(interior_points,
 
     #Initialize variables
     control_point_dict = {
-        'control_points': {},
+        'line_dicts': {},
         'interior_only': True,
         'drawn_array': None
         }
-    point_dict = {
-        'coordinates': [],
-        'radius_values': [],
-
+    line_dict = {
+        'start_coordinates': [],
+        'end_coordinates': [],
+        'radius_value': [],
         }
-    start_points = []
-    end_points = []
+    strand_radius = strand_diam/2
+
+    #TODO: add options in the future
+      #if 'strand_thickness_func' is already a callable object, assume it's a function and just use it
+    if callable(thickness_fcn):
+        pass
+    #otherwise, start parsing what the input wants the functional form to look like
+      #standard circular strand assumptions
+    elif thickness_fcn == 'cylinder':
+        strand_thickness_func = lambda distance: 2* math.sqrt(strand_radius**2 - distance**2)
     
     #Condition input coordinates
     if type(interior_points) == tuple:
@@ -865,8 +881,8 @@ def draw_2D_strand_line_bythickness(interior_points,
             interior_points = np.array(interior_points)
         elif (type(interior_points[0]==int) or (type(interior_points[0]==float))):
             interior_points = np.array([interior_points])
-      # coerce to int because these are array indices
-    interior_points = interior_points.astype(np.int)
+        # coerce to int because these are array indices
+    interior_points = interior_points.astype(np.int32)
     
     #Make sure angle is appropriate
     if angle >360:
@@ -897,62 +913,193 @@ def draw_2D_strand_line_bythickness(interior_points,
             print()
     return_array = np.zeros((array_y_dim, array_x_dim))
 
-    #Set conditions for drawing lines
-      # set edge-finding conditions
+    #Get array coordinates for drawing the lines and set conditions
+      # if no length, go to edges of array from 
     if (not length) and (line_type == 'simple'):
         #In this case, assume a line should be drawn across the entire screen
         control_point_dict['interior_only'] = False
-        #Find closest array edges
+        
+        #Run through each passed point
         for idx, point in enumerate(interior_points):
             this_y = point[0]
             this_x = point[1]
             #Get upper line angle
             if angle >180:
                 upper_angle = angle%180
+            else:
+                upper_angle = angle
             #Get slope of line
             slope = math.tan(math.radians(upper_angle))
             #Get max_y at max_y and vice versa
-            y_at_right = ((array_x_dim-this_x) * slope * -1) + this_y  #Flip sign of slope for delta-y
-            x_at_right = this_x + abs(this_y/slope) 
-            y_at_left = ((this_x) * slope) + this_y
-            x_at_left = this_x - abs((array_y_dim- this_y)/slope) 
+                # X is easy because it's always > to the right; 
+            y_at_right = round(((array_x_dim-this_x) * slope *-1) + this_y)  #Flip sign of slope for delta-y
+            y_at_left =  round(((this_x) * slope) + this_y)
+                # Slope changes Y behaviour (i.e. how much 'Y' is left for each side), so both cases have to be accounted for
+            if slope > 0:
+                if abs(slope) > 1e-7:
+                    x_at_right = round(this_x + abs((this_y)/slope) )
+                    x_at_left = round(this_x - abs((array_y_dim- this_y)/slope))
+                #If slope is basically zero, just assume horizontal to avoid division by ~zero overflow error
+                else:
+                    x_at_left = 0
+                    x_at_right = (array_x_dim - 1)
+            elif slope < 0:
+                if abs(slope) > 1e-7:
+                    x_at_right = round(this_x + abs((array_y_dim- this_y)/slope) )
+                    x_at_left = round(this_x - abs((this_y)/slope))
+                #If slope is basically zero, just assume horizontal to avoid division by ~zero overflow error
+                else:
+                    x_at_left = 0
+                    x_at_right = (array_x_dim - 1)
+            else:
+                x_at_left = 0
+                x_at_right = (array_x_dim - 1)
+                
+            #Check to see if edge indices are within array bounds
             y_right_bool = bool((y_at_right >=0) and (y_at_right<=(array_y_dim-1)))
             x_right_bool = bool((x_at_right >=0) and (x_at_right<=(array_x_dim-1)))
             y_left_bool = bool((y_at_left >=0) and (y_at_left<=(array_y_dim-1)))
             x_left_bool = bool((x_at_left >=0) and (x_at_left<=(array_x_dim-1)))
 
-          # top/right check
-          
+            #Find appropriate array edge coordinates
+            # For right side of point
+            if y_right_bool and x_right_bool:
+                #If both edges have valid indices, find the closest one
+                right_y_guess = [y_at_right ,(array_x_dim-1)]
+                if slope>0:
+                    right_x_guess = [0, x_at_right]
+                elif slope<0: 
+                    right_x_guess = [(array_y_dim-1), x_at_right]
 
-          #left/bottom check
+                #Distance to top/bottom and right edges
+                x_edge_distance = math.sqrt((this_x-right_x_guess[1])**2 + 
+                                        (this_y-right_x_guess[0])**2)
+                y_edge_distance = math.sqrt((this_x-right_y_guess[1])**2 + 
+                                        (this_y-right_y_guess[0])**2)
 
-        #
+                if x_edge_distance<y_edge_distance:
+                    right_edge_point = right_x_guess
+                elif x_edge_distance > y_edge_distance:
+                    right_edge_point = right_y_guess
+            elif y_right_bool:
+                right_edge_point = [y_at_right, (array_x_dim-1)]
+            elif x_right_bool:
+                if slope > 0:
+                    right_edge_point = [0, x_at_right]
+                else:
+                    right_edge_point = [(array_y_dim-1), x_at_right]
+
+            # For the left side of the point
+            if y_left_bool and x_left_bool:
+                #If both edges have valid indices, find the closest one
+                left_y_guess = [y_at_left ,(array_x_dim-1)]
+                if slope<0:
+                    left_x_guess = [0, x_at_left]
+                elif slope>0: 
+                    left_x_guess = [(array_y_dim-1), x_at_left]
+
+                #Distance to top/bottom and right edges
+                x_edge_distance = math.sqrt((this_x-left_x_guess[1])**2 + 
+                                        (this_y-left_x_guess[0])**2)
+                y_edge_distance = math.sqrt((this_x-left_y_guess[1])**2 + 
+                                        (this_y-left_y_guess[0])**2)
+
+                if x_edge_distance < y_edge_distance:
+                    left_edge_point = left_x_guess
+                elif x_edge_distance > y_edge_distance:
+                    left_edge_point = left_y_guess
+            elif y_left_bool:
+                left_edge_point = [y_at_left, 0]
+            elif x_left_bool:
+                if slope >0:
+                    left_edge_point = [(array_y_dim-1), x_at_left]
+                else:
+                    left_edge_point = [0, x_at_left]
+
+            #Initialize dict for these values and save to output dict
+            this_line_dict = line_dict.copy()
+            this_line_dict['start_coordinates'] = left_edge_point
+            this_line_dict['end_coordinates'] = right_edge_point
+            this_line_dict['radius_value'] = strand_radius
+            control_point_dict['line_dicts'][f"line_{idx+1}_0"] = this_line_dict
 
     elif (not length) and (line_type == 'bezier'):
         #TODO: add special bezier flags; not currently implemented
         control_point_dict['interior_only'] = False
     
-    elif length and (line_type == 'simple') and (len(interior_points)==1):
-        #Find endpoint and coerce to array dimensions
-        start_point = interior_points[0]
-        y_change = start_point[0] * math.sin(math.radians(angle)) *-1  #Flip 'y_change' to match traditional system ((Y,X) with origin at top-left of image)
-        x_change = start_point[1] * math.cos(math.radians(angle))
-        end_point = [[round(start_point[0] + y_change), 
-                        round(start_point[1] + x_change)]]
-        start_points.append(start_point)
-        end_points.append(end_point)
+    elif length and (line_type == 'simple') and (len(interior_points)>=1):
 
-      # get equation of the line
-    
-      # get orthogonal line and normalize
+        for idx, start_point in enumerate(interior_points):
+            #Find endpoint and coerce to array dimensions
+            y_change = start_point[0] * math.sin(math.radians(angle)) *-1  #Flip 'y_change' to match traditional system ((Y,X) with origin at top-left of image)
+            x_change = start_point[1] * math.cos(math.radians(angle))
+            end_point = [[round(start_point[0] + y_change), 
+                            round(start_point[1] + x_change)]]
+            #Initialize dict for these values and save to output dict 
+            this_line_dict = line_dict.copy()
+            this_line_dict['start_coordinates'] = start_point
+            this_line_dict['end_coordinates'] = end_point
+            this_line_dict['radius_value'] = strand_radius
+            control_point_dict['line_dicts'][f"line_{idx+1}_0"] = this_line_dict
 
-    #Find closest 
+      # line starts and ends are now defined
+    #Actually draw the thickness onto the return array
+    for line_key in list(control_point_dict['line_dicts'].keys()):
+        #Pull values to draw
+        this_line_dict = control_point_dict['line_dicts'][line_key]
+        this_start_point = this_line_dict['start_coordinates']
+        this_end_point = this_line_dict['end_coordinates']
+        this_radius = this_line_dict['radius_value']
 
+        #Initialize center of line
+        if (not length) and (line_type == 'simple'):
+            #Draw initial line thickness
+            rr, cc = line(int(this_start_point[0]), int(this_start_point[1]), int(this_end_point[0]), int(this_end_point[1]))
+            return_array[rr,cc] = this_radius*2
+        
+            #Find next-index over on each side of centerline, calculate thickness, and add to 
 
-
-
+        #TODO: implement bezier for smoother corners
+        elif (not length) and (line_type == 'bezier'):
+            pass
 
     return control_point_dict
 
     
+def get_radial_neighbor_array_data(initial_start_coord,
+                               initial_end_coord, 
+                               array_dims,
+                               pix_to_um_conv = 1,
+                               thickness_fcn = 'cylinder'):
+    """
+    Description:
+        lorem
+    INPUTS:
+        ''
+        ''
+        ''
+    ACTIONS:
+        - 
+    OUTPUTS:
+        '' 
+    """
+
+    #Initialize variables
+    neighbor_dict = {
+        'starting_points': [],
+        'ending_points': [],
+        ''
+        }
+
+    #TODO: add options in the future
+      #if 'strand_thickness_func' is already a callable object, assume it's a function and just use it
+    if callable(thickness_fcn):
+        pass
+    #otherwise, start parsing what the input wants the functional form to look like
+      #standard circular strand assumptions
+    elif thickness_fcn == 'cylinder':
+        strand_thickness_func = lambda distance: 2* math.sqrt(strand_radius**2 - distance**2)
+
+
+    #Check for edge coordinates
 

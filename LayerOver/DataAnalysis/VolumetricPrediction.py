@@ -71,12 +71,12 @@ def flat_ideal_volume_guess(structure_dict,
     Description: Take 
 
     INPUT:
-        'structure_dict'-           lorem
+        'structure_dict'            lorem
       (optional)
-        'n_structures'-             Number of voxels to generate
-        'voxel_side_length'-        in mm; total X-Y side length of the full voxel
-        'voxel_resolution'-         In microns (um); pixel side length 
-        'compression_factor'-       Percentage of 'ideal' thickness 'actual' part will be do to strand-strand convergence pre-curing
+        'n_structures'              Number of voxels to generate
+        'voxel_side_length'         In mm; total X-Y side length of the full voxel
+        'voxel_resolution_microns'  In microns (um); pixel side length 
+        'compression_factor'        Percentage of 'ideal' thickness 'actual' part will be do to strand-strand convergence pre-curing
     ACTIONS:
     OUTPUTS:
         'return_volume_dict'-       Dictionary with same structure (keys) as 'generic_volume_dict'; represents
@@ -150,7 +150,6 @@ def flat_ideal_volume_guess(structure_dict,
             this_pitch = layer_pitches[layer_idx]
               # convert strand_diameter to # of pixels
             strand_radius_in_pixels = round(strand_diameter/2/voxel_resolution_microns, 5)
-            
 
             #Get layer matrial opacity 
 
@@ -161,25 +160,57 @@ def flat_ideal_volume_guess(structure_dict,
             #Populate array with lines 
             if these_layer_point_coordinates:
                 #If explicit coordinates are passed, use those to draw strands
-                draw_2D_strand_line_bythickness(these_layer_point_coordinates,
-                                                this_angular_offset,
-                                                strand_radius_in_pixels,
-                                                (y_array_dim, x_array_dim),
-                                                length = None,
-                                                line_type = 'simple')
+                array_dict = draw_2D_strand_line_bythickness(these_layer_point_coordinates,
+                                                            this_angular_offset,
+                                                            strand_diameter,
+                                                            (y_array_dim, x_array_dim),
+                                                            pix_to_um_conv = 1,
+                                                            length = None,
+                                                            line_type = 'simple',
+                                                            thickness_fcn = 'cylinder',
+                                                            show_points = False,
+                                                            show_final_array = False)
+
+                drawn_array = array_dict['drawn_array']
+                drawn_mask = drawn_array[drawn_array > 0]
+                #If 'None' is not passed, assume the array is good and add new values to 'this_layer'
+                if drawn_array:
+                    this_layer[drawn_mask] = drawn_array[drawn_mask]
+
             #If no explicit coordinates are passed, assume this is a generic layer and populate with strands as appropriate
             else:
                 #Create a seed point 
                 seed_y_idx = random.randrange(0, y_array_dim-1)
                 seed_x_idx = random.randrange(0, x_array_dim-1)
 
-            #Populate array with strand thicknesses
-              # find edge coordinates for the seed point
+                #Draw initial line
+                array_dict = draw_2D_strand_line_bythickness([[seed_y_idx, seed_x_idx]],
+                                                            this_angular_offset,
+                                                            strand_diameter,
+                                                            (y_array_dim, x_array_dim),
+                                                            pix_to_um_conv = 1,
+                                                            length = None,
+                                                            line_type = 'simple',
+                                                            thickness_fcn = 'cylinder',
+                                                            show_points = False,
+                                                            show_final_array = False)
+                #Pull array and values
+                line_keys = list(array_dict['line_dicts'].keys())
+                line_dict = array_dict[line_keys[0]]  #Should only be one entry, so taking first value is good enough
+                initial_line_start = line_dict['start_coordinates']
+                initial_line_end = line_dict['end_coordinates']
+                drawn_array = array_dict['drawn_array']
+                drawn_mask = drawn_array[drawn_array > 0]
 
+                #Calculate 
+                slope = (initial_line_end[0]- initial_line_start[0])/(initial_line_end[1]- initial_line_start[1])
+                
+                #If 'None' is not passed, assume the array is good and add new values to 'this_layer'
+                if drawn_array:
+                    this_layer[drawn_mask] = drawn_array[drawn_mask]
 
-              # draw initial line based on seed
+                #S
 
-              # check max distances and fill in the rest of the array
             
             #Adjust for compression, strand-to-strand interactions and add to global volume array
             if layer_idx == 0:

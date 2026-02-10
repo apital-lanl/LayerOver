@@ -33,8 +33,9 @@ interior_point_list = [
     [17,149],
     [149, 30],
     ]
-angle_list = [
-    0,1,40,90,135,179,180]
+# angle_list = [
+#     0,1,40,90,135,179,180]
+angle_list = [115, 135, 145, 170]
     
 """
 Description:
@@ -132,16 +133,30 @@ for interior_points in interior_point_list:
                 #Get slope of line
                 slope = math.tan(math.radians(upper_angle))
                 #Get max_y at max_y and vice versa
+                  # X is easy because it's always > to the right; 
                 y_at_right = round(((array_x_dim-this_x) * slope *-1) + this_y)  #Flip sign of slope for delta-y
-                try:
-                    x_at_right = round(this_x + abs(this_y/slope) )
-                except:
-                    x_at_right = array_x_dim +10
-                y_at_left = round(((this_x) * slope) + this_y)
-                try:
-                    x_at_left = round(this_x - abs((array_y_dim- this_y)/slope))
-                except:
-                    x_at_left = array_x_dim +10
+                y_at_left =  round(((this_x) * slope) + this_y)
+                  # Slope changes Y behaviour (i.e. how much 'Y' is left for each side), so both cases have to be accounted for
+                if slope > 0:
+                    if abs(slope) > 1e-7:
+                        x_at_right = round(this_x + abs((this_y)/slope) )
+                        x_at_left = round(this_x - abs((array_y_dim- this_y)/slope))
+                    #If slope is basically zero, just assume horizontal to avoid division by ~zero overflow error
+                    else:
+                        x_at_left = 0
+                        x_at_right = (array_x_dim - 1)
+                elif slope < 0:
+                    if abs(slope) > 1e-7:
+                        x_at_right = round(this_x + abs((array_y_dim- this_y)/slope) )
+                        x_at_left = round(this_x - abs((this_y)/slope))
+                    #If slope is basically zero, just assume horizontal to avoid division by ~zero overflow error
+                    else:
+                        x_at_left = 0
+                        x_at_right = (array_x_dim - 1)
+                else:
+                    x_at_left = 0
+                    x_at_right = (array_x_dim - 1)
+                
                 #Check to see if edge indices are within array bounds
                 y_right_bool = bool((y_at_right >=0) and (y_at_right<=(array_y_dim-1)))
                 x_right_bool = bool((x_at_right >=0) and (x_at_right<=(array_x_dim-1)))
@@ -151,25 +166,49 @@ for interior_points in interior_point_list:
                 #Find appropriate array edge coordinates
                   # for right side of point
                 if y_right_bool and x_right_bool:
-                    #Index of exact corner of array is selected
-                    if y_right_bool == 0:
-                        right_edge_point = [0, (array_x_dim-1)]
-                    else:
-                        right_edge_point = [(array_y_dim-1), (array_x_dim-1)]
+                    #If both edges have valid indices, find the closest one
+                    right_y_guess = [y_at_right ,(array_x_dim-1)]
+                    if slope>0:
+                        right_x_guess = [0, x_at_right]
+                    elif slope<0: 
+                        right_x_guess = [(array_y_dim-1), x_at_right]
+
+                    #Distance to top/bottom and right edges
+                    x_edge_distance = math.sqrt((this_x-right_x_guess[1])**2 + 
+                                           (this_y-right_x_guess[0])**2)
+                    y_edge_distance = math.sqrt((this_x-right_y_guess[1])**2 + 
+                                           (this_y-right_y_guess[0])**2)
+
+                    if x_edge_distance<y_edge_distance:
+                        right_edge_point = right_x_guess
+                    elif x_edge_distance > y_edge_distance:
+                        right_edge_point = right_y_guess
                 elif y_right_bool:
                     right_edge_point = [y_at_right, (array_x_dim-1)]
                 elif x_right_bool:
-                    if slope >0:
+                    if slope > 0:
                         right_edge_point = [0, x_at_right]
                     else:
                         right_edge_point = [(array_y_dim-1), x_at_right]
                   # for the left side of the point
                 if y_left_bool and x_left_bool:
-                    #Index of exact corner of array is selected
-                    if y_left_bool == 0:
-                        left_edge_point = [0, 0]
-                    else:
-                        left_edge_point = [(array_y_dim-1), 0]
+                    #If both edges have valid indices, find the closest one
+                    left_y_guess = [y_at_left ,(array_x_dim-1)]
+                    if slope<0:
+                        left_x_guess = [0, x_at_left]
+                    elif slope>0: 
+                        left_x_guess = [(array_y_dim-1), x_at_left]
+
+                    #Distance to top/bottom and right edges
+                    x_edge_distance = math.sqrt((this_x-left_x_guess[1])**2 + 
+                                           (this_y-left_x_guess[0])**2)
+                    y_edge_distance = math.sqrt((this_x-left_y_guess[1])**2 + 
+                                           (this_y-left_y_guess[0])**2)
+
+                    if x_edge_distance < y_edge_distance:
+                        left_edge_point = left_x_guess
+                    elif x_edge_distance > y_edge_distance:
+                        left_edge_point = left_y_guess
                 elif y_left_bool:
                     left_edge_point = [y_at_left, 0]
                 elif x_left_bool:
