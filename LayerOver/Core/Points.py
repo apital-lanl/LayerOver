@@ -1149,8 +1149,8 @@ def get_radial_neighbor_array_data(initial_start_coord,
     #####################################################
     #Check for edge coordinates
     # start coordinates
-    start_y = initial_start_coord[0]
-    start_x = initial_start_coord[1]
+    start_y = left_coord[0]
+    start_x = left_coord[1]
     if (start_y == 0) and ((start_x>0) and (start_x < array_x_dim)):
         start_edge_pos = 'north'
     elif (start_y == 0) and (start_x == 0):
@@ -1182,8 +1182,8 @@ def get_radial_neighbor_array_data(initial_start_coord,
         start_edge_pos = 'interior'
 
     # end coordinates
-    end_y = initial_end_coord[0]
-    end_x = initial_end_coord[1]
+    end_y = right_coord[0]
+    end_x = right_coord[1]
     if (end_y == 0) and ((end_x>0) and (end_x < array_x_dim)):
         end_edge_pos = 'north'
     elif (end_y == 0) and (end_x == 0):
@@ -1218,7 +1218,35 @@ def get_radial_neighbor_array_data(initial_start_coord,
 
     #If points are on edges, proceeed with edge calcs
     if (end_edge_pos != 'interior') and (start_edge_pos != 'interior'):
-        while 
+        radial_distance = 0
+        last_right_right = right_coord
+        last_right_left = right_coord
+        last_left_right = left_coord
+        last_left_left = left_coord
+
+        #At each step: 
+        #   1) move 1 pixel in each direction from strand center
+        #   2) adjust for any crossing of corners or (for interior points) running into edges,
+        #   3) calculate an 'average' radial distance for both points
+        #   4) add points and distance to lists for return
+        #   5) increment distance until a line is drawn that is beyond the strand radius
+        while radial_distance < strand_radius:
+            #If top or bottom, shift 1 pixel in each direction and calculate effect
+            if (end_edge_pos == 'north') or (end_edge_pos == 'south'):
+                new_right_right_coord = [last_right_right[0], last_right_right[1]]
+                new_right_left_coord = [last_right_left[0], last_right_left[1]]
+            if (start_edge_pos == 'north') or (start_edge_pos == 'south'):
+                new_left_right_coord = [last_left_right[0], last_left_right[1]]
+                new_left_left_coord = [last_left_left[0], last_left_left[1]]
+
+            #If left or right, shift 1 pixel in each direction and calculate effect
+            if (end_edge_pos == 'east') or (end_edge_pos == 'west'):
+                new_right_right_coord = [last_right_right[0], last_right_right[1]]
+                new_right_left_coord = [last_right_left[0], last_right_left[1]]
+            if (start_edge_pos == 'east') or (start_edge_pos == 'west'):
+                new_left_right_coord = [last_left_right[0], last_left_right[1]]
+                new_left_left_coord = [last_left_left[0], last_left_left[1]]
+
 
     #If points are interior, proceed with interior calcs
     elif (end_edge_pos == 'interior') and (start_edge_pos == 'interior'):
