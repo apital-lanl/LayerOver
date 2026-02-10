@@ -151,6 +151,9 @@ def flat_ideal_volume_guess(structure_dict,
               # convert strand_diameter to # of pixels
             strand_radius_in_pixels = round(strand_diameter/2/voxel_resolution_microns, 5)
             
+
+            #Get layer matrial opacity 
+
             #Create layer blank
               # (Y,X) format to align with image libraries (i.e. CV2, Matplotlib, etc.)
             this_layer = np.zeros((y_array_dim, x_array_dim))

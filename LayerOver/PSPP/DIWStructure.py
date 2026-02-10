@@ -128,6 +128,30 @@ layer_materials
 layer_pitches
 '''
 
+#DIW material-to-opacity
+diw_material_opacity_dict = {
+    'default':{
+        'opacity': 0.1,
+        'per_length': 1,
+        'length_unit': 'mm'},
+    'll50': {
+        'opacity': 0.1,
+        'per_length': 1,
+        'length_unit': 'mm'},
+    'll60': {
+        'opacity': 0.1,
+        'per_length': 1,
+        'length_unit': 'mm'},
+    'SE1700': {
+        'opacity': 0.1,
+        'per_length': 1,
+        'length_unit': 'mm'},
+    'PDMS': {
+        'opacity': 0.1,
+        'per_length': 1,
+        'length_unit': 'mm'},
+    }
+
 #str literals for structure
 diw_structure_codes = {
     "s": {
