@@ -9,7 +9,7 @@ a nonexclusive, paid-up, irrevocable worldwide license in this material to repro
 distribute copies to the public, perform publicly and display publicly, and to permit others to do so.
 
 Created:   2024-03-18
-Modified:  2025-07-15
+Modified:  2026-02-11
 Version:   0.6.1
 
 @author: Aaron Pital (Los Alamos National Lab)
@@ -23,7 +23,12 @@ Description: Class wrapper for handling 3D data; parametric conversion, 3D trans
         2025-04-16
             - Fixed # of points returned in 'generate_radial_points'
         2025-07-15
-            - Refactored STL 
+            - Refactored STL
+        2026-02
+
+TODO:
+    get_radial_neighbor_array_data
+        -Add functionality for interior and mixed interior/edge points
 
 """
 
@@ -668,13 +673,16 @@ def line_line_distance(a0,a1,b0,b1,\
                         clampAll=True, \
                         clampA0=False,clampA1=False,\
                         clampB0=False,clampB1=False):
-    ''' v0.1.0  created:2024-05-20  modified:2024-05-20 
-    taken verbatim from https://stackoverflow.com/questions/2824478/shortest-distance-between-two-line-segments
+    ''' v0.2.0  created:2024-05-20  modified:2026-02-11 
+    taken verbatim from https://stackoverflow.com/questions/2824478/shortest-distance-between-two-line-segments and modified as needed
         
     INPUT:   Two 'a' and 'b' points; point a/b arbitrary, as is 0/1
                 'Clamp' options constrain distances within those segment bound(s); otherwise, the shortest line distance is calculated.
     ACTION:  lorem
-    OUTPUT:  lorem
+    OUTPUT:  
+        'pA'        Closest point on segment A
+        'pB'        Closest point on segment B
+        'distance'  Distance between the points
     '''
     
     # If clampAll=True, set all clamps to True
@@ -683,7 +691,16 @@ def line_line_distance(a0,a1,b0,b1,\
         clampA1=True
         clampB0=True
         clampB1=True
-    
+
+    #Make sure points are np.arrays
+    if type(a0) == list:
+        a0 = np.array(a0)
+    if type(a1) == list:
+        a1 = np.array(a1)
+    if type(b0) == list:
+        b0 = np.array(b0)
+    if type(b1) == list:
+        b1 = np.array(b1)
     
     # Calculate denomitator
     A = a1 - a0
@@ -694,7 +711,7 @@ def line_line_distance(a0,a1,b0,b1,\
     _A = A / magA
     _B = B / magB
         
-    cross = np.cross(_A, _B);
+    cross = np.cross(_A, _B)
     denom = np.linalg.norm(cross)**2
         
         
@@ -734,8 +751,8 @@ def line_line_distance(a0,a1,b0,b1,\
     detA = np.linalg.det([t, _B, cross])
     detB = np.linalg.det([t, _A, cross])
     
-    t0 = detA/denom;
-    t1 = detB/denom;
+    t0 = detA/denom
+    t1 = detB/denom
     
     pA = a0 + (_A * t0) # Projected closest point on segment A
     pB = b0 + (_B * t1) # Projected closest point on segment B
@@ -770,9 +787,11 @@ def line_line_distance(a0,a1,b0,b1,\
             elif clampA1 and dot > magA:
                 dot = magA
             pA = a0 + (_A * dot)
+
+    distance = np.linalg.norm(pA-pB)
     
         
-    return pA,pB,np.linalg.norm(pA-pB)
+    return pA,pB,distance
 
     
 ###############################################################################
@@ -1068,7 +1087,7 @@ def draw_2D_strand_line_bythickness(interior_points,
     
 
 
-def get_radial_neighbor_array_data(initial_start_coord,
+def get_radial_neighbors_array_data(initial_start_coord,
                                    initial_end_coord,
                                    angle,
                                    strand_diameter,
@@ -1097,6 +1116,10 @@ def get_radial_neighbor_array_data(initial_start_coord,
     starting_points_list = []
     ending_points_list = []
     thickness_list = []
+    #Check that start-end points haven't hit an edge-limit
+    #  i.e. make sure they aren't continuing on the same edge
+    point_left_edge_hit = False
+    point_right_edge_hit = False
     #Pull array dimensions
     array_y_dim = array_dim[0]
     array_x_dim = array_dim[1]
@@ -1124,12 +1147,18 @@ def get_radial_neighbor_array_data(initial_start_coord,
     elif x_diff == 0:
         slope = 1e8
         line_orient = 'vertical'
-        right_coord = initial_start_coord
-        left_coord = initial_end_coord
-      # purely horizontal
+        #Convention is that top coord is 'RIGHT'
+        if initial_start_coord[0] > initial_end_coord[0]:
+            right_coord = initial_start_coord
+            left_coord = initial_end_coord
+        else:
+            right_coord = initial_end_coord
+            left_coord = initial_start_coord
+      # purely horizontal; already handled the case if 'x_diff==0' above
     elif y_diff <1:
         slope = 0
         line_orient = 'horizontal'
+        #Flip coordinates if slope is negative
         if x_diff>0:
             right_coord = initial_end_coord
             left_coord = initial_start_coord
@@ -1137,7 +1166,10 @@ def get_radial_neighbor_array_data(initial_start_coord,
             right_coord = initial_start_coord
             left_coord = initial_end_coord
 
-    #TODO: add options in the future
+    #Get original line equation
+
+
+    #TODO: add options in the future for other thickness drop-off shapes 
       #if 'strand_thickness_func' is already a callable object, assume it's a function and just use it
     if callable(thickness_fcn):
         pass
@@ -1148,76 +1180,76 @@ def get_radial_neighbor_array_data(initial_start_coord,
 
     #####################################################
     #Check for edge coordinates
-    # start coordinates
-    start_y = left_coord[0]
-    start_x = left_coord[1]
-    if (start_y == 0) and ((start_x>0) and (start_x < array_x_dim)):
-        start_edge_pos = 'north'
-    elif (start_y == 0) and (start_x == 0):
-        start_edge_pos = 'northwest'
-    elif (start_y == 0) and (start_x== (array_x_dim-1)):
-        start_edge_pos = 'northeast'
+      # LEFT point/start coordinates
+    left_y = left_coord[0]
+    left_x = left_coord[1]
+    if (left_y == 0) and ((left_x>0) and (left_x < array_x_dim)):
+        left_edge_pos = 'north'
+    elif (left_y == 0) and (left_x == 0):
+        left_edge_pos = 'northwest'
+    elif (left_y == 0) and (left_x== (array_x_dim-1)):
+        left_edge_pos = 'northeast'
 
-    elif (start_y == (array_y_dim-1)) and ((start_x>0) and (start_x < array_x_dim)):
-        start_edge_pos = 'south'
-    elif (start_y == (array_y_dim-1)) and (start_x == 0):
-        start_edge_pos = 'southwest'
-    elif (start_y == (array_y_dim-1)) and (start_x== (array_x_dim-1)):
-        start_edge_pos = 'southeast'
+    elif (left_y == (array_y_dim-1)) and ((left_x>0) and (left_x < array_x_dim)):
+        left_edge_pos = 'south'
+    elif (left_y == (array_y_dim-1)) and (left_x == 0):
+        left_edge_pos = 'southwest'
+    elif (left_y == (array_y_dim-1)) and (left_x== (array_x_dim-1)):
+        left_edge_pos = 'southeast'
 
-    elif (start_x == 0) and ((start_y>0) and (start_y < array_y_dim)):
-        start_edge_pos = 'west'
-    elif (start_x == 0) and (start_y == 0):
-        start_edge_pos = 'northwest'
-    elif (start_x == 0) and (start_y== (array_y_dim-1)):
-        start_edge_pos = 'southwest'
+    elif (left_x == 0) and ((left_y>0) and (left_y < array_y_dim)):
+        left_edge_pos = 'west'
+    elif (left_x == 0) and (left_y == 0):
+        left_edge_pos = 'northwest'
+    elif (left_x == 0) and (left_y== (array_y_dim-1)):
+        left_edge_pos = 'southwest'
 
-    elif (start_x == (array_x_dim-1)) and ((start_y>0) and (start_y < array_y_dim)):
-        start_edge_pos = 'east'
-    elif (start_x == (array_x_dim-1)) and (start_y == 0):
-        start_edge_pos = 'northeast'
-    elif (start_x == (array_x_dim-1)) and (start_y== (array_y_dim-1)):
-        start_edge_pos = 'southeast'
+    elif (left_x == (array_x_dim-1)) and ((left_y>0) and (left_y < array_y_dim)):
+        left_edge_pos = 'east'
+    elif (left_x == (array_x_dim-1)) and (left_y == 0):
+        left_edge_pos = 'northeast'
+    elif (left_x == (array_x_dim-1)) and (left_y== (array_y_dim-1)):
+        left_edge_pos = 'southeast'
     else:
-        start_edge_pos = 'interior'
+        left_edge_pos = 'interior'
 
-    # end coordinates
-    end_y = right_coord[0]
-    end_x = right_coord[1]
-    if (end_y == 0) and ((end_x>0) and (end_x < array_x_dim)):
-        end_edge_pos = 'north'
-    elif (end_y == 0) and (end_x == 0):
-        end_edge_pos = 'northwest'
-    elif (end_y == 0) and (end_x== (array_x_dim-1)):
-        end_edge_pos = 'northeast'
+      # RIGHT point/end coordinates
+    right_y = right_coord[0]
+    right_x = right_coord[1]
+    if (right_y == 0) and ((right_x>0) and (right_x < array_x_dim)):
+        right_edge_pos = 'north'
+    elif (right_y == 0) and (right_x == 0):
+        right_edge_pos = 'northwest'
+    elif (right_y == 0) and (right_x== (array_x_dim-1)):
+        right_edge_pos = 'northeast'
 
-    elif (end_y == (array_y_dim-1)) and ((end_x>0) and (end_x < array_x_dim)):
-        end_edge_pos = 'south'
-    elif (end_y == (array_y_dim-1)) and (end_x == 0):
-        end_edge_pos = 'southwest'
-    elif (end_y == (array_y_dim-1)) and (end_x== (array_x_dim-1)):
-        end_edge_pos = 'southeast'
+    elif (right_y == (array_y_dim-1)) and ((right_x>0) and (right_x < array_x_dim)):
+        right_edge_pos = 'south'
+    elif (right_y == (array_y_dim-1)) and (right_x == 0):
+        right_edge_pos = 'southwest'
+    elif (right_y == (array_y_dim-1)) and (right_x== (array_x_dim-1)):
+        right_edge_pos = 'southeast'
 
-    elif (start_x == 0) and ((end_y>0) and (end_y < array_y_dim)):
-        end_edge_pos = 'west'
-    elif (start_x == 0) and (end_y == 0):
-        end_edge_pos = 'northwest'
-    elif (start_x == 0) and (end_y== (array_y_dim-1)):
-        end_edge_pos = 'southwest'
+    elif (left_x == 0) and ((right_y>0) and (right_y < array_y_dim)):
+        right_edge_pos = 'west'
+    elif (left_x == 0) and (right_y == 0):
+        right_edge_pos = 'northwest'
+    elif (left_x == 0) and (right_y== (array_y_dim-1)):
+        right_edge_pos = 'southwest'
 
-    elif (start_x == (array_x_dim-1)) and ((end_y>0) and (end_y < array_y_dim)):
-        end_edge_pos = 'east'
-    elif (start_x == (array_x_dim-1)) and (end_y == 0):
-        end_edge_pos = 'northeast'
-    elif (start_x == (array_x_dim-1)) and (end_y== (array_y_dim-1)):
-        end_edge_pos = 'southeast'
+    elif (left_x == (array_x_dim-1)) and ((right_y>0) and (right_y < array_y_dim)):
+        right_edge_pos = 'east'
+    elif (left_x == (array_x_dim-1)) and (right_y == 0):
+        right_edge_pos = 'northeast'
+    elif (left_x == (array_x_dim-1)) and (right_y== (array_y_dim-1)):
+        right_edge_pos = 'southeast'
     else:
-        end_edge_pos = 'interior'
+        right_edge_pos = 'interior'
 
     #####################################################
 
     #If points are on edges, proceeed with edge calcs
-    if (end_edge_pos != 'interior') and (start_edge_pos != 'interior'):
+    if (right_edge_pos != 'interior') and (left_edge_pos != 'interior'):
         radial_distance = 0
         last_right_right = right_coord
         last_right_left = right_coord
@@ -1230,35 +1262,301 @@ def get_radial_neighbor_array_data(initial_start_coord,
         #   3) calculate an 'average' radial distance for both points
         #   4) add points and distance to lists for return
         #   5) increment distance until a line is drawn that is beyond the strand radius
-        while radial_distance < strand_radius:
+        iteration_cntr = 0
+        max_iterations = int(max(array_x_dim, array_y_dim))
+        while (radial_distance < strand_radius) and (iteration_cntr<max_iterations):
+            #NOTE: 'Left' incremented down in X and down in Y; 'Right' increment
+            #
+            #      Confusing names here are because there are two points (left and right) defining the initial line.
+            #      In order to find next-line-over, we need to increment both points with new points on either side of the initial line.
+            #      This leads 'right' and 'left' center points to have two new points that are each propogated left and right.
+            #      First split is above.
+            
             #If top or bottom, shift 1 pixel in each direction and calculate effect
-            if (end_edge_pos == 'north') or (end_edge_pos == 'south'):
-                new_right_right_coord = [last_right_right[0], last_right_right[1]]
-                new_right_left_coord = [last_right_left[0], last_right_left[1]]
-            if (start_edge_pos == 'north') or (start_edge_pos == 'south'):
-                new_left_right_coord = [last_left_right[0], last_left_right[1]]
-                new_left_left_coord = [last_left_left[0], last_left_left[1]]
+            if (right_edge_pos == 'north') or (right_edge_pos == 'south'):
+                
+                #If slope is positive, things are easy
+                if slope > 0:
+                    #RIGHT-right
+                      # try basic increment right
+                    if (last_right_right[1]+1 >= 0) and (last_right_right[1]+1 < array_x_dim):
+                        new_right_right_coord = [last_right_right[0], last_right_right[1]+1]
+                      # running off the edge north/south-east; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_right_right[1]+1 >= array_x_dim) and (slope > 1e7):
+                        new_right_right_coord = last_right_right
+                      # running off the edge north/south-east; move to 'east' edge
+                    elif (last_right_right[1]+1 >= array_x_dim):
+                        new_right_right_coord = [last_right_right[0]+1, last_right_right[1]]
+                        right_edge_pos = 'east'
+                    
+                    #RIGHT-left
+                      # try basic increment left
+                    if (last_right_left[1]-1 >= 0) and (last_right_left[1]-1 < array_x_dim):
+                        new_right_left_coord = [last_right_left[0], last_right_left[1]-1]
+                      # running off the edge north/south-west; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_right_left[1]-1 <0) and (slope > 1e7):
+                        new_right_left_coord = last_right_left
+                      # running off the edge north/south-west; (+) slope, so assume there's no other place to go and keep the last position
+                    elif (last_right_left[1]-1 <0):
+                        new_right_left_coord = last_right_left
+                
+                #If slope is negative, 'X' and 'Y' increments move in different directions
+                #  i.e. 'left' shift is +X and 'right' shift is -X  
+                if slope < 0:
+                    #RIGHT-right
+                      # try basic increment right
+                    if (last_right_right[1]-1 >= 0) and (last_right_right[1]-1 < array_x_dim):
+                        new_right_right_coord = [last_right_right[0], last_right_right[1]+1]
+                      # running off the edge north/south-west; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_right_right[1]-1 < 0) and (slope > 1e7):
+                        new_right_right_coord = last_right_right
+                      # running off the edge north/south-west; (-) slope, so assume there's no other place to go and keep the last position
+                    elif (last_right_right[1]-1 < 0):
+                        new_right_right_coord = last_right_right
+                    
+                    #RIGHT-left
+                      # try basic increment left
+                    if (last_right_left[1]+1 >= 0) and (last_right_left[1]+1 < array_x_dim):
+                        new_right_left_coord = [last_right_left[0], last_right_left[1]-1]
+                      # running off the edge north/south-east; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_right_left[1]+1 >= array_x_dim) and (slope > 1e7):
+                        new_right_left_coord = last_right_left
+                      # running off the edge north/south-east; shift to 'east' position and increment -Y instead of +X
+                    elif (last_right_left[1]+1 >= array_x_dim):
+                        new_right_left_coord = [last_right_left[0]+1, last_right_left[1]]
+                        right_edge_pos = 'east'
+                
+                #If horizontal, easy case because point shouldn't be ; convention is 'left' shift is UP (-Y)
+                if slope == 0:
+                    pass
+
+            if (left_edge_pos == 'north') or (left_edge_pos == 'south'):
+                #If slope is positive, things are easy
+                if slope > 0:
+                    #LEFT-right
+                      # try basic increment right
+                    if (last_left_right[1]+1 >= 0) and (last_left_right[1]+1 < array_x_dim):
+                        new_left_right_coord = [last_left_right[0], last_left_right[1]+1]
+                      # running off the edge north/south-east; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_left_right[1]+1 >= array_x_dim) and (slope > 1e7):
+                        new_left_right_coord = last_left_right
+                      # running off the edge north/south-east; (+) slope, so assume there's no other place to go and keep the last position
+                    elif (last_left_right[1]+1 >= array_x_dim):
+                        new_left_right_coord = last_left_right
+                    
+                    #LEFT-left
+                      # try basic increment left
+                    if (last_left_left[1]-1 >= 0) and (last_left_left[1]-1 < array_x_dim):
+                        new_left_left_coord = [last_left_left[0], last_left_left[1]-1]
+                      # running off the edge north/south-west; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_left_left[1]-1 <0) and (slope > 1e7):
+                        new_left_left_coord = last_left_left
+                      # running off the edge north/south-west; (+) slope, so assume there's no other place to go and keep the last position
+                    elif (last_left_left[1]-1 <0):
+                        new_left_left_coord = last_left_left
+                
+                #If slope is negative, 'X' and 'Y' increments move in different directions
+                #  i.e. 'left' shift is +X and 'right' shift is -X  
+                if slope < 0:
+                    #LEFT-right
+                      # try basic increment right
+                    if (last_left_right[1]-1 >= 0) and (last_left_right[1]-1 < array_x_dim):
+                        new_left_right_coord = [last_left_right[0], last_left_right[1]-1]
+                      # running off the edge north/south-west; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_left_right[1]-1 < 0) and (slope > 1e7):
+                        new_left_right_coord = last_left_right
+                      # running off the edge north/south-west; shift to 'west' position and start walking down the 'west' edge
+                    elif (last_left_right[1]-1 < 0):
+                        new_left_right_coord = [last_left_right[0]-1, last_left_right[1]]
+                        right_edge_pos = 'west'
+                    
+                    #LEFT-left
+                      # try basic increment left
+                    if (last_left_left[1]+1 >= 0) and (last_left_left[1]+1 < array_x_dim):
+                        new_left_left_coord = [last_left_left[0], last_left_left[1]-1]
+                      # running off the edge north/south-east; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_left_left[1]+1 >= array_x_dim) and (slope > 1e7):
+                        new_left_left_coord = last_left_left
+                      # running off the edge north/south-east; (-) slope, so assume there's nowhere else to go
+                    elif (last_left_left[1]+1 >= array_x_dim):
+                        new_left_left_coord = last_left_left
+                
+                #If horizontal, easy case because case shouldn't exist ; convention is "'left' shift is UP (-Y)"
+                if slope == 0:
+                    pass
 
             #If left or right, shift 1 pixel in each direction and calculate effect
-            if (end_edge_pos == 'east') or (end_edge_pos == 'west'):
-                new_right_right_coord = [last_right_right[0], last_right_right[1]]
-                new_right_left_coord = [last_right_left[0], last_right_left[1]]
-            if (start_edge_pos == 'east') or (start_edge_pos == 'west'):
-                new_left_right_coord = [last_left_right[0], last_left_right[1]]
-                new_left_left_coord = [last_left_left[0], last_left_left[1]]
+            if (right_edge_pos == 'east') or (right_edge_pos == 'west'):
+                #If slope is positive, things are easy
+                if slope > 0:
+                    #RIGHT-right
+                      # try basic increment right
+                    if (last_right_right[0]+1 >= 0) and (last_right_right[0]+1 < array_y_dim):
+                        new_right_right_coord = [last_right_right[0]+1, last_right_right[1]]
+                      # running off the edge south-east; assume there's no where else to go
+                    elif (last_right_right[0]+1 >= array_y_dim):
+                        new_right_right_coord = last_right_right
+                    
+                    #RIGHT-left
+                      # try basic increment left
+                    if (last_right_left[0]-1 >= 0) and (last_right_left[0]-1 < array_y_dim):
+                        new_right_left_coord = [last_right_left[0]-1, last_right_left[1]]
+                      # running off the north-east edge; transition to north
+                    elif (last_right_left[0]-1 <0):
+                        new_right_left_coord = [last_right_left[0], last_right_left[1]-1]
+                        right_edge_pos = 'north'
+
+                #If slope is negative, 'X' and 'Y' increments move in different directions
+                #  i.e. 'left' shift is +X and 'right' shift is -X  
+                if slope < 0:
+                    #RIGHT-right
+                      # try basic increment right
+                    if (last_right_right[0]+1 >= 0) and (last_right_right[0]+1 < array_y_dim):
+                        new_right_right_coord = [last_right_right[0], last_right_right[1]+1]
+                      # running off the edge south-west; no where else to go, just pass last value
+                    elif (last_right_right[0]+1 >= array_y_dim):
+                        new_right_right_coord = last_right_right
+                    
+                    #RIGHT-left
+                      # try basic increment left
+                    if (last_right_left[0]-1 >= 0) and (last_right_left[0]-1 < array_y_dim):
+                        new_right_left_coord = [last_right_left[0], last_right_left[1]-1]
+                      # running off the edge north/south-east; shift to 'east' position and increment -Y instead of +X
+                    elif (last_right_left[0]-1 <0):
+                        new_right_left_coord = [last_right_left[0], last_right_left[1]-1]
+                        right_edge_pos = 'north'
+                
+                #If horizontal, easy case; convention is 'left' shift is UP (-Y)
+                if slope == 0:
+                    #RIGHT-right
+                    if (last_right_right[0]+1 >= 0) and (last_right_right[0]+1 < array_y_dim):
+                        new_right_right_coord = [last_right_right[0], last_right_right[1]+1]
+                    elif (last_right_right[0]+1 >= array_y_dim):
+                        new_right_right_coord = last_right_right
+                    #RIGHT-left
+                    if (last_right_left[0]-1 >= 0) and (last_right_left[0]-1 < array_y_dim):
+                        new_right_left_coord = [last_right_left[0], last_right_left[1]-1]
+                    elif (last_right_left[0]-1 < 0):
+                        new_right_left_coord = last_right_left
+
+            #If left or right, shift 1 pixel in each direction and calculate effect
+            if (left_edge_pos == 'east') or (left_edge_pos == 'west'):
+                #If slope is positive, things are easy
+                if slope > 0:
+                    #LEFT-right
+                      # try basic increment right
+                    if (last_left_right[0]+1 >= 0) and (last_left_right[0]+1 < array_y_dim):
+                        new_left_right_coord = [last_left_right[0]+1, last_left_right[1]]
+                      # running off the edge south-west; transition to 'south' 
+                    elif (last_left_right[0]+1 >= array_y_dim):
+                        new_left_right_coord = [last_left_right[0], last_left_right[1]+1]
+                        left_edge_pos = 'south'
+                    
+                    #LEFT-left
+                      # try basic increment left
+                    if (last_left_left[0]-1 >= 0) and (last_left_left[0]-1 < array_y_dim):
+                        new_left_left_coord = [last_left_left[0]-1, last_left_left[1]]
+                      # running off the north-east edge; transition to north
+                    elif (last_left_left[0]-1 <0):
+                        new_left_left_coord = [last_left_left[0], last_left_left[1]+1]
+                        right_edge_pos = 'north'
+
+                #If slope is negative, 'X' and 'Y' increments move in different directions
+                #  i.e. 'left' shift is +X and 'right' shift is -X  
+                if slope < 0:
+                    #LEFT-right
+                      # try basic increment right
+                    if (last_left_right[0]+1 >= 0) and (last_left_right[0]+1 < array_y_dim):
+                        new_left_right_coord = [last_left_right[0]+1, last_left_right[1]]
+                      # running off the edge south-west; no where else to go, just pass last value
+                    elif (last_left_right[0]+1 <0):
+                        new_left_right_coord = last_left_right
+                    
+                    #LEFT-left
+                      # try basic increment left
+                    if (last_left_left[0]-1 >= 0) and (last_left_left[0]-1 < array_y_dim):
+                        new_left_left_coord = [last_left_left[0]-1, last_left_left[1]]
+                      # running off the edge north/south-east; shift to 'east' position and increment -Y instead of +X
+                    elif (last_left_left[0]-1 <0):
+                        new_left_left_coord = [last_left_left[0]-1, last_left_left[1]]
+                        right_edge_pos = 'north'
+                
+                #If horizontal, easy case; convention is 'left' shift is UP (-Y)
+                if slope == 0:
+                    #LEFT-right
+                    if (last_left_right[0]+1 >= 0) and (last_left_right[0]+1 < array_y_dim):
+                        new_left_right_coord = [last_left_right[0], last_left_right[1]+1]
+                    elif (last_left_right[0]+1 >= array_y_dim):
+                        new_left_right_coord = last_left_right
+                    #LEFT-left
+                    if (last_left_left[0]-1 >= 0) and (last_left_left[0]-1 < array_y_dim):
+                        new_left_left_coord = [last_left_left[0], last_left_left[1]-1]
+                    elif (last_left_left[0]-1 < 0):
+                        new_left_left_coord = last_left_left
+
+            #Calculate distance between initial centerline and this new line
+            left_distances = [point_line_distance(new_left_left_coord, initial_start_coord, initial_end_coord),
+                              point_line_distance(new_right_left_coord, initial_start_coord, initial_end_coord)]
+            average_left_distance = sum(left_distances)/2
+            right_distances = [point_line_distance(new_left_right_coord, initial_start_coord, initial_end_coord),
+                              point_line_distance(new_right_right_coord, initial_start_coord, initial_end_coord)]
+            average_left_distance = sum(left_distances)/2
+            average_right_distance = sum(right_distances)/2
+
+            radial_distance = max(average_left_distance,average_right_distance) * pix_to_um_conv            
+                        
+            #Store values if progression isn't continuing down the same array edge (store first instance and no others)
+            #NOTE: order doesn't matter here, but trying to maintain 'left = start', 'right = end' convention for (some) clarity
+              #new ->right line
+            if not point_right_edge_hit:
+                starting_points_list.append(new_left_right_coord)
+                ending_points_list.append(new_right_right_coord)
+                thickness_list.append(average_right_distance)
+            if not point_left_edge_hit:
+                starting_points_list.append(new_left_left_coord)
+                ending_points_list.append(new_right_left_coord)
+                thickness_list.append(average_left_distance)
+            
+            #Check to make sure a line isn't being drawn along the edge again (allowed first time)
+            left_edge_bool = bool(
+                ((new_left_left_coord[0] == 0) and (new_right_left_coord[0] ==0)) or
+                ((new_left_left_coord[0] == array_y_dim) and (new_right_left_coord[0] == array_y_dim)) or
+                ((new_left_left_coord[1] == 0) and (new_right_left_coord[1] == 0)) or
+                ((new_left_left_coord[1] == array_x_dim) and (new_right_left_coord[1] == array_x_dim))
+                )
+            right_edge_bool = bool(
+                ((new_left_right_coord[0] == 0) and (new_right_right_coord[0] ==0)) or
+                ((new_left_right_coord[0] == array_y_dim) and (new_right_right_coord[0] == array_y_dim)) or
+                ((new_left_right_coord[1] == 0) and (new_right_right_coord[1] == 0)) or
+                ((new_left_right_coord[1] == array_x_dim) and (new_right_right_coord[1] == array_x_dim))
+                )
+              # change edge flag if just hit
+            if (left_edge_bool) and (not point_left_edge_hit):
+                point_left_edge_hit = True
+            if (right_edge_bool) and (not point_right_edge_hit):
+                point_right_edge_hit = True
+
+            #Store current position for next iteration
+            last_right_right = new_right_right_coord
+            last_right_left = new_right_left_coord
+            last_left_right = new_left_right_coord
+            last_left_left = new_left_left_coord
+
+            #Increment cntr in case things go poorly above
+            iteration_cntr += 1
 
 
     #If points are interior, proceed with interior calcs
-    elif (end_edge_pos == 'interior') and (start_edge_pos == 'interior'):
+    elif (right_edge_pos == 'interior') and (left_edge_pos == 'interior'):
         pass
     
     #If points are mixed, do both interior and edge calcs
     #TODO: fill in these cases
       # end pos only edge
-    elif (end_edge_pos != 'interior'):
+    elif (right_edge_pos != 'interior'):
         pass
       # start pos only edge
-    elif (start_edge_pos != 'interior'):
+    elif (left_edge_pos != 'interior'):
         pass
 
 

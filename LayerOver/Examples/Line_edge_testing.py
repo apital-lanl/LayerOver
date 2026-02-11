@@ -19,6 +19,7 @@ Description:
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+from LayerOver.Core.Points import get_radial_neighbors_array_data
 
 interior_points = (20,45)
 angle = 90
@@ -26,6 +27,7 @@ line_radius = 10
 array_dim = (150, 150)
 length = None
 line_type = 'simple'
+strand_diameter = 50
 
 interior_point_list = [
     [20, 30],
@@ -229,10 +231,36 @@ for interior_points in interior_point_list:
         print('_'*50)
         print()
 
+        ##Plot the line segment 
+        # plt.scatter([left_edge_point[1], right_edge_point[1]],[left_edge_point[0], right_edge_point[0]], marker = 'x', color = 'r')
+        # plt.scatter([this_x], [this_y], marker='o', color = 'k')
+        # plt.plot([left_edge_point[1], right_edge_point[1]],[left_edge_point[0], right_edge_point[0]], color = 'r')
+        # plt.title(f"Point {interior_points[0]} at angle of {angle}")
+        # plt.xlim(0, array_x_dim)
+        # plt.ylim(array_y_dim, 0)
+        # plt.show()
 
+        #Test radial line getter for plotted line
+        radial_dict = get_radial_neighbors_array_data(left_edge_point,
+                                                       right_edge_point,
+                                                       angle,
+                                                       strand_diameter,
+                                                       array_dim,
+                                                       pix_to_um_conv = 1,
+                                                       thickness_fcn = 'cylinder')
+        start_points = radial_dict['starting_points']
+        end_points = radial_dict['ending_points']
+        distances = radial_dict['thicnkess']
+
+        print()
         plt.scatter([left_edge_point[1], right_edge_point[1]],[left_edge_point[0], right_edge_point[0]], marker = 'x', color = 'r')
         plt.scatter([this_x], [this_y], marker='o', color = 'k')
         plt.plot([left_edge_point[1], right_edge_point[1]],[left_edge_point[0], right_edge_point[0]], color = 'r')
+        for start, stop, distance in zip(start_points, end_points, distances):
+            print(f"\t {start} \t {stop} \t {distance}")
+            plt.plot([start[1], stop[1]],[start[0], stop[0]], color = 'gray', linewidth = 1, alpha = 0.2)
+        print('#'*50)
+
         plt.title(f"Point {interior_points[0]} at angle of {angle}")
         plt.xlim(0, array_x_dim)
         plt.ylim(array_y_dim, 0)
