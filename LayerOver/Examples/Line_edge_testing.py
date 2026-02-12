@@ -258,7 +258,7 @@ for interior_points in interior_point_list:
         plt.plot([left_edge_point[1], right_edge_point[1]],[left_edge_point[0], right_edge_point[0]], color = 'r')
         for start, stop, distance in zip(start_points, end_points, distances):
             print(f"\t {start} \t {stop} \t {distance}")
-            plt.plot([start[1], stop[1]],[start[0], stop[0]], color = 'gray', linewidth = 1, alpha = 0.2)
+            plt.plot([start[1], stop[1]],[start[0], stop[0]], color = 'gray', linewidth = 1, alpha = 0.8)
         print('#'*50)
 
         plt.title(f"Point {interior_points[0]} at angle of {angle}")

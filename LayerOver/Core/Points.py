@@ -1166,9 +1166,6 @@ def get_radial_neighbors_array_data(initial_start_coord,
             right_coord = initial_start_coord
             left_coord = initial_end_coord
 
-    #Get original line equation
-
-
     #TODO: add options in the future for other thickness drop-off shapes 
       #if 'strand_thickness_func' is already a callable object, assume it's a function and just use it
     if callable(thickness_fcn):
@@ -1186,30 +1183,38 @@ def get_radial_neighbors_array_data(initial_start_coord,
     if (left_y == 0) and ((left_x>0) and (left_x < array_x_dim)):
         left_edge_pos = 'north'
     elif (left_y == 0) and (left_x == 0):
-        left_edge_pos = 'northwest'
+        #Northeast corner
+        left_edge_pos = 'north'
     elif (left_y == 0) and (left_x== (array_x_dim-1)):
-        left_edge_pos = 'northeast'
+        #Northwest corner
+        left_edge_pos = 'north'
 
     elif (left_y == (array_y_dim-1)) and ((left_x>0) and (left_x < array_x_dim)):
         left_edge_pos = 'south'
     elif (left_y == (array_y_dim-1)) and (left_x == 0):
-        left_edge_pos = 'southwest'
+        #Southwest corner
+        left_edge_pos = 'south'
     elif (left_y == (array_y_dim-1)) and (left_x== (array_x_dim-1)):
-        left_edge_pos = 'southeast'
+        #Southeast corner
+        left_edge_pos = 'south'
 
     elif (left_x == 0) and ((left_y>0) and (left_y < array_y_dim)):
         left_edge_pos = 'west'
     elif (left_x == 0) and (left_y == 0):
-        left_edge_pos = 'northwest'
+        #Northwest corner
+        left_edge_pos = 'west'
     elif (left_x == 0) and (left_y== (array_y_dim-1)):
-        left_edge_pos = 'southwest'
+        #Southwest corner
+        left_edge_pos = 'west'
 
     elif (left_x == (array_x_dim-1)) and ((left_y>0) and (left_y < array_y_dim)):
         left_edge_pos = 'east'
     elif (left_x == (array_x_dim-1)) and (left_y == 0):
-        left_edge_pos = 'northeast'
+        #Northeast corner
+        left_edge_pos = 'east'
     elif (left_x == (array_x_dim-1)) and (left_y== (array_y_dim-1)):
-        left_edge_pos = 'southeast'
+        #Southeast corner
+        left_edge_pos = 'east'
     else:
         left_edge_pos = 'interior'
 
@@ -1230,18 +1235,18 @@ def get_radial_neighbors_array_data(initial_start_coord,
     elif (right_y == (array_y_dim-1)) and (right_x== (array_x_dim-1)):
         right_edge_pos = 'southeast'
 
-    elif (left_x == 0) and ((right_y>0) and (right_y < array_y_dim)):
+    elif (right_x == 0) and ((right_y>0) and (right_y < array_y_dim)):
         right_edge_pos = 'west'
-    elif (left_x == 0) and (right_y == 0):
+    elif (right_x == 0) and (right_y == 0):
         right_edge_pos = 'northwest'
-    elif (left_x == 0) and (right_y== (array_y_dim-1)):
+    elif (right_x == 0) and (right_y== (array_y_dim-1)):
         right_edge_pos = 'southwest'
 
-    elif (left_x == (array_x_dim-1)) and ((right_y>0) and (right_y < array_y_dim)):
+    elif (right_x == (array_x_dim-1)) and ((right_y>0) and (right_y < array_y_dim)):
         right_edge_pos = 'east'
-    elif (left_x == (array_x_dim-1)) and (right_y == 0):
+    elif (right_x == (array_x_dim-1)) and (right_y == 0):
         right_edge_pos = 'northeast'
-    elif (left_x == (array_x_dim-1)) and (right_y== (array_y_dim-1)):
+    elif (right_x == (array_x_dim-1)) and (right_y== (array_y_dim-1)):
         right_edge_pos = 'southeast'
     else:
         right_edge_pos = 'interior'
@@ -1296,9 +1301,10 @@ def get_radial_neighbors_array_data(initial_start_coord,
                       # running off the edge north/south-west; vertical line, so just pass the last line again (nowhere to increment to)
                     elif (last_right_left[1]-1 <0) and (slope > 1e7):
                         new_right_left_coord = last_right_left
-                      # running off the edge north/south-west; (+) slope, so assume there's no other place to go and keep the last position
+                      # running off the edge north-west; move to 'west' edge
                     elif (last_right_left[1]-1 <0):
-                        new_right_left_coord = last_right_left
+                        new_right_left_coord = [last_right_left[0]+1, last_right_left[1]]
+                        right_edge_pos = 'west'
                 
                 #If slope is negative, 'X' and 'Y' increments move in different directions
                 #  i.e. 'left' shift is +X and 'right' shift is -X  
@@ -1306,24 +1312,25 @@ def get_radial_neighbors_array_data(initial_start_coord,
                     #RIGHT-right
                       # try basic increment right
                     if (last_right_right[1]-1 >= 0) and (last_right_right[1]-1 < array_x_dim):
-                        new_right_right_coord = [last_right_right[0], last_right_right[1]+1]
+                        new_right_right_coord = [last_right_right[0], last_right_right[1]-1]
                       # running off the edge north/south-west; vertical line, so just pass the last line again (nowhere to increment to)
                     elif (last_right_right[1]-1 < 0) and (slope > 1e7):
                         new_right_right_coord = last_right_right
-                      # running off the edge north/south-west; (-) slope, so assume there's no other place to go and keep the last position
+                      # running off the edge south-west; move to 'west'
                     elif (last_right_right[1]-1 < 0):
-                        new_right_right_coord = last_right_right
+                        new_right_right_coord = [last_right_right[0]-1, last_right_right[1]]
+                        right_edge_pos = 'west'
                     
                     #RIGHT-left
                       # try basic increment left
                     if (last_right_left[1]+1 >= 0) and (last_right_left[1]+1 < array_x_dim):
-                        new_right_left_coord = [last_right_left[0], last_right_left[1]-1]
+                        new_right_left_coord = [last_right_left[0], last_right_left[1]+1]
                       # running off the edge north/south-east; vertical line, so just pass the last line again (nowhere to increment to)
                     elif (last_right_left[1]+1 >= array_x_dim) and (slope > 1e7):
                         new_right_left_coord = last_right_left
-                      # running off the edge north/south-east; shift to 'east' position and increment -Y instead of +X
+                      # running off the edge south-east; shift to 'east' position and increment -Y instead of +X
                     elif (last_right_left[1]+1 >= array_x_dim):
-                        new_right_left_coord = [last_right_left[0]+1, last_right_left[1]]
+                        new_right_left_coord = [last_right_left[0]-1, last_right_left[1]]
                         right_edge_pos = 'east'
                 
                 #If horizontal, easy case because point shouldn't be ; convention is 'left' shift is UP (-Y)
@@ -1340,9 +1347,10 @@ def get_radial_neighbors_array_data(initial_start_coord,
                       # running off the edge north/south-east; vertical line, so just pass the last line again (nowhere to increment to)
                     elif (last_left_right[1]+1 >= array_x_dim) and (slope > 1e7):
                         new_left_right_coord = last_left_right
-                      # running off the edge north/south-east; (+) slope, so assume there's no other place to go and keep the last position
+                      # running off the edge south-east; move to 'east' and start incrementing -Y
                     elif (last_left_right[1]+1 >= array_x_dim):
-                        new_left_right_coord = last_left_right
+                        new_left_right_coord = [last_left_right[0]-1, last_left_right[1]]
+                        left_edge_pos = 'east'
                     
                     #LEFT-left
                       # try basic increment left
@@ -1351,9 +1359,10 @@ def get_radial_neighbors_array_data(initial_start_coord,
                       # running off the edge north/south-west; vertical line, so just pass the last line again (nowhere to increment to)
                     elif (last_left_left[1]-1 <0) and (slope > 1e7):
                         new_left_left_coord = last_left_left
-                      # running off the edge north/south-west; (+) slope, so assume there's no other place to go and keep the last position
+                      # running off the edge south-west; move to 'west' edge and start incrementing -Y
                     elif (last_left_left[1]-1 <0):
-                        new_left_left_coord = last_left_left
+                        new_left_left_coord = [last_left_left[0]-1, last_left_left[1]]
+                        left_edge_pos = 'west'
                 
                 #If slope is negative, 'X' and 'Y' increments move in different directions
                 #  i.e. 'left' shift is +X and 'right' shift is -X  
@@ -1365,21 +1374,22 @@ def get_radial_neighbors_array_data(initial_start_coord,
                       # running off the edge north/south-west; vertical line, so just pass the last line again (nowhere to increment to)
                     elif (last_left_right[1]-1 < 0) and (slope > 1e7):
                         new_left_right_coord = last_left_right
-                      # running off the edge north/south-west; shift to 'west' position and start walking down the 'west' edge
+                      # running off the edge north-west; shift to 'west' position and start walking down the 'west' edge
                     elif (last_left_right[1]-1 < 0):
-                        new_left_right_coord = [last_left_right[0]-1, last_left_right[1]]
-                        right_edge_pos = 'west'
+                        new_left_right_coord = [last_left_right[0]+1, last_left_right[1]]
+                        left_edge_pos = 'west'
                     
                     #LEFT-left
                       # try basic increment left
                     if (last_left_left[1]+1 >= 0) and (last_left_left[1]+1 < array_x_dim):
-                        new_left_left_coord = [last_left_left[0], last_left_left[1]-1]
+                        new_left_left_coord = [last_left_left[0], last_left_left[1]+1]
                       # running off the edge north/south-east; vertical line, so just pass the last line again (nowhere to increment to)
                     elif (last_left_left[1]+1 >= array_x_dim) and (slope > 1e7):
                         new_left_left_coord = last_left_left
-                      # running off the edge north/south-east; (-) slope, so assume there's nowhere else to go
+                      # running off the edge north-east; transition to 'east' edge
                     elif (last_left_left[1]+1 >= array_x_dim):
-                        new_left_left_coord = last_left_left
+                        new_left_left_coord = [last_left_left[0]+1, last_left_left[1]]
+                        left_edge_pos = 'east'
                 
                 #If horizontal, easy case because case shouldn't exist ; convention is "'left' shift is UP (-Y)"
                 if slope == 0:
@@ -1412,16 +1422,17 @@ def get_radial_neighbors_array_data(initial_start_coord,
                     #RIGHT-right
                       # try basic increment right
                     if (last_right_right[0]+1 >= 0) and (last_right_right[0]+1 < array_y_dim):
-                        new_right_right_coord = [last_right_right[0], last_right_right[1]+1]
-                      # running off the edge south-west; no where else to go, just pass last value
+                        new_right_right_coord = [last_right_right[0]+1, last_right_right[1]]
+                      # running off the edge south-west; move to south edge and begin incrementing -X
                     elif (last_right_right[0]+1 >= array_y_dim):
-                        new_right_right_coord = last_right_right
+                        new_right_right_coord = [last_right_right[0], last_right_right[1]-1]
+                        right_edge_pos = 'south'
                     
                     #RIGHT-left
                       # try basic increment left
                     if (last_right_left[0]-1 >= 0) and (last_right_left[0]-1 < array_y_dim):
-                        new_right_left_coord = [last_right_left[0], last_right_left[1]-1]
-                      # running off the edge north/south-east; shift to 'east' position and increment -Y instead of +X
+                        new_right_left_coord = [last_right_left[0]-1, last_right_left[1]]
+                      # running off the edge north-east; shift to 'north' position and increment -X
                     elif (last_right_left[0]-1 <0):
                         new_right_left_coord = [last_right_left[0], last_right_left[1]-1]
                         right_edge_pos = 'north'
@@ -1430,12 +1441,14 @@ def get_radial_neighbors_array_data(initial_start_coord,
                 if slope == 0:
                     #RIGHT-right
                     if (last_right_right[0]+1 >= 0) and (last_right_right[0]+1 < array_y_dim):
-                        new_right_right_coord = [last_right_right[0], last_right_right[1]+1]
+                        new_right_right_coord = [last_right_right[0]+1, last_right_right[1]]
+                      # running off south edge; ignore further incrementing
                     elif (last_right_right[0]+1 >= array_y_dim):
                         new_right_right_coord = last_right_right
                     #RIGHT-left
                     if (last_right_left[0]-1 >= 0) and (last_right_left[0]-1 < array_y_dim):
-                        new_right_left_coord = [last_right_left[0], last_right_left[1]-1]
+                        new_right_left_coord = [last_right_left[0]-1, last_right_left[1]]
+                      # running off south edge; ignore further incrementing
                     elif (last_right_left[0]-1 < 0):
                         new_right_left_coord = last_right_left
 
@@ -1459,7 +1472,7 @@ def get_radial_neighbors_array_data(initial_start_coord,
                       # running off the north-east edge; transition to north
                     elif (last_left_left[0]-1 <0):
                         new_left_left_coord = [last_left_left[0], last_left_left[1]+1]
-                        right_edge_pos = 'north'
+                        left_edge_pos = 'north'
 
                 #If slope is negative, 'X' and 'Y' increments move in different directions
                 #  i.e. 'left' shift is +X and 'right' shift is -X  
@@ -1468,29 +1481,32 @@ def get_radial_neighbors_array_data(initial_start_coord,
                       # try basic increment right
                     if (last_left_right[0]+1 >= 0) and (last_left_right[0]+1 < array_y_dim):
                         new_left_right_coord = [last_left_right[0]+1, last_left_right[1]]
-                      # running off the edge south-west; no where else to go, just pass last value
+                      # running off the edge south-west; transition to 'south'
                     elif (last_left_right[0]+1 <0):
-                        new_left_right_coord = last_left_right
+                        new_left_right_coord = [last_left_right[0], last_left_right[1]+1]
+                        left_edge_pos = 'south'
                     
                     #LEFT-left
                       # try basic increment left
                     if (last_left_left[0]-1 >= 0) and (last_left_left[0]-1 < array_y_dim):
                         new_left_left_coord = [last_left_left[0]-1, last_left_left[1]]
-                      # running off the edge north/south-east; shift to 'east' position and increment -Y instead of +X
+                      # running off the edge north-west; shift to 'north' position and increment +X
                     elif (last_left_left[0]-1 <0):
-                        new_left_left_coord = [last_left_left[0]-1, last_left_left[1]]
-                        right_edge_pos = 'north'
+                        new_left_left_coord = [last_left_left[0], last_left_left[1]+1]
+                        left_edge_pos = 'north'
                 
                 #If horizontal, easy case; convention is 'left' shift is UP (-Y)
                 if slope == 0:
                     #LEFT-right
                     if (last_left_right[0]+1 >= 0) and (last_left_right[0]+1 < array_y_dim):
-                        new_left_right_coord = [last_left_right[0], last_left_right[1]+1]
+                        new_left_right_coord = [last_left_right[0]+1, last_left_right[1]]
+                      # running off south edge; ignore further incrementing
                     elif (last_left_right[0]+1 >= array_y_dim):
                         new_left_right_coord = last_left_right
                     #LEFT-left
                     if (last_left_left[0]-1 >= 0) and (last_left_left[0]-1 < array_y_dim):
-                        new_left_left_coord = [last_left_left[0], last_left_left[1]-1]
+                        new_left_left_coord = [last_left_left[0]-1, last_left_left[1]]
+                      # running off south edge; ignore further incrementing
                     elif (last_left_left[0]-1 < 0):
                         new_left_left_coord = last_left_left
 
