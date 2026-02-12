@@ -1149,11 +1149,11 @@ def get_radial_neighbors_array_data(initial_start_coord,
         line_orient = 'vertical'
         #Convention is that top coord is 'RIGHT'
         if initial_start_coord[0] > initial_end_coord[0]:
-            right_coord = initial_start_coord
-            left_coord = initial_end_coord
-        else:
             right_coord = initial_end_coord
             left_coord = initial_start_coord
+        else:
+            right_coord = initial_start_coord
+            left_coord = initial_end_coord
       # purely horizontal; already handled the case if 'x_diff==0' above
     elif y_diff <1:
         slope = 0
@@ -1184,19 +1184,19 @@ def get_radial_neighbors_array_data(initial_start_coord,
         left_edge_pos = 'north'
     elif (left_y == 0) and (left_x == 0):
         #Northeast corner
-        left_edge_pos = 'north'
+        left_edge_pos = 'west'
     elif (left_y == 0) and (left_x== (array_x_dim-1)):
-        #Northwest corner
-        left_edge_pos = 'north'
+        #Northeast corner
+        left_edge_pos = 'east'
 
     elif (left_y == (array_y_dim-1)) and ((left_x>0) and (left_x < array_x_dim)):
         left_edge_pos = 'south'
     elif (left_y == (array_y_dim-1)) and (left_x == 0):
         #Southwest corner
-        left_edge_pos = 'south'
+        left_edge_pos = 'west'
     elif (left_y == (array_y_dim-1)) and (left_x== (array_x_dim-1)):
         #Southeast corner
-        left_edge_pos = 'south'
+        left_edge_pos = 'east'
 
     elif (left_x == 0) and ((left_y>0) and (left_y < array_y_dim)):
         left_edge_pos = 'west'
@@ -1224,30 +1224,30 @@ def get_radial_neighbors_array_data(initial_start_coord,
     if (right_y == 0) and ((right_x>0) and (right_x < array_x_dim)):
         right_edge_pos = 'north'
     elif (right_y == 0) and (right_x == 0):
-        right_edge_pos = 'northwest'
+        right_edge_pos = 'west'
     elif (right_y == 0) and (right_x== (array_x_dim-1)):
-        right_edge_pos = 'northeast'
+        right_edge_pos = 'east'
 
     elif (right_y == (array_y_dim-1)) and ((right_x>0) and (right_x < array_x_dim)):
         right_edge_pos = 'south'
     elif (right_y == (array_y_dim-1)) and (right_x == 0):
-        right_edge_pos = 'southwest'
+        right_edge_pos = 'west'
     elif (right_y == (array_y_dim-1)) and (right_x== (array_x_dim-1)):
-        right_edge_pos = 'southeast'
+        right_edge_pos = 'east'
 
     elif (right_x == 0) and ((right_y>0) and (right_y < array_y_dim)):
         right_edge_pos = 'west'
     elif (right_x == 0) and (right_y == 0):
-        right_edge_pos = 'northwest'
+        right_edge_pos = 'west'
     elif (right_x == 0) and (right_y== (array_y_dim-1)):
-        right_edge_pos = 'southwest'
+        right_edge_pos = 'west'
 
     elif (right_x == (array_x_dim-1)) and ((right_y>0) and (right_y < array_y_dim)):
         right_edge_pos = 'east'
     elif (right_x == (array_x_dim-1)) and (right_y == 0):
-        right_edge_pos = 'northeast'
+        right_edge_pos = 'east'
     elif (right_x == (array_x_dim-1)) and (right_y== (array_y_dim-1)):
-        right_edge_pos = 'southeast'
+        right_edge_pos = 'east'
     else:
         right_edge_pos = 'interior'
 
