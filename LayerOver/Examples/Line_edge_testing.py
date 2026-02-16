@@ -247,7 +247,8 @@ for interior_points in interior_point_list:
                                                        strand_diameter,
                                                        array_dim,
                                                        pix_to_um_conv = 1,
-                                                       thickness_fcn = 'cylinder')
+                                                       thickness_fcn = 'cylinder',
+                                                       print_intermediate_steps = True)
         start_points = radial_dict['starting_points']
         end_points = radial_dict['ending_points']
         distances = radial_dict['thicnkess']
@@ -257,7 +258,7 @@ for interior_points in interior_point_list:
         plt.scatter([this_x], [this_y], marker='o', color = 'k')
         plt.plot([left_edge_point[1], right_edge_point[1]],[left_edge_point[0], right_edge_point[0]], color = 'r')
         for start, stop, distance in zip(start_points, end_points, distances):
-            print(f"\t {start} \t {stop} \t {distance}")
+        #     print(f"\t {start} \t {stop} \t {distance}")
             plt.plot([start[1], stop[1]],[start[0], stop[0]], color = 'gray', linewidth = 1, alpha = 0.8)
         print('#'*50)
 
