@@ -24,20 +24,20 @@ from LayerOver.Core.Points import get_radial_neighbors_array_data
 interior_points = (20,45)
 angle = 90
 line_radius = 10
-array_dim = (150, 150)
+array_dim = (1500, 1500)
 length = None
 line_type = 'simple'
 strand_diameter = 50
 
 interior_point_list = [
-    [20, 30],
-    [2,6],
-    [17,149],
-    [149, 30],
+    [200, 300],
+    [20,60],
+    [170,1490],
+    [1490, 300],
     ]
 # angle_list = [
 #     0,1,40,90,135,179,180]
-angle_list = [115, 135, 145, 170]
+angle_list = [20, 45, 115, 135, 170]
     
 """
 Description:
