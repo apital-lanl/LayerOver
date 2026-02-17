@@ -248,10 +248,11 @@ for interior_points in interior_point_list:
                                                        array_dim,
                                                        pix_to_um_conv = 1,
                                                        thickness_fcn = 'cylinder',
-                                                       print_intermediate_steps = True)
+                                                       print_intermediate_steps = True,
+                                                       show_final_array=True)
         start_points = radial_dict['starting_points']
         end_points = radial_dict['ending_points']
-        distances = radial_dict['thicnkess']
+        distances = radial_dict['thickness_list']
 
         print()
         plt.scatter([left_edge_point[1], right_edge_point[1]],[left_edge_point[0], right_edge_point[0]], marker = 'x', color = 'r')

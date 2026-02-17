@@ -307,114 +307,6 @@ def check_point_line_distance(point, line_vector, reference_points = np.array([0
         
     return np.hypot(h, np.linalg.norm(c))
 
-
-def line_line_distance(a0,a1,b0,b1,\
-                                clampAll=False,clampA0=False,clampA1=False,clampB0=False,clampB1=False):
-    ''' v0.1.0  created:2024-05-20  modified:2024-05-20 
-    taken verbatim from https://stackoverflow.com/questions/2824478/shortest-distance-between-two-line-segments
-        
-    INPUT:   Two 'a' and 'b' points; point a/b arbitrary, as is 0/1
-                'Clamp' options constrain distances within those segment bound(s); otherwise, the shortest line distance is calculated.
-    ACTION:  lorem
-    OUTPUT:  lorem
-    '''
-    
-    # If clampAll=True, set all clamps to True
-    if clampAll:
-        clampA0=True
-        clampA1=True
-        clampB0=True
-        clampB1=True
-    
-    
-    # Calculate denomitator
-    A = a1 - a0
-    B = b1 - b0
-    magA = np.linalg.norm(A)
-    magB = np.linalg.norm(B)
-        
-    _A = A / magA
-    _B = B / magB
-        
-    cross = np.cross(_A, _B);
-    denom = np.linalg.norm(cross)**2
-        
-        
-    # If lines are parallel (denom=0) test if lines overlap.
-    # If they don't overlap then there is a closest point solution.
-    # If they do overlap, there are infinite closest positions, but there is a closest distance
-    if not denom:
-        d0 = np.dot(_A,(b0-a0))
-            
-        # Overlap only possible with clamping
-        if clampA0 or clampA1 or clampB0 or clampB1:
-            d1 = np.dot(_A,(b1-a0))
-                
-            # Is segment B before A?
-            if d0 <= 0 >= d1:
-                if clampA0 and clampB1:
-                    if np.absolute(d0) < np.absolute(d1):
-                        return a0,b0,np.linalg.norm(a0-b0)
-                    return a0,b1,np.linalg.norm(a0-b1)
-                    
-                    
-            # Is segment B after A?
-            elif d0 >= magA <= d1:
-                if clampA1 and clampB0:
-                    if np.absolute(d0) < np.absolute(d1):
-                        return a1,b0,np.linalg.norm(a1-b0)
-                    return a1,b1,np.linalg.norm(a1-b1)
-                    
-                    
-        # Segments overlap, return distance between parallel segments
-        return None,None,np.linalg.norm(((d0*_A)+a0)-b0)
-            
-        
-        
-    # Lines criss-cross: Calculate the projected closest points
-    t = (b0 - a0);
-    detA = np.linalg.det([t, _B, cross])
-    detB = np.linalg.det([t, _A, cross])
-    
-    t0 = detA/denom;
-    t1 = detB/denom;
-    
-    pA = a0 + (_A * t0) # Projected closest point on segment A
-    pB = b0 + (_B * t1) # Projected closest point on segment B
-    
-    
-    # Clamp projections
-    if clampA0 or clampA1 or clampB0 or clampB1:
-        if clampA0 and t0 < 0:
-            pA = a0
-        elif clampA1 and t0 > magA:
-            pA = a1
-            
-        if clampB0 and t1 < 0:
-            pB = b0
-        elif clampB1 and t1 > magB:
-            pB = b1
-                
-        # Clamp projection A
-        if (clampA0 and t0 < 0) or (clampA1 and t0 > magA):
-            dot = np.dot(_B,(pA-b0))
-            if clampB0 and dot < 0:
-                dot = 0
-            elif clampB1 and dot > magB:
-                dot = magB
-            pB = b0 + (_B * dot)
-        
-        # Clamp projection B
-        if (clampB0 and t1 < 0) or (clampB1 and t1 > magB):
-            dot = np.dot(_A,(pB-a0))
-            if clampA0 and dot < 0:
-                dot = 0
-            elif clampA1 and dot > magA:
-                dot = magA
-            pA = a0 + (_A * dot)
-    
-        
-    return pA,pB,np.linalg.norm(pA-pB)
         
 #
 def fibonnaci_points(lats, verts, points=1000):
@@ -642,7 +534,7 @@ def visualize_3D(xyzarray, sphIndices, triangIndices, \
         plt.show()
     
 
-def point_line_distance(point, line_segment_start, line_segment_end):
+def point_linesegment_distance(point, line_segment_start, line_segment_end):
     '''
     Description: calculate the min distance between a 3D line segment and a point in 3D space; works in 2D as well, but coordinate systems can't be mixed.
     taken almost verbatim from https://stackoverflow.com/questions/56463412/distance-from-a-point-to-a-line-segment-in-3d-python
@@ -667,6 +559,33 @@ def point_line_distance(point, line_segment_start, line_segment_end):
     c = np.cross(point - line_segment_start, d)
 
     return np.hypot(h, np.linalg.norm(c))
+
+
+def point_line_distance(point, line_segment_start, line_segment_end):
+    """
+    Returns perpendicular distance 
+    Taken verbatim from Gemini search output
+    """
+
+    # Convert to numpy arrays
+    p1 = np.array(line_segment_start)
+    p2 = np.array(line_segment_end)
+    r = np.array(point)
+
+    # Vector representing the line's direction
+    line_vec = p2 - p1
+    # Vector from p1 to the point r
+    pnt_vec = r - p1
+
+    # Project pnt_vec onto line_vec to find the nearest point's parameter 't'
+    # 't' is a scalar representing the position on the line
+    t = np.dot(pnt_vec, line_vec) / np.dot(line_vec, line_vec)
+
+    # The formula below calculates the perpendicular distance
+    # The magnitude of the cross product of the vectors can also be used
+    distance = np.linalg.norm(pnt_vec - t * line_vec)\
+
+    return distance
 
 
 def line_line_distance(a0,a1,b0,b1,\
@@ -835,16 +754,16 @@ def curve_interpolate(xs, zs, desired_number_of_points,
 
 
 def draw_2D_strand_line_bythickness(interior_points,
-                        angle,
-                        strand_diam,
-                        array_dim,
-                        pix_to_um_conv = 1,
-                        length = None,
-                        line_type = 'simple',
-                        thickness_fcn = 'cylinder',
-                        show_points = False,
-                        show_array_iterations = False,
-                        show_final_array = True):
+                                    angle,
+                                    strand_diam,
+                                    array_dim,
+                                    pix_to_um_conv = 1,
+                                    length = None,
+                                    line_type = 'simple',
+                                    thickness_fcn = 'cylinder',
+                                    show_points = False,
+                                    show_array_iterations = False,
+                                    show_final_array = True):
     """
     Description:
         Interpret line points as an ideal strand of radius 'strand_radius' and draw thickness on array with values of microns. 
@@ -889,7 +808,7 @@ def draw_2D_strand_line_bythickness(interior_points,
     #otherwise, start parsing what the input wants the functional form to look like
       #standard circular strand assumptions
     elif thickness_fcn == 'cylinder':
-        strand_thickness_func = lambda distance: 2* math.sqrt(strand_radius**2 - distance**2)
+        strand_thickness_func = lambda radial_distance: 2* math.sqrt(strand_radius**2 - radial_distance**2)
     
     #Condition input coordinates
     if type(interior_points) == tuple:
@@ -1042,6 +961,8 @@ def draw_2D_strand_line_bythickness(interior_points,
             this_line_dict['radius_value'] = strand_radius
             control_point_dict['line_dicts'][f"line_{idx+1}_0"] = this_line_dict
 
+            #Draw radial points and add to the 'return_array'
+
     elif (not length) and (line_type == 'bezier'):
         #TODO: add special bezier flags; not currently implemented
         control_point_dict['interior_only'] = False
@@ -1094,7 +1015,8 @@ def get_radial_neighbors_array_data(initial_start_coord,
                                    array_dim,
                                    pix_to_um_conv = 1,
                                    thickness_fcn = 'cylinder',
-                                   print_intermediate_steps = False):
+                                   print_intermediate_steps = False, 
+                                   show_final_array = True):
     """
     Description:
         Handle stepping 1 pixel from centerline to produce a dict of line coordinates and associated thicknesses for radial neighboring points 
@@ -1114,17 +1036,21 @@ def get_radial_neighbors_array_data(initial_start_coord,
     """
 
     #Initialize variables
-    starting_points_list = []
-    ending_points_list = []
-    thickness_list = []
+    starting_points_list = [initial_start_coord]
+    ending_points_list = [initial_end_coord]
+    thickness_list = [0]
+    
     #Check that start-end points haven't hit an edge-limit
     #  i.e. make sure they aren't continuing on the same edge
     point_left_edge_hit = False
     point_right_edge_hit = False
-    #Pull array dimensions
+    
+    #Pull array dimensions and initialize return array
     array_y_dim = array_dim[0]
     array_x_dim = array_dim[1]
     strand_radius = strand_diameter/2
+    return_array = np.zeros((array_y_dim, array_x_dim))
+
     #Not sure whether 'end' or 'start' is to the right, so find that out and call the 'right' the end
     x_diff = initial_end_coord[1]-initial_start_coord[1]
     y_diff = initial_end_coord[0]-initial_start_coord[0]
@@ -1174,7 +1100,7 @@ def get_radial_neighbors_array_data(initial_start_coord,
     #otherwise, start parsing what the input wants the functional form to look like
       #standard circular strand assumptions
     elif thickness_fcn == 'cylinder':
-        strand_thickness_func = lambda distance: 2* math.sqrt(strand_radius**2 - distance**2)
+        strand_thickness_func = lambda radial_distance: 2* math.sqrt(strand_radius**2 - radial_distance**2)
 
     #####################################################
     #Check for edge coordinates
@@ -1566,25 +1492,37 @@ def get_radial_neighbors_array_data(initial_start_coord,
             #Calculate distance between initial centerline and this new line
             left_distances = [point_line_distance(new_left_left_coord, initial_start_coord, initial_end_coord),
                               point_line_distance(new_right_left_coord, initial_start_coord, initial_end_coord)]
-            average_left_distance = sum(left_distances)/2
             right_distances = [point_line_distance(new_left_right_coord, initial_start_coord, initial_end_coord),
                               point_line_distance(new_right_right_coord, initial_start_coord, initial_end_coord)]
-            average_left_distance = sum(left_distances)/2
-            average_right_distance = sum(right_distances)/2
+            average_left_distance = sum(left_distances)/2* pix_to_um_conv
+            average_right_distance = sum(right_distances)/2* pix_to_um_conv
 
-            radial_distance = max(average_left_distance,average_right_distance) * pix_to_um_conv            
+            #Avoid math domain error by ignoring average distances close to strand radius
+            if (strand_radius-average_left_distance) > 1e-5:
+                average_left_thickness = strand_thickness_func(average_left_distance)
+            else:
+                average_left_thickness = 0 
+            if (strand_radius-average_right_distance) > 1e-5:
+                average_right_thickness = strand_thickness_func(average_right_distance)
+            else:
+                average_right_thickness = 0
+
+            #Each side doesn't increment equally in terms of radial distance because of the way the array grid indexing differs from spatial distance
+            #Use this to flag the minimum distance and keep calculating left-right radial points until it's met
+            radial_distance = min(average_left_distance,average_right_distance) * pix_to_um_conv            
                         
             #Store values if progression isn't continuing down the same array edge (store first instance and no others)
             #NOTE: order doesn't matter here, but trying to maintain 'left = start', 'right = end' convention for (some) clarity
               #new ->right line
-            if not point_right_edge_hit:
+            #NOTE: keep adding each side until distance is > strand_radius; i.e. if one side hits that distance first, keep adding the other until that side reaches the limit
+            if not point_right_edge_hit and ((right_distances[0]<=strand_radius) and (right_distances[1]<=strand_radius)):
                 starting_points_list.append(new_left_right_coord)
                 ending_points_list.append(new_right_right_coord)
-                thickness_list.append(average_right_distance)
-            if not point_left_edge_hit:
+                thickness_list.append(average_right_thickness)
+            if not point_left_edge_hit and ((left_distances[0]<=strand_radius) and (left_distances[1]<=strand_radius)):
                 starting_points_list.append(new_left_left_coord)
                 ending_points_list.append(new_right_left_coord)
-                thickness_list.append(average_left_distance)
+                thickness_list.append(average_left_thickness)
             
             #Check to make sure a line isn't being drawn along the edge again (allowed first time)
             left_edge_bool = bool(
@@ -1611,12 +1549,12 @@ def get_radial_neighbors_array_data(initial_start_coord,
                 print()
                 
                 print(f"Iteration {iteration_cntr}: ")
-                print(f"Point_name \t\t Point_coord  \t\t Edge  \t\t Moving_direction \t Slope")
+                print(f"Point_name \t\t Point_coord  \t\t Edge  \t\t Radial-distances \t\t Calc. Thickness")
                 print('-'*75)
-                print(f"  L-left   \t\t {new_left_left_coord} \t\t {left_left_edge_pos} \t\t {left_left_moving} \t {slope}")
-                print(f"  L-right  \t\t {new_left_right_coord} \t\t {left_right_edge_pos} \t\t {left_right_moving} \t {slope}")
-                print(f"  R-left   \t\t {new_right_left_coord} \t\t {right_left_edge_pos} \t\t {right_left_moving} \t {slope}")
-                print(f"  R-right  \t\t {new_right_right_coord} \t\t {right_right_edge_pos} \t\t {right_right_moving} \t {slope}")
+                print(f"  L-left   \t\t {new_left_left_coord} \t\t {left_left_edge_pos} \t\t {left_distances[0]} \t\t {average_left_thickness}")
+                print(f"  L-right  \t\t {new_left_right_coord} \t\t {left_right_edge_pos} \t\t {left_distances[1]} \t\t {average_left_thickness}")
+                print(f"  R-left   \t\t {new_right_left_coord} \t\t {right_left_edge_pos} \t\t {right_distances[0]} \t\t {average_right_thickness}")
+                print(f"  R-right  \t\t {new_right_right_coord} \t\t {right_right_edge_pos} \t\t {right_distances[1]} \t\t {average_right_thickness}")
 
             #Store current position for next iteration
             last_right_right = new_right_right_coord
@@ -1641,11 +1579,22 @@ def get_radial_neighbors_array_data(initial_start_coord,
     elif (left_edge_pos != 'interior'):
         pass
 
-
+    #Store the starting, ending, and distance values for passing
     neighbor_dict = {
         'starting_points': starting_points_list,
         'ending_points': ending_points_list,
-        'thicnkess': thickness_list
+        'thickness_list': thickness_list
         }
+
+    #Step through array and draw lines for each starting and ending point
+    for start, end, thickness in zip(starting_points_list, ending_points_list, thickness_list):
+        rr, cc = line(start[0], start[1], end[0], end[1])
+        return_array[rr,cc] = thickness
+
+    neighbor_dict['drawn_array'] = return_array
+
+    if show_final_array:
+        plt.imshow(return_array)
+        plt.show()
 
     return neighbor_dict

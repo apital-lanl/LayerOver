@@ -194,7 +194,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                             thickness_fcn = 'cylinder',
                                                             show_points = False,
                                                             show_final_array = False)
-                #Pull array and values
+                   # pull array and values
                 line_keys = list(array_dict['line_dicts'].keys())
                 line_dict = array_dict[line_keys[0]]  #Should only be one entry, so taking first value is good enough
                 initial_line_start = line_dict['start_coordinates']
