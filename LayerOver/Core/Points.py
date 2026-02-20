@@ -1650,7 +1650,17 @@ def generate_random_pole_point_2D(starting_point,
     #Generate values for 'pole_point'
     if (starting_angle == 0) or (starting_angle ==180):
         #If horizontal, step is purely in X
-        new_pole_point
+        new_pole_point = np.array([starting_point[0], starting_point[1]+step_distance])
+        line_direction = 'horizontal'
+    elif (starting_angle == 90) or (starting_angle == 270):
+        #If vertical, step is purely in Y
+        new_pole_point = np.array([starting_point[0]+step_distance, starting_point[1]])
+        line_direction = 'vertical'
+    elif (starting_angle <90) or ((starting_angle >180) and (starting_angle <270)):
+        #If "+" slope, line can extend in either direction. Convention is neg. ste
+
+        new_pole_point = np.array([starting_point[0], starting_point[1]+step_distance])
+        line_direction = 'horizontal'
 
     new_pole_point = [dim+step for dim,step in zip(array_dims, step_distances)]
     pole_start_distance = math.sqrt(sum([(pole-start)**2 for pole, start in zip(new_pole_point, starting_point)]))
