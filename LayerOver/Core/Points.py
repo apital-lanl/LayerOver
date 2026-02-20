@@ -53,6 +53,9 @@ from scipy.spatial import KDTree
 from scipy.spatial import ConvexHull
 from scipy.spatial import Delaunay
 
+############################################################################################################################################################
+###  G-code specific point functions   #####################################################################################################################
+############################################################################################################################################################
     
 #take G-Code coordinates parsed from file and return a layer dictionary with XYZ-cartesian coordinates
 def AC_to_XYZ(xyzacf_array, substrate_dict, offset_adjust=False):
@@ -136,6 +139,10 @@ def AC_to_XYZ(xyzacf_array, substrate_dict, offset_adjust=False):
         
     return layer_dict
     
+
+############################################################################################################################################################
+###  Generic Geomoetry Functions   #########################################################################################################################
+############################################################################################################################################################
 
 #Simple unit-normal function for getting points on a circle
 def circle_circumference_xy(normal_vector, theta):
@@ -259,7 +266,7 @@ def check_point_line_distance(point, line_vector, reference_points = np.array([0
     ''' v0.2.0  created:2024-05-12  modified:2024-05-20 
         
     INPUT:   Point, line vector, and location bounds on line to define distance region
-                'reference_points'- np ndarray of either 1 or two points. If one, supply a 'reference_delta' to ge a line.
+                'reference_points'- np ndarray of either 1 or two points. If one, supply a 'reference_delta' to get a line.
                     If two points supplied, make a vector between them 
                 'reference_delta'- distance above and below reference along 'line' vector to generate reference points
     ACTION:  Calculate distance between line and point and reference_point and point
@@ -308,8 +315,11 @@ def check_point_line_distance(point, line_vector, reference_points = np.array([0
     return np.hypot(h, np.linalg.norm(c))
 
         
-#
 def fibonnaci_points(lats, verts, points=1000):
+    """
+    Description:
+        Generate fibonnaci points in  radial spiral on a 3D surface
+    """
     if points <= 1:
         points = len(verts)
     else:
@@ -563,8 +573,8 @@ def point_linesegment_distance(point, line_segment_start, line_segment_end):
 
 def point_line_distance(point, line_segment_start, line_segment_end):
     """
-    Returns perpendicular distance 
-    Taken verbatim from Gemini search output
+    Returns perpendicular distance between a point and an infinite line (i.e. not clamped to line segment).
+    Taken nearly verbatim from Gemini search output.
     """
 
     # Convert to numpy arrays
@@ -713,9 +723,9 @@ def line_line_distance(a0,a1,b0,b1,\
     return pA,pB,distance
 
     
-###############################################################################
-####   Utility functions   ####################################################
-###############################################################################
+###################################################################################################################################
+####   Utility functions   ########################################################################################################
+###################################################################################################################################
 
 
 # Helper function to interpolate between curve points to get a reasonable result
@@ -751,6 +761,11 @@ def curve_interpolate(xs, zs, desired_number_of_points,
     zsnew = interpol_function(xsnew)
 
     return xsnew, zsnew
+
+
+######################################################################################################################################
+####   Opacity/Volume Prediction v2 Functions   ######################################################################################
+######################################################################################################################################
 
 
 def draw_2D_strand_line_bythickness(interior_points,
@@ -1598,3 +1613,99 @@ def get_radial_neighbors_array_data(initial_start_coord,
         plt.show()
 
     return neighbor_dict
+
+
+def generate_random_pole_point_2D(starting_point,
+                                   starting_angle,
+                                   array_dims
+                                   ):
+    """
+    Description:
+        Starting from a point within the 2D array, generate a line along its trajectory and define
+        a random point outside the array at a random distance to serve as a 'pole_point' for
+        starting each new layer's lines. Return a dictionary with specifics about distance 
+        and angles between the new 'pole_point' and the array's points/edges.
+
+    INPUTS:
+        'starting_point'    iterable (tuple, list, numpy.array) of int; initial starting point within the array bounds
+        'starting_angle'    int or float; intial line angle at 'starting_point'
+                            NOTE: line is drawn in each direction; 'angle' and 360-(180-'angle')
+        'array_dims'        iterable (tuple, list, numpy.array) of int; size of array in pixels
+    ACTIONS:
+        -lorem
+    OUTPUTS:
+        'pole_point_dict'   lorem
+
+    """
+
+    #Initialize and format variables
+    starting_point = np.array(starting_point).astype(np.int_)
+    array_dims = np.array(array_dims).astype(np.int_)
+    array_shape = array_dims.shape[0]
+      # initialize a maximum distance from the array to step when generating the new 'pole_point'
+      # NOTE: intention is to allow it to be 'far' away without being pointlessly far, hence the hard-coded multiplier below
+    max_step_distance = max(array_dims) *3  #hard-coded distance limit
+    step_distance = random.randint(-1*max_step_distance, max_step_distance)
+    
+    #Generate values for 'pole_point'
+    if (starting_angle == 0) or (starting_angle ==180):
+        #If horizontal, step is purely in X
+        new_pole_point
+
+    new_pole_point = [dim+step for dim,step in zip(array_dims, step_distances)]
+    pole_start_distance = math.sqrt(sum([(pole-start)**2 for pole, start in zip(new_pole_point, starting_point)]))
+      # test to see if 'pole_point' is within the array boundaries (i.e. 'interior' to array)
+    dim_bools = [((point<dim)and(point>=0)) for point, dim in zip(new_pole_point, array_dims)]
+    interior_bool = all(dim_bools)
+
+      # initialize the return function
+    pole_point_dict = {
+        'pole_point': np.array(new_pole_point),
+        'interior_bool': interior_bool,
+        'array_dims': array_dims,
+        'starting_point': starting_point,
+        'angles': {
+            'pole_to_start_point': 0,
+            'north_edge': 0,
+            'east_edge': 0,
+            'south_edge': 0,
+            'west_edge': 0,
+            'ne_corner': 0,
+            'nw_corner': 0,
+            'se_corner': 0,
+            'sw_corner': 0
+            },
+        'distances': {
+            'pole_to_start_point': pole_start_distance,
+            'north_edge': 0,
+            'east_edge': 0,
+            'south_edge': 0,
+            'west_edge': 0,
+            'ne_corner': 0,
+            'nw_corner': 0,
+            'se_corner': 0,
+            'sw_corner': 0
+            }
+        }
+
+    # 
+    
+    
+    return pole_point_dict
+
+
+def tile_array_from_arbitrary_point(initial_point,
+                                    line_angle, 
+                                    line_spacing,
+                                    lateral_offset,
+                                    array):
+    """
+    Description:
+        Point maybe
+    """
+
+    #Initialize and format variables
+    pole_to_array_dict = {}
+
+
+    return pole_to_array_dict
