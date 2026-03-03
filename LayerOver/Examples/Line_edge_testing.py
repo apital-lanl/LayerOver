@@ -20,9 +20,9 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 from LayerOver.Core.Points import get_radial_neighbors_array_data
-from LayerOver.Core.Points import generate_random_pole_point
+from LayerOver.Core.Points import generate_random_pole_point_2D
 
-show_intermediate_step_plots = False
+show_intermediate_step_plots = True
 
 interior_points = (20,45)
 angle = 90
