@@ -22,14 +22,16 @@ import numpy as np
 import random
 import skimage.draw as draw
 from LayerOver.Core.Points import draw_2D_strand_line_bythickness
+from LayerOver.Core.Points import generate_random_pole_point_2D
+from LayerOver.Core.Points import pole_point_to_array_interior_point
 
 
 #Hard-coded assumptions and conversion ratios
-
 default_compression_factors= {
     'default': 0.7,
     'general-siloxane': 0.7,
     }
+
 #Generic dictionaries 
 generic_punch_sizes = {
     'default':{
@@ -56,17 +58,18 @@ generic_volume_dict = {
 ###  Lorem  #####################################################################################################
 #################################################################################################################
 
-def flat_ideal_volume_guess(structure_dict, 
-                       n_structures= 2, 
-                       voxel_side_length= 15.875,
-                       voxel_resolution_microns= 1,
-                       compression_factor= 0.7,
-                       save_layer_images= False,
-                       save_layer_arrays= False,
-                       save_final_image= False,
-                       save_final_array= False,
-                       show_layer_images= True,
-                       show_final_image= True):
+def flat_ideal_volume_guess(structure_dict,
+                            array_dims, 
+                            n_structures= 2, 
+                            voxel_side_length= 15.875,
+                            voxel_resolution_microns= 1,
+                            compression_factor= 0.7,
+                            save_layer_images= False,
+                            save_layer_arrays= False,
+                            save_final_image= False,
+                            save_final_array= False,
+                            show_layer_images= True,
+                            show_final_image= True):
     '''
     Description: Take 
 
@@ -105,7 +108,7 @@ def flat_ideal_volume_guess(structure_dict,
     layer_materials= structure_dict['layer_materials']
     layer_pitches= structure_dict['layer_pitches']
 
-    #Check data types and coerce
+    #Check initial data types and coerce
     if type(compression_factor) == float:
         # check if a fraction
         if compression_factor <=1 and compression_factor >0:
@@ -151,8 +154,6 @@ def flat_ideal_volume_guess(structure_dict,
               # convert strand_diameter to # of pixels
             strand_radius_in_pixels = round(strand_diameter/2/voxel_resolution_microns, 5)
 
-            #Get layer matrial opacity 
-
             #Create layer blank
               # (Y,X) format to align with image libraries (i.e. CV2, Matplotlib, etc.)
             this_layer = np.zeros((y_array_dim, x_array_dim))
@@ -179,37 +180,73 @@ def flat_ideal_volume_guess(structure_dict,
 
             #If no explicit coordinates are passed, assume this is a generic layer and populate with strands as appropriate
             else:
-                #Create a seed point 
-                seed_y_idx = random.randrange(0, y_array_dim-1)
-                seed_x_idx = random.randrange(0, x_array_dim-1)
+                #For first layer, generate seed points
+                if layer_idx == 0:
+                    #Create a seed point 
+                    seed_y_idx = random.randrange(0, y_array_dim-1)
+                    seed_x_idx = random.randrange(0, x_array_dim-1)
 
-                #Draw initial line
-                array_dict = draw_2D_strand_line_bythickness([[seed_y_idx, seed_x_idx]],
-                                                            this_angular_offset,
-                                                            strand_diameter,
-                                                            (y_array_dim, x_array_dim),
-                                                            pix_to_um_conv = 1,
-                                                            length = None,
-                                                            line_type = 'simple',
-                                                            thickness_fcn = 'cylinder',
-                                                            show_points = False,
-                                                            show_final_array = False)
-                   # pull array and values
+                    #Draw initial line
+                    array_dict = draw_2D_strand_line_bythickness([seed_y_idx, seed_x_idx],
+                                                                this_angular_offset,
+                                                                strand_diameter,
+                                                                (y_array_dim, x_array_dim),
+                                                                pix_to_um_conv = 1,
+                                                                length = None,
+                                                                line_type = 'simple',
+                                                                thickness_fcn = 'cylinder',
+                                                                show_points = False,
+                                                                show_final_array = False)
+
+                    #Extend initial seed point to an arbitrary 'pole_point' that's used for every other layer
+                    #NOTE: 'pole_point' is the point at which the strand will be drawn through for every layer.
+                    #       It is generally outside the drawn array. 
+                    pole_point = generate_random_pole_point_2D([seed_y_idx, seed_x_idx], this_angular_offset, array_dims)
+                
+                else:
+                    #Get new layer points from 'pole_point' and new layer-structure specification
+                    starting_interior_point = pole_point_to_array_interior_point(pole_point,
+                                                                                this_angular_offset,
+                                                                                this_pitch,
+                                                                                this_lateral_offset,
+                                                                                array_dims,
+                                                                                strand_radius_in_pixels,
+                                                                                pix_to_um_conv = 1,
+                                                                                line_type = 'simple',
+                                                                                )
+                    
+                    #Draw initial line
+                    array_dict = draw_2D_strand_line_bythickness([seed_y_idx, seed_x_idx],
+                                                                this_angular_offset,
+                                                                strand_diameter,
+                                                                (y_array_dim, x_array_dim),
+                                                                pix_to_um_conv = 1,
+                                                                length = None,
+                                                                line_type = 'simple',
+                                                                thickness_fcn = 'cylinder',
+                                                                show_points = False,
+                                                                show_final_array = False)
+
+                #Pull array and values
                 line_keys = list(array_dict['line_dicts'].keys())
                 line_dict = array_dict[line_keys[0]]  #Should only be one entry, so taking first value is good enough
                 initial_line_start = line_dict['start_coordinates']
                 initial_line_end = line_dict['end_coordinates']
                 drawn_array = array_dict['drawn_array']
                 drawn_mask = drawn_array[drawn_array > 0]
-
-                #Calculate 
-                slope = (initial_line_end[0]- initial_line_start[0])/(initial_line_end[1]- initial_line_start[1])
                 
-                #If 'None' is not passed, assume the array is good and add new values to 'this_layer'
+                #If 'drawn_array' has a value that isn't None, assume the array is good and add new values to 'this_layer'
                 if drawn_array:
                     this_layer[drawn_mask] = drawn_array[drawn_mask]
+                  # if 'None' IS passed, something went wrong and flag that error
+                else:
+                    #TODO: add error handling for this case
+                    pass
 
                 #S
+
+
+                #A
 
             
             #Adjust for compression, strand-to-strand interactions and add to global volume array

@@ -34,8 +34,10 @@ TODO:
 
 
   #System and built-ins
+from encodings.punycode import T
 import math
 import random
+from re import I
 from tkinter import Tk, filedialog
 
   #Visualizaiton
@@ -1662,56 +1664,20 @@ def generate_random_pole_point_2D(starting_point,
         new_pole_point = np.array([starting_point[0], starting_point[1]+step_distance])
         line_direction = 'horizontal'
 
-    new_pole_point = [dim+step for dim,step in zip(array_dims, step_distances)]
+    new_pole_point = [dim+step_distance for dim in array_dims]
     pole_start_distance = math.sqrt(sum([(pole-start)**2 for pole, start in zip(new_pole_point, starting_point)]))
-      # test to see if 'pole_point' is within the array boundaries (i.e. 'interior' to array)
-    dim_bools = [((point<dim)and(point>=0)) for point, dim in zip(new_pole_point, array_dims)]
-    interior_bool = all(dim_bools)
-
-      # initialize the return function
-    pole_point_dict = {
-        'pole_point': np.array(new_pole_point),
-        'interior_bool': interior_bool,
-        'array_dims': array_dims,
-        'starting_point': starting_point,
-        'angles': {
-            'pole_to_start_point': 0,
-            'north_edge': 0,
-            'east_edge': 0,
-            'south_edge': 0,
-            'west_edge': 0,
-            'ne_corner': 0,
-            'nw_corner': 0,
-            'se_corner': 0,
-            'sw_corner': 0
-            },
-        'distances': {
-            'pole_to_start_point': pole_start_distance,
-            'north_edge': 0,
-            'east_edge': 0,
-            'south_edge': 0,
-            'west_edge': 0,
-            'ne_corner': 0,
-            'nw_corner': 0,
-            'se_corner': 0,
-            'sw_corner': 0
-            }
-        }
-
-    # 
     
-    
-    return pole_point_dict
+    return new_pole_point
 
 
-def tile_array_from_arbitrary_point(initial_point,
-                                    line_angle, 
-                                    line_spacing,
-                                    lateral_offset,
-                                    array):
+def tile_array_from_initial_line(initial_point,
+                                offset_angle, 
+                                strand_pitch,
+                                lateral_offset,
+                                array_dims):
     """
     Description:
-        Point maybe
+        From an intial point within an array
     """
 
     #Initialize and format variables
@@ -1719,3 +1685,140 @@ def tile_array_from_arbitrary_point(initial_point,
 
 
     return pole_to_array_dict
+
+
+def pole_point_to_array_interior_point(pole_point,
+                                        offset_angle,
+                                        strand_pitch,
+                                        lateral_offset,
+                                        array_dims,
+                                        strand_radius,
+                                        pix_to_um_conv = 1,
+                                        line_type = 'simple'
+                                        ):
+    """
+    Description:
+        From a 'pole_point' dictionary, generate a line from the 'pole_point' to the array and calculate the angles and distances between the 'pole_point' and the array's points/edges.
+        NOTE: Calculations are done in (X,Y) to make vector math easier, but are flipped back to (Y,X) for array indexing at the end.
+    INPUTS:
+        'pole_point_dict'   dictionary; output of 'generate_random_pole_point_2D' function)
+    """
+
+    #Initialize variables
+    interior_point = [0,0]
+    pole_point = np.array(pole_point)
+
+    #Test to see if 'pole_point' is within the array boundaries (i.e. 'interior' to array)
+    dim_bools = [((point<dim)and(point>=0)) for point, dim in zip(pole_point, array_dims)]
+    interior_bool = all(dim_bools)
+
+    #If pole_point is interior to array, no more calculations needed
+    if interior_bool:
+        interior_point = pole_point
+    
+    #If 'pole_point' is exterior to array (most common case by far), calculate angles and distances to array points/edges
+    else:
+        #Generate a line at the 'pole_point' based on structure values and calculate the intersection of that line with the array boundaries
+        #Step ~5 pixels along the line in each direction
+        if (offset_angle < 90 and offset_angle  >= 0):
+            left_angle = 180 + offset_angle
+            right_angle = offset_angle
+        elif offset_angle ==90 or offset_angle == 270:
+            left_angle = 270
+            right_angle = 90
+        elif offset_angle <= 180 and offset_angle > 90:
+            left_angle = offset_angle
+            right_angle = offset_angle + 180
+        elif offset_angle < 270 and offset_angle > 180:
+            left_angle = offset_angle
+            right_angle = offset_angle - 180
+        elif offset_angle >270 and offset_angle < 360:
+            left_angle = offset_angle - 180
+            right_angle = offset_angle
+          # round to avoid overflow errors in trig functions at extreme angles
+        right_y = round(math.sin(math.radians(right_angle)), 5)*5
+        right_x = round(math.cos(math.radians(right_angle)), 5)*5
+        left_y = round(math.sin(math.radians(left_angle)), 5)*5
+        left_x = round(math.cos(math.radians(left_angle)), 5)*5
+        #NOTE: These are all (X,Y) to make vector math easier, but will need to be flipped back to (Y,X) for array indexing later
+          # increment original 'pole_point' to create characterisitic line
+        a0 = np.array([pole_point[1]+left_x, pole_point[0]+left_y])
+        a1 = np.array([pole_point[1]+right_x, pole_point[0]+right_y])
+
+        #Set up variables for calculating distances to array boundaries
+        edges = [
+            [[0,0], [array_dims[1], 0]], 
+            [[array_dims[1], 0], [array_dims[1], array_dims[0]]],
+            [[0, array_dims[0]], [array_dims[1], array_dims[0]]],
+            [[0, array_dims[0]], [0,0]]
+                 ]
+        edge_names = ['south', 'east', 'north', 'west']
+        edge_distances = []
+        intersected_edges=[]
+        intersected_edge_names = []
+        
+        #Check to see if 'pole_point_line' intersects with array boundaries and calculate intersection point (i.e. 'interior_point')
+        for idx, edge in enumerate(edges):
+            b0 = np.array(edge[0])
+            b1 = np.array(edge[1])
+            #Calculate distance between infinite line and segment of array boundary;
+            #  'clamp' values below ensure distance to line segment of boundary is calculated, not infinite line at the boundary location
+            this_distance = line_line_distance(a0,a1,b0,b1,
+                                                clampB0=True,
+                                                clampB1=True)
+            #round to get 0-comparison-capable distance measures; otherwise float-to-int comparison can be iffy
+            if this_distance < 1e-10:
+                edge_distances.append(0)
+                intersected_edges.append(edge)
+                intersected_edge_names.append(edge_names[idx])
+            else:
+                edge_distances.append(round(this_distance))
+
+        if len(intersected_edges) >0:
+            intersected_bool = True
+        else:
+            intersected_bool = False
+
+        #If intersection exists, calculate an interior point 
+        if intersected_bool:
+
+
+        else:
+
+        #
+
+
+        pole_point_dict = {
+            'pole_point': np.array(new_pole_point),
+            'interior_bool': interior_bool,
+            'array_dims': array_dims,
+            'starting_point': starting_point,
+            'angles': {
+                'pole_to_start_point': 0,
+                'north_edge': 0,
+                'east_edge': 0,
+                'south_edge': 0,
+                'west_edge': 0,
+                'ne_corner': 0,
+                'nw_corner': 0,
+                'se_corner': 0,
+                'sw_corner': 0
+                },
+            'distances': {
+                'pole_to_start_point': pole_start_distance,
+                'north_edge': 0,
+                'east_edge': 0,
+                'south_edge': 0,
+                'west_edge': 0,
+                'ne_corner': 0,
+                'nw_corner': 0,
+                'se_corner': 0,
+                'sw_corner': 0
+                }
+            }
+
+    # 
+    
+
+
+    return interior_point
