@@ -1,0 +1,94 @@
+"""
+Copyright 2025. Triad National Security, LLC. All rights reserved.
+This program was produced under U.S. Government contract 89233218CNA000001 for Los Alamos National Laboratory (LANL), 
+which is operated by Triad National Security, LLC for the U.S. Department of Energy/National Nuclear Security 
+Administration. All rights in the program are reserved by Triad National Security, LLC, and the U.S. Department of 
+Energy/National Nuclear Security Administration. The Government is granted for itself and others acting on its behalf 
+a nonexclusive, paid-up, irrevocable worldwide license in this material to reproduce, prepare. derivative works, 
+distribute copies to the public, perform publicly and display publicly, and to permit others to do so.
+
+Created:   20YY-MM-DD
+Version:   0.1.0
+
+@author: Aaron Pital (Los Alamos National Lab)
+
+Description: 
+
+"""
+
+import numpy as np
+import math
+import matplotlib.pyplot as plt
+
+from LayerOver.Analysis.VolumetricPrediction import flat_ideal_volume_guess
+from LayerOver.PSPP.DIWStructure import blank_diw_structure_dict
+
+
+# structure_dict keys:
+#     metadata
+#     number_of_layers
+#     layer_strand_extrusion
+#     layer_strand_diameter
+#     layer_types
+#     layer_type_modifiers
+#     layer_points
+#     layer_steps
+#     layer_angles
+#     layer_lateral_offsets
+#     layer_materials
+#     layer_pitches
+
+array_dims = (15000, 15000)
+
+diw_structure_dict = {
+    'metadata': {
+        'unique_structure_name': None,
+        'print_name': None,
+        'structure': None,
+        'nozzle_size_um': None,
+        'pitch_offset': None,
+        'syringe-material': None,
+        'project': None,
+        'machine_name': None,
+        'layerup_file': None,
+        'version_number': None,
+        'notes': None,
+        'mech_data_flag': None,
+        'keyence_data_flag': None,
+        'punch_diameter': None,
+        'mass_g': None,
+        'thickness_mm': None,
+        'density_g/cc': None
+        },
+    'part_structure': None,
+    'part_skin_nozzle_size': 150,
+    'part_layer_nozzle_size': 150,
+    'part_angular_offset': 45,
+    'part_lateral_offset': 0,
+    'part_material': '',
+    'part_pitch': None,
+    'number_of_layers': 4,
+    'layer_strand_extrusion': None,
+    'layer_strand_diameter': [150, 150, 150, 150],
+    'layer_types': ['skin', 'helicoidal', 'helicoidal', 'helicoidal'],
+    'layer_type_modifiers': None,
+    'layer_points': None,
+    'layer_steps': [0, 125, 250, 275],
+    'layer_angles': [0, 45, 90, 135],
+    'layer_lateral_offsets': [0, 0, 0, 0],
+    'layer_materials': None,
+    'layer_pitches': [600, 600, 600, 600]
+    }
+
+flat_ideal_volume_guess(diw_structure_dict,
+                            array_dims, 
+                            n_structures= 2, 
+                            voxel_side_length= 15.875,
+                            voxel_resolution_microns= 1,
+                            compression_factor= 0.7,
+                            save_layer_images= False,
+                            save_layer_arrays= False,
+                            save_final_image= False,
+                            save_final_array= False,
+                            show_layer_images= True,
+                            show_final_image= True)

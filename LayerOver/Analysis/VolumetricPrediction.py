@@ -17,14 +17,16 @@ Description: Module for handling conversions between ideal structure assumptions
           and segregate these to the headers of classes and the full module. Other (specific) use cases will require modifications.
 
 """
-#from Points import
+#Standard libraries
 import numpy as np
 import random
 import skimage.draw as draw
+#LayerOver imports
+  #separate calls for clarity; 
 from LayerOver.Core.Points import draw_2D_strand_line_bythickness
 from LayerOver.Core.Points import generate_random_pole_point_2D
 from LayerOver.Core.Points import pole_point_to_array_interior_point
-
+from LayerOver.Core.Points import ideal_tile_from_initial_line
 
 #Hard-coded assumptions and conversion ratios
 default_compression_factors= {
@@ -71,7 +73,7 @@ def flat_ideal_volume_guess(structure_dict,
                             show_layer_images= True,
                             show_final_image= True):
     '''
-    Description: Take 
+    Description: Take 'ideal' strucures 
 
     INPUT:
         'structure_dict'            lorem
@@ -129,8 +131,9 @@ def flat_ideal_volume_guess(structure_dict,
         #Generate a layer name
         voxel_idx = i+1
         if 'unique_structure_name' in metadata_dict:
-            voxel_name = metadata_dict['unique_structure_name']+f'_Voxel-{voxel_idx}'
-        elif 'print_name' in metadata_dict:
+            if metadata_dict['unique_structure_name']:
+                voxel_name = metadata_dict['unique_structure_name']+f'_Voxel-{voxel_idx}'
+        elif 'print_name' in metadata_dict and metadata_dict['print_name']:
             voxel_name = metadata_dict['print_name']+f'_Voxel-{voxel_idx}'
           # generate generic voxel_name if everything else fails
         else:
@@ -138,7 +141,9 @@ def flat_ideal_volume_guess(structure_dict,
             voxel_name = f'UNK-Structure-ID_Voxel-{voxel_idx}'
 
         voxel_volume_array = np.zeros((y_array_dim, x_array_dim))  #each dim should be the same, but keeping them separable for now in case that's not true in the future
-        layer_arrays = []
+        ideal_layer_arrays = []    #store raw strand volume array for each layer
+        layer_arrays = []    #store volume array adjusted for compression and strand-strand interactions
+        layer_dict = {}
         #Generate each layer's thickness projection
         for layer_idx in range(n_layers):
             #Get layer specifics
@@ -160,6 +165,7 @@ def flat_ideal_volume_guess(structure_dict,
 
             #Populate array with lines 
             if these_layer_point_coordinates:
+                #TODO: Fix this case to handle actual paths 
                 #If explicit coordinates are passed, use those to draw strands
                 array_dict = draw_2D_strand_line_bythickness(these_layer_point_coordinates,
                                                             this_angular_offset,
@@ -185,6 +191,7 @@ def flat_ideal_volume_guess(structure_dict,
                     #Create a seed point 
                     seed_y_idx = random.randrange(0, y_array_dim-1)
                     seed_x_idx = random.randrange(0, x_array_dim-1)
+                    starting_interior_point = [seed_y_idx, seed_x_idx]
 
                     #Draw initial line
                     array_dict = draw_2D_strand_line_bythickness([seed_y_idx, seed_x_idx],
@@ -214,9 +221,9 @@ def flat_ideal_volume_guess(structure_dict,
                                                                                 pix_to_um_conv = 1,
                                                                                 line_type = 'simple',
                                                                                 )
-                    
+
                     #Draw initial line
-                    array_dict = draw_2D_strand_line_bythickness([seed_y_idx, seed_x_idx],
+                    array_dict = draw_2D_strand_line_bythickness([starting_interior_point[0], starting_interior_point[1]],
                                                                 this_angular_offset,
                                                                 strand_diameter,
                                                                 (y_array_dim, x_array_dim),
@@ -227,7 +234,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                                 show_points = False,
                                                                 show_final_array = False)
 
-                #Pull array and values
+                #Pull array and values from this layer's run
                 line_keys = list(array_dict['line_dicts'].keys())
                 line_dict = array_dict[line_keys[0]]  #Should only be one entry, so taking first value is good enough
                 initial_line_start = line_dict['start_coordinates']
@@ -243,34 +250,57 @@ def flat_ideal_volume_guess(structure_dict,
                     #TODO: add error handling for this case
                     pass
 
-                #S
+                #Add all the other lines
+                tile_dict = ideal_tile_from_initial_line([initial_line_start, initial_line_end],
+                                                        this_angular_offset, 
+                                                        this_pitch,
+                                                        array_dims,
+                                                        strand_radius_in_pixels)
 
-
-                #A
-
+                drawn_array = tile_dict['drawn_array']
+                drawn_mask = drawn_array[drawn_array > 0]
+                this_layer[drawn_mask] = drawn_array[drawn_mask]
             
-            #Adjust for compression, strand-to-strand interactions and add to global volume array
-            if layer_idx == 0:
-                pass
-            else:
-                pass
+                #Store a 'raw' version of the layer
+                ideal_layer_arrays.append(this_layer)
 
-            if save_layer_arrays:
-                pass
-            
-            #Handle images for each layer (ideal, no compression)
-            if show_layer_images:
-                if save_layer_images:
+                #Adjust for compression, strand-to-strand interactions and add to global volume array
+                if layer_idx == 0:
+                    #Apply flat-plate compression (i.e. compression of strand against plate surface)
                     pass
+                else:
+                    pass
+                if save_layer_arrays:
+                    pass
+            
+                #Handle images for each layer (ideal, no compression)
+                if show_layer_images:
+                    if save_layer_images:
+                        pass
                 
-              # save the layer image if 'show_layer_images' is False
-            elif save_layer_images:
-                pass
+                  # save the layer image if 'show_layer_images' is False
+                elif save_layer_images:
+                    pass
 
-            layer_arrays.append(this_layer)
+                #Save the layer array
+                layer_arrays.append(this_layer)    #save adjusted layer; accounts for compression and strand-strand interactions
+                voxel_volume_array = voxel_volume_array + this_layer    #add adjusted layer to global volume array
+        
+            #Assign to dict for return
+            layer_dict['ideal_layers'][layer_idx] = ideal_layer_arrays
+            layer_dict['adjusted_layers'][layer_idx] = layer_arrays
+            layer_dict['full_volume_prediction'] = voxel_volume_array
+            return_volume_dict[voxel_name] = layer_dict
 
-        #
-
+            if show_final_image:
+                plt.figure(figsize=(10,10))
+                plt.imshow(voxel_volume_array)
+                plt.title(f"{voxel_name}")
+                if save_final_image:
+                    pass
+                plt.show()
+        
+    return return_volume_dict
 
 
 def cartesian_ideal_volume_guess(structure_dict, 

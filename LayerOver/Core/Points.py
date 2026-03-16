@@ -37,7 +37,7 @@ TODO:
 from encodings.punycode import T
 import math
 import random
-from re import I
+from re import I, S
 from tkinter import Tk, filedialog
 
   #Visualizaiton
@@ -724,6 +724,91 @@ def line_line_distance(a0,a1,b0,b1,\
         
     return pA,pB,distance
 
+
+def intersect_line_and_segment(p1_line, p2_line, p1_sec, p2_sec):
+    """
+    Description:
+        Finds the intersection point of an infinite line and a finite line segment.
+        (Taken almost verbatim from Gemini search output)
+
+    INPUTS:
+        p1_line
+        p2_line     Endpoints of the infinite line (tuples/lists of x, y).
+        p1_sec 
+        p2_sec      Endpoints of the line-section (tuples/lists of x, y).
+
+    Returns:
+        The intersection point (x, y) if it exists within the line-section, 
+        otherwise None (if parallel or intersection outside the section).
+    """
+
+    x1, y1 = p1_line
+    x2, y2 = p2_line
+    x3, y3 = p1_sec
+    x4, y4 = p2_sec
+
+    denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1)
+
+    # Check if lines are parallel (denominator is 0)
+    if abs(denom) < 1e-9: # Use a small tolerance for floating point comparisons
+        # Lines are parallel or coincident. No single intersection point for a line and line-section, 
+        # or the line-section is coincident with the line (infinite intersections). 
+        # This function returns None for no single point.
+        return None
+
+    # Calculate parametric parameters ua and ub
+    ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom
+    ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom
+
+    # Check if the intersection point lies on the *finite line-section* (ub must be in [0, 1])
+    # ua represents where the intersection is on the infinite line, which is always in range.
+    if not (0 <= ub <= 1):
+        return None
+
+    # Calculate the intersection point
+    x = x1 + ua * (x2 - x1)
+    y = y1 + ua * (y2 - y1)
+
+    return (x, y)
+
+
+def intersect_point_and_segment(p_external, p_line_start, p_line_end):
+    """
+    Description:
+            Finds the closest point on a line segment to an external point.
+        Note: taken with additions from Gemini search output
+    INPUTS:
+            p_external      tuple,list; [x, y] of external point.
+            p_line_start    tuple,list; [x, y] of starting point of the line segment.
+            p_line_end      tuple,list; [x, y] of ending point of the line segment.
+    """
+
+    # Vector from the point on the line to the external point
+    p_on_line = p_line_start  # Can choose either start or end as the reference point on the line; arbitrary
+    vec_to_external = p_external - p_on_line
+    segment_length = math.sqrt((p_line_end[0] - p_line_start[0])**2 + (p_line_end[1] - p_line_start[1])**2)
+    line_direction_vector = p_line_end - p_line_start
+    line_direction_vector = [component/segment_length for component in line_direction_vector]  # Normalize the direction vector]
+    
+    # The line is parameterized as p_on_line + t * line_direction_vector.
+    # The projection falls where t = [(vec_to_external) . (line_direction_vector)] / |line_direction_vector|^2
+    
+    # Calculate dot product of vec_to_external and line_direction_vector
+    dot_prod = np.dot(vec_to_external, line_direction_vector)
+    
+    # Calculate the squared magnitude (dot product with itself) of the line_direction_vector
+    line_magnitude_sq = np.dot(line_direction_vector, line_direction_vector)
+    
+    if line_magnitude_sq == 0:
+        raise ValueError("Line direction vector cannot be a zero vector.")
+        
+    # Calculate the 't' parameter
+    t = dot_prod / line_magnitude_sq
+    
+    # The projection point (closest point on the line)
+    projection_point = p_on_line + t * line_direction_vector
+    
+    return projection_point
     
 ###################################################################################################################################
 ####   Utility functions   ########################################################################################################
@@ -780,7 +865,7 @@ def draw_2D_strand_line_bythickness(interior_points,
                                     thickness_fcn = 'cylinder',
                                     show_points = False,
                                     show_array_iterations = False,
-                                    show_final_array = True):
+                                    show_final_array = False):
     """
     Description:
         Interpret line points as an ideal strand of radius 'strand_radius' and draw thickness on array with values of microns. 
@@ -1670,23 +1755,6 @@ def generate_random_pole_point_2D(starting_point,
     return new_pole_point
 
 
-def tile_array_from_initial_line(initial_point,
-                                offset_angle, 
-                                strand_pitch,
-                                lateral_offset,
-                                array_dims):
-    """
-    Description:
-        From an intial point within an array
-    """
-
-    #Initialize and format variables
-    pole_to_array_dict = {}
-
-
-    return pole_to_array_dict
-
-
 def pole_point_to_array_interior_point(pole_point,
                                         offset_angle,
                                         strand_pitch,
@@ -1702,10 +1770,12 @@ def pole_point_to_array_interior_point(pole_point,
         NOTE: Calculations are done in (X,Y) to make vector math easier, but are flipped back to (Y,X) for array indexing at the end.
     INPUTS:
         'pole_point_dict'   dictionary; output of 'generate_random_pole_point_2D' function)
+    OUTPUT:
+        'interior_point'    list; (Y,X) of array indices of interior point 
     """
 
     #Initialize variables
-    interior_point = [0,0]
+    interior_point = [-1,-1]  #default return value; improper trial point to flag failed process
     pole_point = np.array(pole_point)
 
     #Test to see if 'pole_point' is within the array boundaries (i.e. 'interior' to array)
@@ -1746,6 +1816,7 @@ def pole_point_to_array_interior_point(pole_point,
         a1 = np.array([pole_point[1]+right_x, pole_point[0]+right_y])
 
         #Set up variables for calculating distances to array boundaries
+          # hard-coded edge point list for array boundaries; (X,Y) format for vector math
         edges = [
             [[0,0], [array_dims[1], 0]], 
             [[array_dims[1], 0], [array_dims[1], array_dims[0]]],
@@ -1763,10 +1834,11 @@ def pole_point_to_array_interior_point(pole_point,
             b1 = np.array(edge[1])
             #Calculate distance between infinite line and segment of array boundary;
             #  'clamp' values below ensure distance to line segment of boundary is calculated, not infinite line at the boundary location
-            this_distance = line_line_distance(a0,a1,b0,b1,
+            _,_,this_distance = line_line_distance(a0,a1,b0,b1,
                                                 clampB0=True,
                                                 clampB1=True)
             #round to get 0-comparison-capable distance measures; otherwise float-to-int comparison can be iffy
+            #  i.o.w. condition 'near-zero' distances
             if this_distance < 1e-10:
                 edge_distances.append(0)
                 intersected_edges.append(edge)
@@ -1779,46 +1851,225 @@ def pole_point_to_array_interior_point(pole_point,
         else:
             intersected_bool = False
 
-        #If intersection exists, calculate an interior point 
+        #Calculate interior points
+          # if intersection exists, calculate an interior point 
         if intersected_bool:
-
-
+            boundary_coordinates= []
+            if len(intersected_edges) == 2:
+                for edge_coords, edge_name in zip(intersected_edges, intersected_edge_names):
+                    #NOTE: this is (X,Y) format; will need to be flipped back to (Y,X) for array indexing later
+                    b0 = np.array(edge_coords[0])
+                    b1 = np.array(edge_coords[1])
+                    boundary_x, boundary_y = intersect_line_and_segment(a0, a1, b0, b1)
+                    boundary_coordinates.append([boundary_x, boundary_y])
+                interior_point_x = (boundary_coordinates[0][0] + boundary_coordinates[1][0])/2
+                interior_point_y = (boundary_coordinates[0][1] + boundary_coordinates[1][1])/2
+                interior_point = [int(round(interior_point_y)), int(round(interior_point_x))]
+            #If trial line from 'pole_point' intersects with any other number than 0 or 2 boundaries, something is pathalogical
+            else:
+                print(f"Innapropriate number of intersected boundaries- {len(intersected_edges)} edges:")
+                for edge in intersected_edges:
+                    print(f"\t {edge[0]} \t {edge[1]}")
+          # if line doesn't intersect with ANY array boundaries, find closest edge and calculate an interior point 
         else:
+            smallest_distance = 1e6  #should be way bigger than any possible distance
+            for distance, edge_coords, edge_name in zip(edge_distances, edges, edge_names):
+                if distance < smallest_distance:
+                    closest_edge = edge_coords
+                    closest_edge_name = edge_name
+                    smallest_distance = distance
+            #If closest edge was found, calculate interior point
+            if smallest_distance < 1e5:
+                #Calculate closest point between abstract line from 'pole_point' and clampled line segment of closest edge
+                pole_line_closest_point, array_edge_closest_point, distance = \
+                    line_line_distance(a0,a1,b0,b1,
+                                        clampB0=True,
+                                        clampB1=True)
+                #Calculate orthogonal direction vecotr from to line from 'pole_point' to array edge
+                dx = array_edge_closest_point[0] - pole_line_closest_point[0]
+                dy = array_edge_closest_point[1] - pole_line_closest_point[1]
+                distance = math.sqrt((dx)**2 + (dy)**2)
+                unit_dx = dx/distance
+                unit_dy = dy/distance
+                  # step at lateral_offset towards array
+                step_coord_x = pole_line_closest_point[0] + unit_dx*lateral_offset
+                step_coord_y = pole_line_closest_point[1] + unit_dy*lateral_offset
 
-        #
-
-
-        pole_point_dict = {
-            'pole_point': np.array(new_pole_point),
-            'interior_bool': interior_bool,
-            'array_dims': array_dims,
-            'starting_point': starting_point,
-            'angles': {
-                'pole_to_start_point': 0,
-                'north_edge': 0,
-                'east_edge': 0,
-                'south_edge': 0,
-                'west_edge': 0,
-                'ne_corner': 0,
-                'nw_corner': 0,
-                'se_corner': 0,
-                'sw_corner': 0
-                },
-            'distances': {
-                'pole_to_start_point': pole_start_distance,
-                'north_edge': 0,
-                'east_edge': 0,
-                'south_edge': 0,
-                'west_edge': 0,
-                'ne_corner': 0,
-                'nw_corner': 0,
-                'se_corner': 0,
-                'sw_corner': 0
-                }
-            }
-
-    # 
-    
-
+                #Starting at closest 'pole_point' line point, add offset and step at 'strand_pitch' until within a 'strand_radius' distance of the array
+                interior_reached = False
+                stepping_counter = 0   #safety counter to avoid infinite loops in pathological cases
+                while (not interior_reached) and (stepping_counter<10000):
+                    if (step_coord_x >= 0 and step_coord_x < array_dims[1]) and (step_coord_y >= 0 and step_coord_y < array_dims[0]):
+                        interior_reached = True
+                        interior_point = [int(round(step_coord_y)), int(round(step_coord_x))]
+                        break
+                    else:
+                        step_coord_x += unit_dx*strand_pitch
+                        step_coord_y += unit_dy*strand_pitch
+                        stepping_counter += 1
 
     return interior_point
+
+
+def ideal_tile_from_initial_line(initial_line_points,
+                                offset_angle, 
+                                strand_pitch,
+                                array_dims,
+                                strand_radius):
+    """
+    Description:
+        Tile from an ideal structure (i.e. not from points or toolpath). From an intial point within an array, tile in each direction until the array is filled.
+        NOTE: 'array_dims' and 'drawn_array' are (Y,X) but all points w/in this function are (X,Y).
+
+    INPUTS:
+            'initial_line_points'   iterable (tuple, list, numpy.array); (X,Y) coordinates
+    OUTPUTS:
+            'tile_dict'     dict; contains the following keys:
+                            'drawn_array'   numpy array of size 'array_dims' with tiled structure drawn in; values represent thickness of strand at each point
+    """
+
+    #Initialize and format variables
+    tile_dict = {
+        'drawn_array': None,
+        }
+    layer_array = np.zeros((array_dims[0], array_dims[1]))
+
+    #Define 'left' and 'right' boundary points (corners of the array)
+    #NOTE: 'array_dims' and 'drawn_array' are (Y,X) but all points w/in this function are (X,Y)
+    if (offset_angle == 0) or (offset_angle == 180) or (offset_angle == 360):
+        #If horizontal, use top (left) and bottom (right) edge midpoints
+        left_coord = [(array_dims[1]-1)/2, array_dims[0]]
+        right_coord = [(array_dims[1]-1)/2, 0]
+    elif (offset_angle == 90) or (offset_angle == 270):
+        #if vertical, use east and west edges
+        left_coord = [0, (array_dims[0]-1)/2]
+        right_coord = [array_dims[1], (array_dims[0]-1)/2]
+    elif ((offset_angle > 0) and (offset_angle < 90)) or ((offset_angle > 180) and (offset_angle < 270)):
+        #check corners for "+" slope
+        left_coord = [0, array_dims[0]]
+        right_coord = [array_dims[1], 0]
+    elif ((offset_angle > 90) and (offset_angle < 180)) or ((offset_angle > 270) and (offset_angle < 360)):
+        #check corners for "-" slope
+        left_coord = [0, 0]
+        right_coord = [array_dims[1], array_dims[0]]
+    else:
+        print(f"Invalid offset angle- {offset_angle} degrees; must be between 0 and 360")
+        return tile_dict
+
+    #Fill 'left'
+    prior_line_points = initial_line_points
+    distance_left = 1e6  #arbitrary big number for initialization
+    stepping_counter = 0
+    while (abs(distance_left) > strand_radius) and (stepping_counter <100):
+        p_left_line = intersect_point_and_segment(left_coord, prior_line_points[0], prior_line_points[1])
+        distance_left = math.sqrt((p_left_line[0]-left_coord[0])**2 + (p_left_line[1]-left_coord[1])**2) + strand_radius
+        if distance_left > 0:
+            dx = p_left_line[0]-left_coord[0]
+            dy = p_left_line[1]-left_coord[1]
+            distance = math.sqrt((dx)**2 + (dy)**2)
+            unit_dx = dx/distance
+            unit_dy = dy/distance
+            step_coord_x = left_coord[0] + unit_dx*strand_pitch
+            step_coord_y = left_coord[1] + unit_dy*strand_pitch
+            left_coord = [step_coord_x, step_coord_y]
+            line_dict = draw_2D_strand_line_bythickness([step_coord_y, step_coord_x],
+                                                        offset_angle,
+                                                        strand_radius*2,
+                                                        array_dims,
+                                                        pix_to_um_conv = 1,
+                                                        length = None,
+                                                        line_type = 'simple',
+                                                        thickness_fcn = 'cylinder',
+                                                        show_points = False,
+                                                        show_array_iterations = False,
+                                                        show_final_array = False)
+
+            drawn_array = line_dict['drawn_array']
+            drawn_mask = drawn_array[drawn_array > 0]
+            new_line_start = line_dict['start_coordinates']
+            new_line_end = line_dict['end_coordinates']
+            layer_array[drawn_mask] = drawn_array[drawn_mask]
+
+            #Set values for next iteration
+            prior_line_points = [new_line_start, new_line_end]
+            stepping_counter += 1
+
+        elif abs(distance_left) <= strand_radius:
+            #TODO: add this use case when point is external to array but within a strand radius of the edge
+            # raw_2D_external_line_bythickness(external_point,
+            #                               strand_radius_in_pix,
+            #                               array_dims,
+            #                               pix_to_um_conv = 1,
+            #                               line_type = 'simple')
+            pass
+
+    #Fill 'right'
+    prior_line_points = initial_line_points
+    distance_right = 1e6  #arbitrary big number for initialization
+    stepping_counter = 0
+    while (abs(distance_right) > strand_radius) and (stepping_counter <100):
+        p_right_line = intersect_point_and_segment(right_coord, prior_line_points[0], prior_line_points[1])
+        distance_right = math.sqrt((p_left_line[0]-right_coord[0])**2 + (p_left_line[1]-right_coord[1])**2) + strand_radius
+        if distance_right > 0:
+            dx = p_left_line[0]-right_coord[0]
+            dy = p_left_line[1]-right_coord[1]
+            distance = math.sqrt((dx)**2 + (dy)**2)
+            unit_dx = dx/distance
+            unit_dy = dy/distance
+            step_coord_x = right_coord[0] + unit_dx*strand_pitch
+            step_coord_y = right_coord[1] + unit_dy*strand_pitch
+            right_coord = [step_coord_x, step_coord_y]
+            line_dict = draw_2D_strand_line_bythickness([step_coord_y, step_coord_x],
+                                                        offset_angle,
+                                                        strand_radius*2,
+                                                        array_dims,
+                                                        pix_to_um_conv = 1,
+                                                        length = None,
+                                                        line_type = 'simple',
+                                                        thickness_fcn = 'cylinder',
+                                                        show_points = False,
+                                                        show_array_iterations = False,
+                                                        show_final_array = False)
+
+            drawn_array = line_dict['drawn_array']
+            drawn_mask = drawn_array[drawn_array > 0]
+            new_line_start = line_dict['start_coordinates']
+            new_line_end = line_dict['end_coordinates']
+            layer_array[drawn_mask] = drawn_array[drawn_mask]
+
+            #Set values for next iteration
+            prior_line_points = [new_line_start, new_line_end]
+            stepping_counter += 1
+
+        elif abs(distance_left) <= strand_radius:
+            #TODO: add this use case when point is external to array but within a strand radius of the edge
+            # raw_2D_external_line_bythickness(external_point,
+            #                               strand_radius_in_pix,
+            #                               array_dims,
+            #                               pix_to_um_conv = 1,
+            #                               line_type = 'simple')
+            pass
+
+        tile_dict['drawn_array'] = layer_array
+
+    return tile_dict
+
+
+def draw_2D_external_line_bythickness(external_point,
+                                    strand_radius_in_pix,
+                                    array_dims,
+                                    pix_to_um_conv = 1,
+                                    line_type = 'simple'):
+    """
+    Description:
+        For strands that have some thickness within array boundaries, but whose centerline points are exterior to the array bounds: draw appropriate lines.
+    """
+    #Initialize and format variables
+    drawn_array = np.zeros(array_dims)
+    #Draw line between start and end points
+    rr, cc = line(start_point[0], start_point[1], end_point[0], end_point[1])
+    drawn_array[rr,cc] = thickness
+    if show_final_array:
+        plt.imshow(drawn_array)
+        plt.show()
+    return drawn_array
