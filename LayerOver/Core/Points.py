@@ -917,6 +917,8 @@ def draw_2D_strand_line_bythickness(interior_points,
         'radius_value': [],
         'drawn_array': None
         }
+      # convert from um to pixels
+    strand_diam= strand_diam/pix_to_um_conv
     strand_radius = strand_diam/2
 
     #TODO: add options in the future
@@ -1195,7 +1197,10 @@ def get_radial_neighbors_array_data(initial_start_coord,
     starting_points_list = [initial_start_coord]
     ending_points_list = [initial_end_coord]
     thickness_list = [0]
-    
+      # convert from um to pixels
+    strand_diameter= strand_diameter/pix_to_um_conv
+    strand_radius = strand_diameter/2
+
     #Check that start-end points haven't hit an edge-limit
     #  i.e. make sure they aren't continuing on the same edge
     point_left_edge_hit = False
@@ -1204,7 +1209,6 @@ def get_radial_neighbors_array_data(initial_start_coord,
     #Pull array dimensions and initialize return array
     array_y_dim = array_dim[0]
     array_x_dim = array_dim[1]
-    strand_radius = strand_diameter/2
     return_array = np.zeros((array_y_dim, array_x_dim))
 
     #Not sure whether 'end' or 'start' is to the right, so find that out and call the 'right' the end
@@ -1968,7 +1972,8 @@ def ideal_tile_from_initial_line(initial_line_points,
                                 offset_angle, 
                                 strand_pitch,
                                 array_dims,
-                                strand_radius):
+                                strand_radius,
+                                pix_to_um_conv = 1):
     """
     Description:
         Tile from an ideal structure (i.e. not from points or toolpath). From an intial point within an array, tile in each direction until the array is filled.
@@ -1986,6 +1991,9 @@ def ideal_tile_from_initial_line(initial_line_points,
         'drawn_array': None,
         }
     layer_array = np.zeros((array_dims[0], array_dims[1]))
+      # convert from microns to pixels for calculations
+    strand_pitch = strand_pitch/pix_to_um_conv
+    strand_radius = strand_radius/pix_to_um_conv
 
     #Define 'left' and 'right' boundary points (corners of the array)
     #NOTE: 'array_dims' and 'drawn_array' are (Y,X) but all points w/in this function are (X,Y)
