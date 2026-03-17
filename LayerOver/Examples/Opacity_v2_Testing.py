@@ -38,7 +38,7 @@ from LayerOver.PSPP.DIWStructure import blank_diw_structure_dict
 #     layer_materials
 #     layer_pitches
 
-array_dims = (15000, 15000)
+array_dims = (1500, 1500)
 
 diw_structure_dict = {
     'metadata': {
@@ -71,20 +71,20 @@ diw_structure_dict = {
     'layer_strand_extrusion': None,
     'layer_strand_diameter': [150, 150, 150, 150],
     'layer_types': ['skin', 'helicoidal', 'helicoidal', 'helicoidal'],
-    'layer_type_modifiers': None,
-    'layer_points': None,
+    'layer_type_modifiers': ['None', 'None', 'None', 'None'],
+    'layer_points': [[],[],[],[]],
     'layer_steps': [0, 125, 250, 275],
     'layer_angles': [0, 45, 90, 135],
     'layer_lateral_offsets': [0, 0, 0, 0],
-    'layer_materials': None,
+    'layer_materials': ['LL50', 'LL50', 'LL50', 'LL50'],
     'layer_pitches': [600, 600, 600, 600]
     }
 
 flat_ideal_volume_guess(diw_structure_dict,
                             array_dims, 
                             n_structures= 2, 
-                            voxel_side_length= 15.875,
-                            voxel_resolution_microns= 1,
+                            voxel_side_length= 15,
+                            voxel_resolution_microns= 0,
                             compression_factor= 0.7,
                             save_layer_images= False,
                             save_layer_arrays= False,

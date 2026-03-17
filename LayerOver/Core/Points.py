@@ -678,9 +678,19 @@ def line_line_distance(a0,a1,b0,b1,\
         
         
     # Lines criss-cross: Calculate the projected closest points
-    t = (b0 - a0);
-    detA = np.linalg.det([t, _B, cross])
-    detB = np.linalg.det([t, _A, cross])
+    t = (b0 - a0)
+
+    # If inputs are 2D, embed into 3D (z=0) so np.linalg.det gets 3-element rows
+    if t.size == 2:
+        t3     = np.array([t[0],     t[1],     0.0])
+        A3     = np.array([_A[0],    _A[1],    0.0])
+        B3     = np.array([_B[0],    _B[1],    0.0])
+        cross3 = np.array([0.0,      0.0,      float(cross)])  # cross is scalar z for 2D
+        detA = np.linalg.det([t3, B3, cross3])
+        detB = np.linalg.det([t3, A3, cross3])
+    else:
+        detA = np.linalg.det([t, _B, cross])
+        detB = np.linalg.det([t, _A, cross])
     
     t0 = detA/denom
     t1 = detB/denom
@@ -775,7 +785,7 @@ def intersect_line_and_segment(p1_line, p2_line, p1_sec, p2_sec):
 def intersect_point_and_segment(p_external, p_line_start, p_line_end):
     """
     Description:
-            Finds the closest point on a line segment to an external point.
+            Finds the closest orthogonal point on a line segment to an external point.
         Note: taken with additions from Gemini search output
     INPUTS:
             p_external      tuple,list; [x, y] of external point.
@@ -783,32 +793,36 @@ def intersect_point_and_segment(p_external, p_line_start, p_line_end):
             p_line_end      tuple,list; [x, y] of ending point of the line segment.
     """
 
-    # Vector from the point on the line to the external point
-    p_on_line = p_line_start  # Can choose either start or end as the reference point on the line; arbitrary
-    vec_to_external = p_external - p_on_line
-    segment_length = math.sqrt((p_line_end[0] - p_line_start[0])**2 + (p_line_end[1] - p_line_start[1])**2)
-    line_direction_vector = p_line_end - p_line_start
-    line_direction_vector = [component/segment_length for component in line_direction_vector]  # Normalize the direction vector]
+    #Condition inputs
+    P = np.array(p_external)
+    A = np.array(p_line_start)
+    B = np.array(p_line_end)
+
+    # Calculate vectors
+    AB = B - A
+    AP = P - A
     
-    # The line is parameterized as p_on_line + t * line_direction_vector.
-    # The projection falls where t = [(vec_to_external) . (line_direction_vector)] / |line_direction_vector|^2
-    
-    # Calculate dot product of vec_to_external and line_direction_vector
-    dot_prod = np.dot(vec_to_external, line_direction_vector)
-    
-    # Calculate the squared magnitude (dot product with itself) of the line_direction_vector
-    line_magnitude_sq = np.dot(line_direction_vector, line_direction_vector)
-    
-    if line_magnitude_sq == 0:
-        raise ValueError("Line direction vector cannot be a zero vector.")
-        
-    # Calculate the 't' parameter
-    t = dot_prod / line_magnitude_sq
-    
-    # The projection point (closest point on the line)
-    projection_point = p_on_line + t * line_direction_vector
-    
-    return projection_point
+    # Calculate the scalar projection parameter 't' using the dot product formula
+    # t = (AP . AB) / |AB|^2 
+    # This value of 't' indicates how far along the line AB the projection lies.
+    # 0 <= t <= 1 means the projection is on the segment.
+    dot_product_AP_AB = np.dot(AP, AB)
+    squared_length_AB = np.dot(AB, AB) # |AB|^2
+
+    # Handle the case where A and B are the same point
+    if squared_length_AB == 0:
+        return None
+
+    t = dot_product_AP_AB / squared_length_AB
+
+    # Check if the projection is on the line segment
+    if 0 <= t <= 1:
+        # The projection point is A + t * AB
+        projection = A + t * AB
+        return projection
+    else:
+        # The orthogonal projection falls outside the line segment's endpoints
+        return None
     
 ###################################################################################################################################
 ####   Utility functions   ########################################################################################################
@@ -891,15 +905,17 @@ def draw_2D_strand_line_bythickness(interior_points,
     """
 
     #Initialize variables
+      # return dict
     control_point_dict = {
         'line_dicts': {},
         'interior_only': True,
-        'drawn_array': None
         }
+      # blank dict for each strand that's drawn
     line_dict = {
         'start_coordinates': [],
         'end_coordinates': [],
         'radius_value': [],
+        'drawn_array': None
         }
     strand_radius = strand_diam/2
 
@@ -961,8 +977,8 @@ def draw_2D_strand_line_bythickness(interior_points,
         
         #Run through each passed point
         for idx, point in enumerate(interior_points):
-            this_y = point[0]
-            this_x = point[1]
+            this_y = float(point[0])
+            this_x = float(point[1])
             #Get upper line angle
             if angle >180:
                 upper_angle = angle%180
@@ -976,7 +992,7 @@ def draw_2D_strand_line_bythickness(interior_points,
             y_at_left =  round(((this_x) * slope) + this_y)
                 # Slope changes Y behaviour (i.e. how much 'Y' is left for each side), so both cases have to be accounted for
             if slope > 0:
-                if abs(slope) > 1e-7:
+                if abs(slope) > 1e-3:
                     x_at_right = round(this_x + abs((this_y)/slope) )
                     x_at_left = round(this_x - abs((array_y_dim- this_y)/slope))
                 #If slope is basically zero, just assume horizontal to avoid division by ~zero overflow error
@@ -984,7 +1000,7 @@ def draw_2D_strand_line_bythickness(interior_points,
                     x_at_left = 0
                     x_at_right = (array_x_dim - 1)
             elif slope < 0:
-                if abs(slope) > 1e-7:
+                if abs(slope) > 1e-3:
                     x_at_right = round(this_x + abs((array_y_dim- this_y)/slope) )
                     x_at_left = round(this_x - abs((this_y)/slope))
                 #If slope is basically zero, just assume horizontal to avoid division by ~zero overflow error
@@ -1002,6 +1018,11 @@ def draw_2D_strand_line_bythickness(interior_points,
             x_left_bool = bool((x_at_left >=0) and (x_at_left<=(array_x_dim-1)))
 
             #Find appropriate array edge coordinates
+            #   Take point in space and known slope, and find 'how much X/Y' is left to get to the edge of the array.
+            #   This results in two possible endpoints for each side of the line (i.e. one for the 'left' and one for the 'right'), 
+            #     both of which have an 'x_guess' and a 'y_guess' for which variable is limiting.
+            #   In other words, draw a line with 'slope' both left and right from the 'point', and find whether 'x_guess' or 'y_guess' hits
+            #      the edge of the array first. This is the point that should be used as the endpoint for that side of the line.
             # For right side of point
             if y_right_bool and x_right_bool:
                 #If both edges have valid indices, find the closest one
@@ -1010,6 +1031,8 @@ def draw_2D_strand_line_bythickness(interior_points,
                     right_x_guess = [0, x_at_right]
                 elif slope<0: 
                     right_x_guess = [(array_y_dim-1), x_at_right]
+                else:
+                    right_x_guess = [y_at_right, (array_x_dim-1)]
 
                 #Distance to top/bottom and right edges
                 x_edge_distance = math.sqrt((this_x-right_x_guess[1])**2 + 
@@ -1021,6 +1044,9 @@ def draw_2D_strand_line_bythickness(interior_points,
                     right_edge_point = right_x_guess
                 elif x_edge_distance > y_edge_distance:
                     right_edge_point = right_y_guess
+                  # if equal, it's probably a horizontal line and just go with right_x_guess
+                else:
+                    right_edge_point = right_x_guess
             elif y_right_bool:
                 right_edge_point = [y_at_right, (array_x_dim-1)]
             elif x_right_bool:
@@ -1037,6 +1063,8 @@ def draw_2D_strand_line_bythickness(interior_points,
                     left_x_guess = [0, x_at_left]
                 elif slope>0: 
                     left_x_guess = [(array_y_dim-1), x_at_left]
+                else:
+                    left_x_guess = [y_at_left, 0]
 
                 #Distance to top/bottom and right edges
                 x_edge_distance = math.sqrt((this_x-left_x_guess[1])**2 + 
@@ -1048,6 +1076,10 @@ def draw_2D_strand_line_bythickness(interior_points,
                     left_edge_point = left_x_guess
                 elif x_edge_distance > y_edge_distance:
                     left_edge_point = left_y_guess
+                  # if equal, it's probably a horizontal line and just go with left_y_guess
+                  #  Both will be equal in this case anyway.
+                else:
+                    left_edge_point = left_y_guess
             elif y_left_bool:
                 left_edge_point = [y_at_left, 0]
             elif x_left_bool:
@@ -1056,6 +1088,14 @@ def draw_2D_strand_line_bythickness(interior_points,
                 else:
                     left_edge_point = [0, x_at_left]
 
+            #Fix garbage return of identical points; caused by slope being weird
+            if (left_edge_point == right_edge_point):
+                if (abs(slope) < 1e-5):
+                    #Convention is that right is bottom and left is top for horizontal line
+                    #NOTE: convention is Y=0 is UP, and Y= (array_y_dim -1) is DOWN
+                    left_edge_point = [0, left_edge_point[1]]
+                    right_edge_point = [(array_y_dim-1), right_edge_point[1]]
+
             #Initialize dict for these values and save to output dict
             this_line_dict = line_dict.copy()
             this_line_dict['start_coordinates'] = left_edge_point
@@ -1063,28 +1103,28 @@ def draw_2D_strand_line_bythickness(interior_points,
             this_line_dict['radius_value'] = strand_radius
             control_point_dict['line_dicts'][f"line_{idx+1}_0"] = this_line_dict
 
-            #Draw radial points and add to the 'return_array'
-
     elif (not length) and (line_type == 'bezier'):
         #TODO: add special bezier flags; not currently implemented
         control_point_dict['interior_only'] = False
     
-    elif length and (line_type == 'simple') and (len(interior_points)>=1):
+    #I don't think we need this case anymore; first 'if' condition above covers multiple line draws?
+    #Retaining case for now until full code review and Tests generation
 
-        for idx, start_point in enumerate(interior_points):
-            #Find endpoint and coerce to array dimensions
-            y_change = start_point[0] * math.sin(math.radians(angle)) *-1  #Flip 'y_change' to match traditional system ((Y,X) with origin at top-left of image)
-            x_change = start_point[1] * math.cos(math.radians(angle))
-            end_point = [[round(start_point[0] + y_change), 
-                            round(start_point[1] + x_change)]]
-            #Initialize dict for these values and save to output dict 
-            this_line_dict = line_dict.copy()
-            this_line_dict['start_coordinates'] = start_point
-            this_line_dict['end_coordinates'] = end_point
-            this_line_dict['radius_value'] = strand_radius
-            control_point_dict['line_dicts'][f"line_{idx+1}_0"] = this_line_dict
-
-      # line starts and ends are now defined
+    # elif length and (line_type == 'simple') and (len(interior_points)>=1):
+    #     #TODO: add case if multiple interior points are passed; should be just drag-and-drop from above
+    #     for idx, start_point in enumerate(interior_points):
+    #         #Find endpoint and coerce to array dimensions
+    #         y_change = start_point[0] * math.sin(math.radians(angle)) *-1  #Flip 'y_change' to match traditional system ((Y,X) with origin at top-left of image)
+    #         x_change = start_point[1] * math.cos(math.radians(angle))
+    #         end_point = [[round(start_point[0] + y_change), 
+    #                         round(start_point[1] + x_change)]]
+    #         #Initialize dict for these values and save to output dict 
+    #         this_line_dict = line_dict.copy()
+    #         this_line_dict['start_coordinates'] = start_point
+    #         this_line_dict['end_coordinates'] = end_point
+    #         this_line_dict['radius_value'] = strand_radius
+    #         control_point_dict['line_dicts'][f"line_{idx+1}_0"] = this_line_dict
+    
     #Actually draw the thickness onto the return array
     for line_key in list(control_point_dict['line_dicts'].keys()):
         #Pull values to draw
@@ -1100,14 +1140,28 @@ def draw_2D_strand_line_bythickness(interior_points,
             return_array[rr,cc] = this_radius*2
         
             #Find next-index over on each side of centerline, calculate thickness, and add to 
-
+            neighbor_dict = get_radial_neighbors_array_data(this_start_point,
+                                                           this_end_point,
+                                                           angle,
+                                                           strand_diam,
+                                                           array_dim,
+                                                           pix_to_um_conv = pix_to_um_conv,
+                                                           thickness_fcn = thickness_fcn,
+                                                           print_intermediate_steps = show_array_iterations, 
+                                                           show_final_array = show_final_array)
+            drawn_array = neighbor_dict['drawn_array']
+            drawn_mask = drawn_array > 0
+            return_array[drawn_mask] = drawn_array[drawn_mask]
+        
         #TODO: implement bezier for smoother corners
         elif (not length) and (line_type == 'bezier'):
             pass
+    
+        #Store the result for the return dict
+        control_point_dict['line_dicts'][f"line_{idx+1}_0"]['drawn_array'] = return_array
 
     return control_point_dict
-
-    
+ 
 
 
 def get_radial_neighbors_array_data(initial_start_coord,
@@ -1745,11 +1799,10 @@ def generate_random_pole_point_2D(starting_point,
         line_direction = 'vertical'
     elif (starting_angle <90) or ((starting_angle >180) and (starting_angle <270)):
         #If "+" slope, line can extend in either direction. Convention is neg. ste
-
         new_pole_point = np.array([starting_point[0], starting_point[1]+step_distance])
         line_direction = 'horizontal'
 
-    new_pole_point = [dim+step_distance for dim in array_dims]
+    # new_pole_point = [dim+step_distance for dim in array_dims]
     pole_start_distance = math.sqrt(sum([(pole-start)**2 for pole, start in zip(new_pole_point, starting_point)]))
     
     return new_pole_point
@@ -1962,6 +2015,8 @@ def ideal_tile_from_initial_line(initial_line_points,
     stepping_counter = 0
     while (abs(distance_left) > strand_radius) and (stepping_counter <100):
         p_left_line = intersect_point_and_segment(left_coord, prior_line_points[0], prior_line_points[1])
+        if p_left_line is None:
+            break
         distance_left = math.sqrt((p_left_line[0]-left_coord[0])**2 + (p_left_line[1]-left_coord[1])**2) + strand_radius
         if distance_left > 0:
             dx = p_left_line[0]-left_coord[0]
@@ -1984,10 +2039,11 @@ def ideal_tile_from_initial_line(initial_line_points,
                                                         show_array_iterations = False,
                                                         show_final_array = False)
 
-            drawn_array = line_dict['drawn_array']
-            drawn_mask = drawn_array[drawn_array > 0]
-            new_line_start = line_dict['start_coordinates']
-            new_line_end = line_dict['end_coordinates']
+            line_key = list(line_dict['line_dicts'].keys())[0]   #pull first key; should be only entry in dict
+            drawn_array = line_dict['line_dicts'][line_key]['drawn_array']
+            drawn_mask = drawn_array > 0
+            new_line_start = line_dict['line_dicts'][line_key]['start_coordinates']
+            new_line_end = line_dict['line_dicts'][line_key]['end_coordinates']
             layer_array[drawn_mask] = drawn_array[drawn_mask]
 
             #Set values for next iteration
@@ -2009,10 +2065,14 @@ def ideal_tile_from_initial_line(initial_line_points,
     stepping_counter = 0
     while (abs(distance_right) > strand_radius) and (stepping_counter <100):
         p_right_line = intersect_point_and_segment(right_coord, prior_line_points[0], prior_line_points[1])
-        distance_right = math.sqrt((p_left_line[0]-right_coord[0])**2 + (p_left_line[1]-right_coord[1])**2) + strand_radius
+        #Either it's not possible to draw another orthogonal point, or a failure occured.
+        #  Either way, break and move on
+        if p_right_line is None:
+            break
+        distance_right = math.sqrt((p_right_line[0]-right_coord[0])**2 + (p_right_line[1]-right_coord[1])**2) + strand_radius
         if distance_right > 0:
-            dx = p_left_line[0]-right_coord[0]
-            dy = p_left_line[1]-right_coord[1]
+            dx = p_right_line[0]-right_coord[0]
+            dy = p_right_line[1]-right_coord[1]
             distance = math.sqrt((dx)**2 + (dy)**2)
             unit_dx = dx/distance
             unit_dy = dy/distance
@@ -2031,10 +2091,11 @@ def ideal_tile_from_initial_line(initial_line_points,
                                                         show_array_iterations = False,
                                                         show_final_array = False)
 
-            drawn_array = line_dict['drawn_array']
-            drawn_mask = drawn_array[drawn_array > 0]
-            new_line_start = line_dict['start_coordinates']
-            new_line_end = line_dict['end_coordinates']
+            line_key = list(line_dict['line_dicts'].keys())[0]   #pull first key; should be only entry in dict
+            drawn_array = line_dict['line_dicts'][line_key]['drawn_array']
+            drawn_mask = drawn_array > 0
+            new_line_start = line_dict['line_dicts'][line_key]['start_coordinates']
+            new_line_end = line_dict['line_dicts'][line_key]['end_coordinates']
             layer_array[drawn_mask] = drawn_array[drawn_mask]
 
             #Set values for next iteration

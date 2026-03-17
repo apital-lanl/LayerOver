@@ -18,9 +18,11 @@ Description: Module for handling conversions between ideal structure assumptions
 
 """
 #Standard libraries
+import matplotlib.pyplot as plt
 import numpy as np
 import random
 import skimage.draw as draw
+
 #LayerOver imports
   #separate calls for clarity; 
 from LayerOver.Core.Points import draw_2D_strand_line_bythickness
@@ -63,8 +65,8 @@ generic_volume_dict = {
 def flat_ideal_volume_guess(structure_dict,
                             array_dims, 
                             n_structures= 2, 
-                            voxel_side_length= 15.875,
-                            voxel_resolution_microns= 1,
+                            voxel_side_length= 0,
+                            voxel_resolution_microns= 0,
                             compression_factor= 0.7,
                             save_layer_images= False,
                             save_layer_arrays= False,
@@ -89,13 +91,22 @@ def flat_ideal_volume_guess(structure_dict,
     '''
 
     #Initialize variables
-    return_volume_dict = {}
+    if voxel_side_length == 0:
+        voxel_side_length = max(array_dims) / 1000
+    print(f"Array side length: {voxel_side_length} mm")
+    if voxel_resolution_microns == 0:
+        voxel_resolution_microns = round((voxel_side_length*1000)/max(array_dims), 3)
+    print(f"Pixel resolution: {voxel_side_length} microns")
     x_array_dim= int(round(voxel_side_length *1000 / voxel_resolution_microns))   #number of pixels (microns/microns)
     y_array_dim= x_array_dim  #Array is square
+    array_dims = (y_array_dim, x_array_dim)
+    print(f"Array dimensions: {array_dims}")
+    return_volume_dict = {
+        'array_dims': array_dims}
     pixel_half_length = voxel_resolution_microns/2
     x_distance_idcs = np.linspace(pixel_half_length, (voxel_side_length *1000)-pixel_half_length, x_array_dim-1)
     y_distance_idcs = np.linspace(pixel_half_length, (voxel_side_length *1000)-pixel_half_length, y_array_dim-1)
-    mesh_x, mesh_y = np.array(np.meshgrid(x_distance_idcs, y_distance_idcs))
+    # mesh_x, mesh_y = np.array(np.meshgrid(x_distance_idcs, y_distance_idcs))
       # pull 'structure_dict' keys
     metadata_dict= structure_dict['metadata']
     n_layers= structure_dict['number_of_layers']
@@ -127,25 +138,32 @@ def flat_ideal_volume_guess(structure_dict,
     
     #Generate 'n_structures' number of iterations of volume
     for i in range(n_structures):
-        
+        print(f"Generating structure {i}")
         #Generate a layer name
         voxel_idx = i+1
         if 'unique_structure_name' in metadata_dict:
             if metadata_dict['unique_structure_name']:
                 voxel_name = metadata_dict['unique_structure_name']+f'_Voxel-{voxel_idx}'
+            else:
+                voxel_name = f'UNK_Voxel-{voxel_idx}'
         elif 'print_name' in metadata_dict and metadata_dict['print_name']:
             voxel_name = metadata_dict['print_name']+f'_Voxel-{voxel_idx}'
           # generate generic voxel_name if everything else fails
         else:
             #TODO: lookup unique names and structure IDs to make this more meaningful
             voxel_name = f'UNK-Structure-ID_Voxel-{voxel_idx}'
+        print(f"\t Voxel name: {voxel_name}")
 
         voxel_volume_array = np.zeros((y_array_dim, x_array_dim))  #each dim should be the same, but keeping them separable for now in case that's not true in the future
         ideal_layer_arrays = []    #store raw strand volume array for each layer
-        layer_arrays = []    #store volume array adjusted for compression and strand-strand interactions
-        layer_dict = {}
+        layer_arrays = []    #store volume array adjusted for compression and strand-strand interaction
         #Generate each layer's thickness projection
         for layer_idx in range(n_layers):
+            print(f"\t\t adding layer {layer_idx +1}")
+            layer_dict = {
+                'ideal_layers':{},
+                'adjusted_layers':{},
+                'full_volume_prediction':[]}
             #Get layer specifics
             strand_diameter = strand_diameters[layer_idx]
             this_layer_type = layer_types[layer_idx]
@@ -210,6 +228,7 @@ def flat_ideal_volume_guess(structure_dict,
                     #       It is generally outside the drawn array. 
                     pole_point = generate_random_pole_point_2D([seed_y_idx, seed_x_idx], this_angular_offset, array_dims)
                 
+                #For each additional layer, use pole_point to generate a new line
                 else:
                     #Get new layer points from 'pole_point' and new layer-structure specification
                     starting_interior_point = pole_point_to_array_interior_point(pole_point,
@@ -223,7 +242,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                                                 )
 
                     #Draw initial line
-                    array_dict = draw_2D_strand_line_bythickness([starting_interior_point[0], starting_interior_point[1]],
+                    array_dict = draw_2D_strand_line_bythickness(starting_interior_point,
                                                                 this_angular_offset,
                                                                 strand_diameter,
                                                                 (y_array_dim, x_array_dim),
@@ -235,20 +254,20 @@ def flat_ideal_volume_guess(structure_dict,
                                                                 show_final_array = False)
 
                 #Pull array and values from this layer's run
-                line_keys = list(array_dict['line_dicts'].keys())
-                line_dict = array_dict[line_keys[0]]  #Should only be one entry, so taking first value is good enough
+                line_key = list(array_dict['line_dicts'].keys())[0]
+                line_dict = array_dict['line_dicts'][line_key]  #Should only be one entry, so taking first value is good enough
                 initial_line_start = line_dict['start_coordinates']
                 initial_line_end = line_dict['end_coordinates']
-                drawn_array = array_dict['drawn_array']
-                drawn_mask = drawn_array[drawn_array > 0]
+                drawn_array = line_dict['drawn_array']
+                drawn_mask = drawn_array > 0
                 
                 #If 'drawn_array' has a value that isn't None, assume the array is good and add new values to 'this_layer'
-                if drawn_array:
-                    this_layer[drawn_mask] = drawn_array[drawn_mask]
-                  # if 'None' IS passed, something went wrong and flag that error
-                else:
+                if drawn_array is None:
                     #TODO: add error handling for this case
-                    pass
+                    pass  
+                else:
+                    this_layer[drawn_mask] = drawn_array[drawn_mask]
+                    
 
                 #Add all the other lines
                 tile_dict = ideal_tile_from_initial_line([initial_line_start, initial_line_end],
@@ -257,9 +276,9 @@ def flat_ideal_volume_guess(structure_dict,
                                                         array_dims,
                                                         strand_radius_in_pixels)
 
-                drawn_array = tile_dict['drawn_array']
-                drawn_mask = drawn_array[drawn_array > 0]
-                this_layer[drawn_mask] = drawn_array[drawn_mask]
+                tile_array = tile_dict['drawn_array']
+                tile_mask = tile_array > 0
+                this_layer[tile_mask] = tile_array[tile_mask]
             
                 #Store a 'raw' version of the layer
                 ideal_layer_arrays.append(this_layer)
