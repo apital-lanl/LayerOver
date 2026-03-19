@@ -64,7 +64,7 @@ generic_volume_dict = {
 
 def flat_ideal_volume_guess(structure_dict,
                             array_dims, 
-                            n_structures= 2, 
+                            n_structures= 1, 
                             voxel_side_length= 0,
                             voxel_resolution_microns= 0,
                             compression_factor= 0.7,
@@ -97,7 +97,7 @@ def flat_ideal_volume_guess(structure_dict,
     if voxel_resolution_microns == 0:
         voxel_resolution_microns = round((voxel_side_length*1000)/max(array_dims), 3)
     print(f"Pixel resolution: {voxel_side_length} microns")
-    pix_to_um_conv = (voxel_side_length*1000)/max(array_dims)
+    um_per_pixel = voxel_resolution_microns
     x_array_dim= int(round(voxel_side_length *1000 / voxel_resolution_microns))   #number of pixels (microns/microns)
     y_array_dim= x_array_dim  #Array is square
     array_dims = (y_array_dim, x_array_dim)
@@ -190,7 +190,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                             this_angular_offset,
                                                             strand_diameter,
                                                             (y_array_dim, x_array_dim),
-                                                            pix_to_um_conv = pix_to_um_conv,
+                                                            pix_to_um_conv = um_per_pixel,
                                                             length = None,
                                                             line_type = 'simple',
                                                             thickness_fcn = 'cylinder',
@@ -217,12 +217,12 @@ def flat_ideal_volume_guess(structure_dict,
                                                                 this_angular_offset,
                                                                 strand_diameter,
                                                                 (y_array_dim, x_array_dim),
-                                                                pix_to_um_conv = pix_to_um_conv,
+                                                                pix_to_um_conv = um_per_pixel,
                                                                 length = None,
                                                                 line_type = 'simple',
                                                                 thickness_fcn = 'cylinder',
                                                                 show_points = False,
-                                                                show_final_array = False)
+                                                                show_final_array = True)
 
                     #Extend initial seed point to an arbitrary 'pole_point' that's used for every other layer
                     #NOTE: 'pole_point' is the point at which the strand will be drawn through for every layer.
@@ -238,7 +238,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                                                 this_lateral_offset,
                                                                                 array_dims,
                                                                                 strand_radius_in_pixels,
-                                                                                pix_to_um_conv = 1,
+                                                                                pix_to_um_conv = um_per_pixel,
                                                                                 line_type = 'simple',
                                                                                 )
 
@@ -247,7 +247,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                                 this_angular_offset,
                                                                 strand_diameter,
                                                                 (y_array_dim, x_array_dim),
-                                                                pix_to_um_conv = pix_to_um_conv,
+                                                                pix_to_um_conv = um_per_pixel,
                                                                 length = None,
                                                                 line_type = 'simple',
                                                                 thickness_fcn = 'cylinder',
@@ -276,7 +276,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                         this_pitch,
                                                         array_dims,
                                                         strand_radius_in_pixels,
-                                                        pix_to_um_conv=pix_to_um_conv)
+                                                        pix_to_um_conv= um_per_pixel)
 
                 tile_array = tile_dict['drawn_array']
                 tile_mask = tile_array > 0

@@ -38,7 +38,7 @@ from LayerOver.PSPP.DIWStructure import blank_diw_structure_dict
 #     layer_materials
 #     layer_pitches
 
-array_dims = (1500, 1500)
+array_dims = (5000, 5000)
 
 diw_structure_dict = {
     'metadata': {
@@ -82,7 +82,7 @@ diw_structure_dict = {
 
 flat_ideal_volume_guess(diw_structure_dict,
                             array_dims, 
-                            n_structures= 2, 
+                            n_structures= 1, 
                             voxel_side_length= 15,
                             voxel_resolution_microns= 0,
                             compression_factor= 0.7,

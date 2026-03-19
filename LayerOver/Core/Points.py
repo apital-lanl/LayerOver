@@ -918,6 +918,7 @@ def draw_2D_strand_line_bythickness(interior_points,
         'drawn_array': None
         }
       # convert from um to pixels
+      # pix_to_um_conv is um_per_pixel
     strand_diam= strand_diam/pix_to_um_conv
     strand_radius = strand_diam/2
 
