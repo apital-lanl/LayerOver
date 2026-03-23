@@ -91,13 +91,17 @@ def flat_ideal_volume_guess(structure_dict,
     '''
 
     #Initialize variables
-    if voxel_side_length == 0:
-        voxel_side_length = max(array_dims) / 1000
+      # refine length scale variables
+    if voxel_side_length == 0 and voxel_resolution_microns == 0:
+        voxel_side_length = 15.875  #mm; default to punch diameter of 15.875 mm (5/8 inch) if no other length options are specified
+    elif voxel_side_length == 0:
+        #'array_dims' must be specified, so if 'voxel_resolution_microns' is specified, use it to constrain mm size scale
+        voxel_side_length = max(array_dims) * voxel_resolution_microns /1000  #pixels->microns->mm
     print(f"Array side length: {voxel_side_length} mm")
     if voxel_resolution_microns == 0:
-        voxel_resolution_microns = round((voxel_side_length*1000)/max(array_dims), 3)
-    print(f"Pixel resolution: {voxel_side_length} microns")
-    pix_to_um_conv = (voxel_side_length*1000)/max(array_dims)
+        voxel_resolution_microns = round((voxel_side_length*1000)/max(array_dims), 5)
+    print(f"Pixel resolution: {voxel_resolution_microns} microns")
+    um_to_pix_conversion = voxel_resolution_microns   #Renaming for clarity and ease of use in functions below
     x_array_dim= int(round(voxel_side_length *1000 / voxel_resolution_microns))   #number of pixels (microns/microns)
     y_array_dim= x_array_dim  #Array is square
     array_dims = (y_array_dim, x_array_dim)
@@ -175,8 +179,6 @@ def flat_ideal_volume_guess(structure_dict,
             this_lateral_offset = layer_lateral_offsets[layer_idx]
             this_material = layer_materials[layer_idx]
             this_pitch = layer_pitches[layer_idx]
-              # convert strand_diameter to # of pixels
-            strand_radius_in_pixels = round(strand_diameter/2/voxel_resolution_microns, 5)
 
             #Create layer blank
               # (Y,X) format to align with image libraries (i.e. CV2, Matplotlib, etc.)
@@ -190,7 +192,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                             this_angular_offset,
                                                             strand_diameter,
                                                             (y_array_dim, x_array_dim),
-                                                            pix_to_um_conv = pix_to_um_conv,
+                                                            um_to_pix_conversion = um_to_pix_conversion,
                                                             length = None,
                                                             line_type = 'simple',
                                                             thickness_fcn = 'cylinder',
@@ -217,7 +219,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                                 this_angular_offset,
                                                                 strand_diameter,
                                                                 (y_array_dim, x_array_dim),
-                                                                pix_to_um_conv = pix_to_um_conv,
+                                                                um_to_pix_conversion = um_to_pix_conversion,
                                                                 length = None,
                                                                 line_type = 'simple',
                                                                 thickness_fcn = 'cylinder',
@@ -237,8 +239,8 @@ def flat_ideal_volume_guess(structure_dict,
                                                                                 this_pitch,
                                                                                 this_lateral_offset,
                                                                                 array_dims,
-                                                                                strand_radius_in_pixels,
-                                                                                pix_to_um_conv = 1,
+                                                                                strand_diameter,
+                                                                                um_to_pix_conversion = um_to_pix_conversion,
                                                                                 line_type = 'simple',
                                                                                 )
 
@@ -247,7 +249,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                                 this_angular_offset,
                                                                 strand_diameter,
                                                                 (y_array_dim, x_array_dim),
-                                                                pix_to_um_conv = pix_to_um_conv,
+                                                                um_to_pix_conversion = um_to_pix_conversion,
                                                                 length = None,
                                                                 line_type = 'simple',
                                                                 thickness_fcn = 'cylinder',
@@ -275,8 +277,8 @@ def flat_ideal_volume_guess(structure_dict,
                                                         this_angular_offset, 
                                                         this_pitch,
                                                         array_dims,
-                                                        strand_radius_in_pixels,
-                                                        pix_to_um_conv=pix_to_um_conv)
+                                                        strand_diameter,
+                                                        um_to_pix_conversion= um_to_pix_conversion)
 
                 tile_array = tile_dict['drawn_array']
                 tile_mask = tile_array > 0
