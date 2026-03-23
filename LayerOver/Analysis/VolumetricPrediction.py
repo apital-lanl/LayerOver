@@ -64,7 +64,7 @@ generic_volume_dict = {
 
 def flat_ideal_volume_guess(structure_dict,
                             array_dims, 
-                            n_structures= 2, 
+                            n_structures= 1, 
                             voxel_side_length= 0,
                             voxel_resolution_microns= 0,
                             compression_factor= 0.7,
@@ -224,7 +224,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                                 line_type = 'simple',
                                                                 thickness_fcn = 'cylinder',
                                                                 show_points = False,
-                                                                show_final_array = False)
+                                                                show_final_array = True)
 
                     #Extend initial seed point to an arbitrary 'pole_point' that's used for every other layer
                     #NOTE: 'pole_point' is the point at which the strand will be drawn through for every layer.
