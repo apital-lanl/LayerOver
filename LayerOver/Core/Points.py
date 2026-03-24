@@ -1054,7 +1054,11 @@ def draw_2D_strand_line_bythickness(interior_points,
             elif x_right_bool:
                 if slope > 0:
                     right_edge_point = [0, x_at_right]
+                elif abs(slope) < 1e-5:
+                    #Essentially 0 slope; allow for weird floating point errors by just treating as horizontal line
+                    right_edge_point = [y_at_right, (array_x_dim-1)]
                 else:
+                    #Negative slope
                     right_edge_point = [(array_y_dim-1), x_at_right]
 
             # For the left side of the point
@@ -1087,7 +1091,11 @@ def draw_2D_strand_line_bythickness(interior_points,
             elif x_left_bool:
                 if slope >0:
                     left_edge_point = [(array_y_dim-1), x_at_left]
+                elif abs(slope) < 1e-5:
+                    #Essentially 0 slope; allow for weird floating point errors by just treating as horizontal line
+                    left_edge_point = [y_at_left, 0]
                 else:
+                    #Negative slope
                     left_edge_point = [0, x_at_left]
 
             #Fix garbage return of identical points; caused by slope being weird
