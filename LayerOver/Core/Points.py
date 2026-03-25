@@ -990,20 +990,20 @@ def draw_2D_strand_line_bythickness(interior_points,
             slope = math.tan(math.radians(upper_angle))
             #Get max_y at max_y and vice versa
                 # X is easy because it's always > to the right; 
-            y_at_right = round(((array_x_dim-this_x) * slope *-1) + this_y)  #Flip sign of slope for delta-y
+            y_at_right = round((((array_x_dim-1)-this_x) * slope *-1) + this_y)  #Flip sign of slope for delta-y
             y_at_left =  round(((this_x) * slope) + this_y)
                 # Slope changes Y behaviour (i.e. how much 'Y' is left for each side), so both cases have to be accounted for
             if slope > 0:
                 if abs(slope) > 1e-3:
                     x_at_right = round(this_x + abs((this_y)/slope) )
-                    x_at_left = round(this_x - abs((array_y_dim- this_y)/slope))
+                    x_at_left = round(this_x - abs(((array_y_dim-1)- this_y)/slope))
                 #If slope is basically zero, just assume horizontal to avoid division by ~zero overflow error
                 else:
                     x_at_left = 0
                     x_at_right = (array_x_dim - 1)
             elif slope < 0:
                 if abs(slope) > 1e-3:
-                    x_at_right = round(this_x + abs((array_y_dim- this_y)/slope) )
+                    x_at_right = round(this_x + abs(((array_y_dim-1)- this_y)/slope) )
                     x_at_left = round(this_x - abs((this_y)/slope))
                 #If slope is basically zero, just assume horizontal to avoid division by ~zero overflow error
                 else:
@@ -1029,12 +1029,12 @@ def draw_2D_strand_line_bythickness(interior_points,
             if y_right_bool and x_right_bool:
                 #If both edges have valid indices, find the closest one
                 right_y_guess = [y_at_right ,(array_x_dim-1)]
+                if abs(slope)<1e-5:
+                    right_x_guess = [y_at_right, (array_x_dim-1)]
                 if slope>0:
                     right_x_guess = [0, x_at_right]
                 elif slope<0: 
                     right_x_guess = [(array_y_dim-1), x_at_right]
-                else:
-                    right_x_guess = [y_at_right, (array_x_dim-1)]
 
                 #Distance to top/bottom and right edges
                 x_edge_distance = math.sqrt((this_x-right_x_guess[1])**2 + 
@@ -1061,16 +1061,17 @@ def draw_2D_strand_line_bythickness(interior_points,
                     #Negative slope
                     right_edge_point = [(array_y_dim-1), x_at_right]
 
-            # For the left side of the point
+            #For the left side of the point
+              # if both 'extend the line to the array edge' values are within array bounds, find out which is correct
             if y_left_bool and x_left_bool:
                 #If both edges have valid indices, find the closest one
                 left_y_guess = [y_at_left ,(array_x_dim-1)]
-                if slope<0:
+                if abs(slope)<1e-5:
+                    left_x_guess = [y_at_left, 0]
+                elif slope<0:
                     left_x_guess = [0, x_at_left]
                 elif slope>0: 
                     left_x_guess = [(array_y_dim-1), x_at_left]
-                else:
-                    left_x_guess = [y_at_left, 0]
 
                 #Distance to top/bottom and right edges
                 x_edge_distance = math.sqrt((this_x-left_x_guess[1])**2 + 
@@ -1105,6 +1106,15 @@ def draw_2D_strand_line_bythickness(interior_points,
                     #NOTE: convention is Y=0 is UP, and Y= (array_y_dim -1) is DOWN
                     left_edge_point = [0, left_edge_point[1]]
                     right_edge_point = [(array_y_dim-1), right_edge_point[1]]
+            #Coerce any rounding errors to avoid index errors
+            if left_edge_point[0] > (array_y_dim-1):
+                left_edge_point[0] = array_y_dim-1
+            if left_edge_point[1] > (array_x_dim-1):
+                left_edge_point[1] = array_x_dim-1
+            if right_edge_point[0] > (array_y_dim-1):
+                right_edge_point[0] = array_y_dim-1
+            if right_edge_point[1] > (array_x_dim-1):
+                right_edge_point[1] = array_x_dim-1
 
             #Initialize dict for these values and save to output dict
             this_line_dict = line_dict.copy()
@@ -1154,7 +1164,7 @@ def draw_2D_strand_line_bythickness(interior_points,
                                                            this_end_point,
                                                            angle,
                                                            strand_diam,
-                                                           array_dim,
+                                                           (array_y_dim, array_x_dim),
                                                            um_to_pix_conversion = um_to_pix_conversion,
                                                            thickness_fcn = thickness_fcn,
                                                            print_intermediate_steps = show_array_iterations, 
@@ -2017,15 +2027,15 @@ def ideal_tile_from_initial_line(initial_line_points,
     elif (offset_angle == 90) or (offset_angle == 270):
         #if vertical, use east and west edges
         left_coord = [0, (array_dims[0]-1)/2]
-        right_coord = [array_dims[1], (array_dims[0]-1)/2]
+        right_coord = [(array_dims[1]-1), (array_dims[0]-1)/2]
     elif ((offset_angle > 0) and (offset_angle < 90)) or ((offset_angle > 180) and (offset_angle < 270)):
         #check corners for "+" slope
-        left_coord = [0, array_dims[0]]
-        right_coord = [array_dims[1], 0]
+        left_coord = [0, (array_dims[0]-1)]
+        right_coord = [(array_dims[1]-1), 0]
     elif ((offset_angle > 90) and (offset_angle < 180)) or ((offset_angle > 270) and (offset_angle < 360)):
         #check corners for "-" slope
         left_coord = [0, 0]
-        right_coord = [array_dims[1], array_dims[0]]
+        right_coord = [(array_dims[1]-1), (array_dims[0]-1)]
     else:
         print(f"Invalid offset angle- {offset_angle} degrees; must be between 0 and 360")
         return tile_dict
