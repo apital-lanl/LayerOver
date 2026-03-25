@@ -225,7 +225,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                                 line_type = 'simple',
                                                                 thickness_fcn = 'cylinder',
                                                                 show_points = False,
-                                                                show_array_iterations = show_layer_images,
+                                                                show_array_iterations = False,
                                                                 show_final_array = False)
 
                     #Extend initial seed point to an arbitrary 'pole_point' that's used for every other layer
@@ -247,7 +247,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                                                 )
 
                     #Draw initial line
-                    array_dict = draw_2D_strand_line_bythickness(starting_interior_point,
+                    array_dict = draw_2D_strand_line_bythickness([starting_interior_point[0], starting_interior_point[1]],
                                                                 this_angular_offset,
                                                                 strand_diameter,
                                                                 (y_array_dim, x_array_dim),
@@ -256,7 +256,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                                 line_type = 'simple',
                                                                 thickness_fcn = 'cylinder',
                                                                 show_points = False,
-                                                                show_array_iterations = show_layer_images,
+                                                                show_array_iterations = False,
                                                                 show_final_array = False)
 
                 #Pull array and values from this layer's run
@@ -281,8 +281,8 @@ def flat_ideal_volume_guess(structure_dict,
                                                         this_pitch,
                                                         array_dims,
                                                         strand_diameter,
-                                                        um_to_pix_conversion= um_to_pix_conversion)
-
+                                                        um_to_pix_conversion= um_to_pix_conversion,
+                                                        show_final_array = False)
                 tile_array = tile_dict['drawn_array']
                 tile_mask = tile_array > 0
                 this_layer[tile_mask] = tile_array[tile_mask]

@@ -34,6 +34,7 @@ TODO:
 
 
   #System and built-ins
+import array
 from encodings.punycode import T
 import math
 import random
@@ -982,8 +983,8 @@ def draw_2D_strand_line_bythickness(interior_points,
         
         #Run through each passed point
         for idx, point in enumerate(interior_points):
-            this_y = float(point[0])
-            this_x = float(point[1])
+            this_y = point[0]
+            this_x = point[1]
             #Get upper line angle
             if angle >180:
                 upper_angle = angle%180
@@ -1658,7 +1659,7 @@ def get_radial_neighbors_array_data(initial_start_coord,
                     if (last_left_right[0]+1 >= 0) and (last_left_right[0]+1 < array_y_dim):
                         new_left_right_coord = [last_left_right[0]+1, last_left_right[1]]
                       # running off the edge south-west; transition to 'south'
-                    elif (last_left_right[0]+1 <0):
+                    elif (last_left_right[0]+1 >= array_y_dim):
                         new_left_right_coord = [last_left_right[0], last_left_right[1]+1]
                         left_right_edge_pos = 'south'
                     
@@ -1688,6 +1689,47 @@ def get_radial_neighbors_array_data(initial_start_coord,
                       # running off south edge; ignore further incrementing
                     elif (last_left_left[0]-1 < 0):
                         new_left_left_coord = last_left_left
+
+            #Final check to coerce out of index values
+            #   Bad check somewhere above and I'm too lazy to find it
+            #   Obviously only works on a single increment; any more than that and it will get screwy
+              # do the Y's
+            if new_left_right_coord[0] == array_y_dim:
+                new_left_right_coord[0] = new_left_right_coord[0]-1
+            if new_left_left_coord[0] == array_y_dim:
+                new_left_left_coord[0] = new_left_left_coord[0]-1
+            if new_right_right_coord[0] == array_y_dim:
+                new_right_right_coord[0] = new_right_right_coord[0]-1
+            if new_right_left_coord[0] == array_y_dim:
+                new_right_left_coord[0] = new_right_left_coord[0]-1
+              # do the X's
+            if new_left_right_coord[1] == array_x_dim:
+                new_left_right_coord[1] = new_left_right_coord[1]-1
+            if new_left_left_coord[1] == array_x_dim:
+                new_left_left_coord[1] = new_left_left_coord[1]-1
+            if new_right_right_coord[1] == array_x_dim:
+                new_right_right_coord[1] = new_right_right_coord[1]-1
+            if new_right_left_coord[1] == array_x_dim:
+                new_right_left_coord[1] = new_right_left_coord[1]-1
+
+            #Check to make sure a line isn't being drawn along the edge again (allowed first time)
+            left_edge_bool = bool(
+                ((new_left_left_coord[0] == 0) and (new_right_left_coord[0] ==0)) or
+                ((new_left_left_coord[0] == array_y_dim) and (new_right_left_coord[0] == array_y_dim)) or
+                ((new_left_left_coord[1] == 0) and (new_right_left_coord[1] == 0)) or
+                ((new_left_left_coord[1] == array_x_dim) and (new_right_left_coord[1] == array_x_dim))
+                )
+            right_edge_bool = bool(
+                ((new_left_right_coord[0] == 0) and (new_right_right_coord[0] ==0)) or
+                ((new_left_right_coord[0] == array_y_dim) and (new_right_right_coord[0] == array_y_dim)) or
+                ((new_left_right_coord[1] == 0) and (new_right_right_coord[1] == 0)) or
+                ((new_left_right_coord[1] == array_x_dim) and (new_right_right_coord[1] == array_x_dim))
+                )
+              # change edge flag if just hit
+            if (left_edge_bool) and (not point_left_edge_hit):
+                point_left_edge_hit = True
+            if (right_edge_bool) and (not point_right_edge_hit):
+                point_right_edge_hit = True
 
             #Calculate distance between initial centerline and this new line
             #NOTE: still in units of 'pixels' here
@@ -1724,25 +1766,6 @@ def get_radial_neighbors_array_data(initial_start_coord,
                 starting_points_list.append(new_left_left_coord)
                 ending_points_list.append(new_right_left_coord)
                 thickness_list.append(average_left_thickness)
-            
-            #Check to make sure a line isn't being drawn along the edge again (allowed first time)
-            left_edge_bool = bool(
-                ((new_left_left_coord[0] == 0) and (new_right_left_coord[0] ==0)) or
-                ((new_left_left_coord[0] == array_y_dim) and (new_right_left_coord[0] == array_y_dim)) or
-                ((new_left_left_coord[1] == 0) and (new_right_left_coord[1] == 0)) or
-                ((new_left_left_coord[1] == array_x_dim) and (new_right_left_coord[1] == array_x_dim))
-                )
-            right_edge_bool = bool(
-                ((new_left_right_coord[0] == 0) and (new_right_right_coord[0] ==0)) or
-                ((new_left_right_coord[0] == array_y_dim) and (new_right_right_coord[0] == array_y_dim)) or
-                ((new_left_right_coord[1] == 0) and (new_right_right_coord[1] == 0)) or
-                ((new_left_right_coord[1] == array_x_dim) and (new_right_right_coord[1] == array_x_dim))
-                )
-              # change edge flag if just hit
-            if (left_edge_bool) and (not point_left_edge_hit):
-                point_left_edge_hit = True
-            if (right_edge_bool) and (not point_right_edge_hit):
-                point_right_edge_hit = True
 
             #Report
             if print_intermediate_steps:
@@ -1796,6 +1819,7 @@ def get_radial_neighbors_array_data(initial_start_coord,
 
     if show_final_array:
         plt.imshow(return_array)
+        plt.title("Single-line draw; radial thickness")
         plt.show()
 
     return neighbor_dict
@@ -1980,6 +2004,8 @@ def pole_point_to_array_interior_point(pole_point,
                     closest_edge = edge_coords
                     closest_edge_name = edge_name
                     smallest_distance = distance
+                    b0 = edge_coords[0]
+                    b1 = edge_coords[1]
             #If closest edge was found, calculate interior point
             if smallest_distance < 1e5:
                 #Calculate closest point between abstract line from 'pole_point' and clampled line segment of closest edge
@@ -2018,14 +2044,15 @@ def ideal_tile_from_initial_line(initial_line_points,
                                 strand_pitch,
                                 array_dims,
                                 strand_diameter,
-                                um_to_pix_conversion = 1):
+                                um_to_pix_conversion = 1,
+                                show_final_array = False):
     """
     Description:
         Tile from an ideal structure (i.e. not from points or toolpath). From an intial point within an array, tile in each direction until the array is filled.
         NOTE: 'array_dims' and 'drawn_array' are (Y,X) but all points w/in this function are (X,Y).
 
     INPUTS:
-            'initial_line_points'   iterable (tuple, list, numpy.array); (X,Y) coordinates
+            'initial_line_points'   iterable (tuple, list, numpy.array); (Y,X) coordinates
             'strand_diameter'       int or float; strand diameter in microns
     OUTPUTS:
             'tile_dict'     dict; contains the following keys:
@@ -2037,6 +2064,8 @@ def ideal_tile_from_initial_line(initial_line_points,
         'drawn_array': None,
         }
     layer_array = np.zeros((array_dims[0], array_dims[1]))
+    array_x_dim = array_dims[1]
+    array_y_dim = array_dims[0]
       # convert from microns to pixels for calculations
     micron_strand_pitch = strand_pitch
     micron_strand_diameter = strand_diameter
@@ -2044,35 +2073,49 @@ def ideal_tile_from_initial_line(initial_line_points,
     strand_pitch = strand_pitch/um_to_pix_conversion
     strand_diameter = strand_diameter / um_to_pix_conversion
     strand_radius = strand_diameter/2
+        #Flip initial points from (Y,X) to (X,Y) for calculations
+    initial_start_point = [initial_line_points[0][1], initial_line_points[0][0]]
+    initial_end_point = [initial_line_points[1][1], initial_line_points[1][0]]
+    if (initial_end_point[0]-initial_start_point[0]) != 0:
+        slope = (initial_end_point[1]-initial_start_point[1])/(initial_end_point[0]-initial_start_point[0])
+    else:
+        slope = 1e7  #arbitrary large number to represent vertical line
+
 
     #Define 'left' and 'right' boundary points (corners of the array)
     #NOTE: 'array_dims' and 'drawn_array' are (Y,X) but all points w/in this function are (X,Y)
-    if (offset_angle == 0) or (offset_angle == 180) or (offset_angle == 360):
-        #If horizontal, use top (left) and bottom (right) edge midpoints
-        left_coord = [(array_dims[1]-1)/2, array_dims[0]]
-        right_coord = [(array_dims[1]-1)/2, 0]
-    elif (offset_angle == 90) or (offset_angle == 270):
-        #if vertical, use east and west edges
-        left_coord = [0, (array_dims[0]-1)/2]
-        right_coord = [(array_dims[1]-1), (array_dims[0]-1)/2]
-    elif ((offset_angle > 0) and (offset_angle < 90)) or ((offset_angle > 180) and (offset_angle < 270)):
-        #check corners for "+" slope
-        left_coord = [0, (array_dims[0]-1)]
-        right_coord = [(array_dims[1]-1), 0]
-    elif ((offset_angle > 90) and (offset_angle < 180)) or ((offset_angle > 270) and (offset_angle < 360)):
-        #check corners for "-" slope
-        left_coord = [0, 0]
-        right_coord = [(array_dims[1]-1), (array_dims[0]-1)]
-    else:
-        print(f"Invalid offset angle- {offset_angle} degrees; must be between 0 and 360")
-        return tile_dict
-
-    #Fill 'left'
-    prior_line_points = initial_line_points
+    #NOTE: image array is flipped-Y, but calculations here are Cartesian
+    if abs(slope) < 1e-5:
+        #horizontal
+        left_coord = [(array_x_dim-1)/2, (array_y_dim-1)]
+        right_coord = [(array_x_dim-1)/2, 0]
+    elif slope > 0:
+        if slope > 1e6:
+            line_type = 'vertical'
+            left_coord = [0, (array_y_dim-1)/2]
+            right_coord = [(array_x_dim-1), (array_y_dim-1)/2]
+        else:
+            #negative slope in the drawn array, positive Cartesian
+            line_type = 'negative'
+            left_coord = [(array_y_dim-1), 0]
+            right_coord = [0, (array_x_dim-1)]
+    elif slope < 0:
+        if abs(slope) > 1e6:
+            line_type = 'vertical'
+            left_coord = [0, (array_y_dim-1)/2]
+            right_coord = [(array_x_dim-1), (array_y_dim-1)/2]
+        else:
+            #positive slope in the drawn array, negative Cartesian
+            line_type = 'positive'
+            left_coord = [0,0]
+            right_coord = [(array_x_dim-1),(array_y_dim-1)]
+    
+    #Fill the array by stepping 'left'
+    prior_line_points = [initial_start_point, initial_end_point]
     distance_left = 1e6  #arbitrary big number for initialization
     stepping_counter = 0
     exterior_hit = False
-    while (abs(distance_left) > (strand_radius)) and (stepping_counter <100) and (not exterior_hit):
+    while (distance_left >= strand_pitch) and (stepping_counter <100) and (not exterior_hit):
         #'left_coord' is left boundary point on the array
         p_left_line = intersect_point_and_segment(left_coord, prior_line_points[0], prior_line_points[1])
         if p_left_line is None:
@@ -2080,19 +2123,20 @@ def ideal_tile_from_initial_line(initial_line_points,
             #  This should only happen if the orthogonal distance is undefined, which SHOULD only happen when no more lines can be drawn in this direction
             break
         #Check if the new 'p_leftline' is outside the array boundaries
-        if (p_left_line[0] < 0) or (p_left_line[1] < 0) or (p_left_line[0] >= array_dims[0]) or (p_left_line[1] >= array_dims[1]):
+        if (p_left_line[0] < 0) or (p_left_line[1] < 0) or (p_left_line[0] >= array_x_dim) or (p_left_line[1] >= array_y_dim):
             exterior_hit = True
+            #TODO: use 'exterior_hit' flag to draw a line if it's within 'strand_radius' of the array boundary
+            #  break for now until implemented
+            break
         #Total distance from
-        distance_left = math.sqrt((p_left_line[0]-left_coord[0])**2 + (p_left_line[1]-left_coord[1])**2) + strand_radius
-        if (distance_left > 0) and (not exterior_hit):
-            dx = p_left_line[0]-left_coord[0]
-            dy = p_left_line[1]-left_coord[1]
-            distance = math.sqrt((dx)**2 + (dy)**2)
-            unit_dx = dx/distance
-            unit_dy = dy/distance
-            step_coord_x = left_coord[0] + unit_dx*strand_pitch
-            step_coord_y = left_coord[1] + unit_dy*strand_pitch
-            left_coord = [step_coord_x, step_coord_y]
+        dx = left_coord[0]-p_left_line[0]
+        dy = left_coord[1]-p_left_line[1]
+        distance_left = math.sqrt((dx)**2 + (dy)**2)
+        if (distance_left >= strand_pitch) and (not exterior_hit):
+            unit_dx = dx/distance_left
+            unit_dy = dy/distance_left
+            step_coord_x = p_left_line[0] + unit_dx*strand_pitch
+            step_coord_y = p_left_line[1] + unit_dy*strand_pitch
             line_dict = draw_2D_strand_line_bythickness([step_coord_y, step_coord_x],
                                                         offset_angle,
                                                         micron_strand_diameter,
@@ -2105,64 +2149,44 @@ def ideal_tile_from_initial_line(initial_line_points,
                                                         show_array_iterations = False,
                                                         show_final_array = False)
 
+            #Pull return dict data and condition
             line_key = list(line_dict['line_dicts'].keys())[0]   #pull first key; should be only entry in dict
             drawn_array = line_dict['line_dicts'][line_key]['drawn_array']
             drawn_mask = drawn_array > 0
-            new_line_start = line_dict['line_dicts'][line_key]['start_coordinates']
-            new_line_end = line_dict['line_dicts'][line_key]['end_coordinates']
             layer_array[drawn_mask] = drawn_array[drawn_mask]
+              # 'line_dict' points are (Y,X), flip to (X,Y)
+            new_line_start = line_dict['line_dicts'][line_key]['start_coordinates']
+            new_line_start = [new_line_start[1], new_line_start[0]]
+            new_line_end = line_dict['line_dicts'][line_key]['end_coordinates']
+            new_line_end = [new_line_end[1], new_line_end[0]]
 
             #Set values for next iteration
-            prior_line_points = [new_line_start, new_line_end]
+            if prior_line_points == [new_line_start, new_line_end]:
+                break
+            else:
+                prior_line_points = [new_line_start, new_line_end]
             stepping_counter += 1
 
-        elif distance_left <= strand_radius:
+        elif abs(distance_left) <= strand_radius:
             #TODO: add this use case when point is external to array but within a strand radius of the edge
             # raw_2D_external_line_bythickness(external_point,
             #                               strand_radius_in_pix,
             #                               array_dims,
             #                               um_to_pix_conversion = 1,
             #                               line_type = 'simple')
-            dx = p_left_line[0]-left_coord[0]
-            dy = p_left_line[1]-left_coord[1]
-            distance = math.sqrt((dx)**2 + (dy)**2)
-            unit_dx = dx/distance
-            unit_dy = dy/distance
-            step_coord_x = left_coord[0] + unit_dx*strand_pitch
-            step_coord_y = left_coord[1] + unit_dy*strand_pitch
-            left_coord = [step_coord_x, step_coord_y]
-            line_dict = draw_2D_strand_line_bythickness([step_coord_y, step_coord_x],
-                                                        offset_angle,
-                                                        micron_strand_diameter,
-                                                        array_dims,
-                                                        um_to_pix_conversion = um_to_pix_conversion,
-                                                        length = None,
-                                                        line_type = 'simple',
-                                                        thickness_fcn = 'cylinder',
-                                                        show_points = False,
-                                                        show_array_iterations = False,
-                                                        show_final_array = False)
 
-            line_key = list(line_dict['line_dicts'].keys())[0]   #pull first key; should be only entry in dict
-            drawn_array = line_dict['line_dicts'][line_key]['drawn_array']
-            drawn_mask = drawn_array > 0
-            new_line_start = line_dict['line_dicts'][line_key]['start_coordinates']
-            new_line_end = line_dict['line_dicts'][line_key]['end_coordinates']
-            layer_array[drawn_mask] = drawn_array[drawn_mask]
+            break
 
-            #Set values for next iteration
-            prior_line_points = [new_line_start, new_line_end]
-            stepping_counter += 1
         else:
             #TODO: add this use case when point is external to array but within a strand radius of the edge; should be same as above but with different distance condition
             break
 
     #Fill 'right'
-    prior_line_points = initial_line_points
+    prior_line_points = [initial_start_point, initial_end_point]
     distance_right = 1e6  #arbitrary big number for initialization
     stepping_counter = 0
     exterior_hit = False
-    while (abs(distance_right) > strand_radius) and (stepping_counter <100) and (not exterior_hit):
+    while (distance_right >= strand_pitch) and (stepping_counter <100) and (not exterior_hit):
         #'right_coord' is left boundary point on the array
         p_right_line = intersect_point_and_segment(right_coord, prior_line_points[0], prior_line_points[1])
         #If point has no intercept with clamped line segment within the array, quite the loop.
@@ -2172,25 +2196,25 @@ def ideal_tile_from_initial_line(initial_line_points,
         #Check if the new 'p_right_line' is outside the array boundaries
         if (p_right_line[0] < 0) or (p_right_line[1] < 0) or (p_right_line[0] >= array_dims[0]) or (p_right_line[1] >= array_dims[1]):
             exterior_hit = True
+            #TODO: use 'exterior_hit' flag to draw a line if it's within 'strand_radius' of the array boundary
+            #  break for now until implemented
+            break
         #Either it's not possible to draw another orthogonal point, or a failure occured.
         #  Either way, break and move on
-        
-        distance_right = math.sqrt((p_right_line[0]-right_coord[0])**2 + (p_right_line[1]-right_coord[1])**2) + strand_radius
+        dx = right_coord[0]- p_right_line[0]
+        dy = right_coord[1]- p_right_line[1]
+        distance_right = math.sqrt((dx)**2 + (dy)**2)
         #Normal case; inside array, do normal things
-        if (distance_right > 0) and (not exterior_hit):
-            dx = p_right_line[0]-right_coord[0]
-            dy = p_right_line[1]-right_coord[1]
-            distance = math.sqrt((dx)**2 + (dy)**2)
-            unit_dx = dx/distance
-            unit_dy = dy/distance
-            step_coord_x = right_coord[0] + unit_dx*strand_pitch
-            step_coord_y = right_coord[1] + unit_dy*strand_pitch
-            right_coord = [step_coord_x, step_coord_y]
+        if (distance_right > strand_pitch) and (not exterior_hit):
+            unit_dx = dx/distance_right
+            unit_dy = dy/distance_right
+            step_coord_x = p_right_line[0] + unit_dx*strand_pitch
+            step_coord_y = p_right_line[1] + unit_dy*strand_pitch
             line_dict = draw_2D_strand_line_bythickness([step_coord_y, step_coord_x],
                                                         offset_angle,
-                                                        strand_radius*2,
+                                                        micron_strand_diameter,
                                                         array_dims,
-                                                        um_to_pix_conversion = 1,
+                                                        um_to_pix_conversion = um_to_pix_conversion,
                                                         length = None,
                                                         line_type = 'simple',
                                                         thickness_fcn = 'cylinder',
@@ -2201,57 +2225,40 @@ def ideal_tile_from_initial_line(initial_line_points,
             line_key = list(line_dict['line_dicts'].keys())[0]   #pull first key; should be only entry in dict
             drawn_array = line_dict['line_dicts'][line_key]['drawn_array']
             drawn_mask = drawn_array > 0
-            new_line_start = line_dict['line_dicts'][line_key]['start_coordinates']
-            new_line_end = line_dict['line_dicts'][line_key]['end_coordinates']
             layer_array[drawn_mask] = drawn_array[drawn_mask]
+              # 'line_dict' points are (Y,X), flip to (X,Y)
+            new_line_start = line_dict['line_dicts'][line_key]['start_coordinates']
+            new_line_start = [new_line_start[1], new_line_start[0]]
+            new_line_end = line_dict['line_dicts'][line_key]['end_coordinates']
+            new_line_end = [new_line_end[1], new_line_end[0]]
 
             #Set values for next iteration
-            prior_line_points = [new_line_start, new_line_end]
+            if prior_line_points == [new_line_start, new_line_end]:
+                break
+            else:
+                prior_line_points = [new_line_start, new_line_end]
             stepping_counter += 1
+        
         #Case where point just exited array; more complicated calculation needed, but just using stand-in code for now
-        elif distance_left <= strand_radius:
+        elif abs(distance_right) <= strand_radius:
             #TODO: add this use case when point is external to array but within a strand radius of the edge
             # raw_2D_external_line_bythickness(external_point,
             #                               strand_radius_in_pix,
             #                               array_dims,
             #                               um_to_pix_conversion = 1,
             #                               line_type = 'simple')
-            dx = p_right_line[0]-right_coord[0]
-            dy = p_right_line[1]-right_coord[1]
-            distance = math.sqrt((dx)**2 + (dy)**2)
-            unit_dx = dx/distance
-            unit_dy = dy/distance
-            step_coord_x = right_coord[0] + unit_dx*strand_pitch
-            step_coord_y = right_coord[1] + unit_dy*strand_pitch
-            right_coord = [step_coord_x, step_coord_y]
-            line_dict = draw_2D_strand_line_bythickness([step_coord_y, step_coord_x],
-                                                        offset_angle,
-                                                        strand_radius*2,
-                                                        array_dims,
-                                                        um_to_pix_conversion = 1,
-                                                        length = None,
-                                                        line_type = 'simple',
-                                                        thickness_fcn = 'cylinder',
-                                                        show_points = False,
-                                                        show_array_iterations = False,
-                                                        show_final_array = False)
-
-            line_key = list(line_dict['line_dicts'].keys())[0]   #pull first key; should be only entry in dict
-            drawn_array = line_dict['line_dicts'][line_key]['drawn_array']
-            drawn_mask = drawn_array > 0
-            new_line_start = line_dict['line_dicts'][line_key]['start_coordinates']
-            new_line_end = line_dict['line_dicts'][line_key]['end_coordinates']
-            layer_array[drawn_mask] = drawn_array[drawn_mask]
-
-            #Set values for next iteration
-            prior_line_points = [new_line_start, new_line_end]
-            stepping_counter += 1
+            break
 
         else:
             #TODO: add this use case when point is external to array but within a strand radius of the edge; should be same as above but with different distance condition
             break
 
         tile_dict['drawn_array'] = layer_array
+
+    if show_final_array:
+        plt.imshow(layer_array)
+        plt.title("Tiled array")
+        plt.show()
 
     return tile_dict
 
