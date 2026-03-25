@@ -197,6 +197,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                             line_type = 'simple',
                                                             thickness_fcn = 'cylinder',
                                                             show_points = False,
+                                                            show_array_iterations = show_layer_images,
                                                             show_final_array = False)
 
                 drawn_array = array_dict['drawn_array']
@@ -215,7 +216,7 @@ def flat_ideal_volume_guess(structure_dict,
                     starting_interior_point = [seed_y_idx, seed_x_idx]
 
                     #Draw initial line
-                    array_dict = draw_2D_strand_line_bythickness([seed_y_idx, seed_x_idx],
+                    array_dict = draw_2D_strand_line_bythickness(starting_interior_point,
                                                                 this_angular_offset,
                                                                 strand_diameter,
                                                                 (y_array_dim, x_array_dim),
@@ -224,7 +225,8 @@ def flat_ideal_volume_guess(structure_dict,
                                                                 line_type = 'simple',
                                                                 thickness_fcn = 'cylinder',
                                                                 show_points = False,
-                                                                show_final_array = True)
+                                                                show_array_iterations = show_layer_images,
+                                                                show_final_array = False)
 
                     #Extend initial seed point to an arbitrary 'pole_point' that's used for every other layer
                     #NOTE: 'pole_point' is the point at which the strand will be drawn through for every layer.
@@ -254,6 +256,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                                 line_type = 'simple',
                                                                 thickness_fcn = 'cylinder',
                                                                 show_points = False,
+                                                                show_array_iterations = show_layer_images,
                                                                 show_final_array = False)
 
                 #Pull array and values from this layer's run
