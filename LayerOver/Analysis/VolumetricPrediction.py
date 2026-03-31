@@ -18,6 +18,7 @@ Description: Module for handling conversions between ideal structure assumptions
 
 """
 #Standard libraries
+import math
 import matplotlib.pyplot as plt
 import numpy as np
 import random
@@ -59,7 +60,7 @@ generic_volume_dict = {
 
 
 #################################################################################################################
-###  Lorem  #####################################################################################################
+###  Volume production from structure data  #####################################################################
 #################################################################################################################
 
 def flat_ideal_volume_guess(structure_dict,
@@ -91,10 +92,17 @@ def flat_ideal_volume_guess(structure_dict,
     '''
 
     #Initialize variables
+
+      # hard-coded parameters
+    figure_width = 5   #inches; for plotting and saving images
+    figure_height = 5   #inches; for plotting and saving images
+    figure_dpi = 600   #dpi for figure save
+
       # refine length scale variables
     if voxel_side_length == 0 and voxel_resolution_microns == 0:
         voxel_side_length = 15.875  #mm; default to punch diameter of 15.875 mm (5/8 inch) if no other length options are specified
     elif voxel_side_length == 0:
+
         #'array_dims' must be specified, so if 'voxel_resolution_microns' is specified, use it to constrain mm size scale
         voxel_side_length = max(array_dims) * voxel_resolution_microns /1000  #pixels->microns->mm
     print(f"Array side length: {voxel_side_length} mm")
@@ -112,6 +120,7 @@ def flat_ideal_volume_guess(structure_dict,
     x_distance_idcs = np.linspace(pixel_half_length, (voxel_side_length *1000)-pixel_half_length, x_array_dim-1)
     y_distance_idcs = np.linspace(pixel_half_length, (voxel_side_length *1000)-pixel_half_length, y_array_dim-1)
     # mesh_x, mesh_y = np.array(np.meshgrid(x_distance_idcs, y_distance_idcs))
+
       # pull 'structure_dict' keys
     metadata_dict= structure_dict['metadata']
     n_layers= structure_dict['number_of_layers']
@@ -161,10 +170,11 @@ def flat_ideal_volume_guess(structure_dict,
 
         voxel_volume_array = np.zeros((y_array_dim, x_array_dim))  #each dim should be the same, but keeping them separable for now in case that's not true in the future
         ideal_layer_arrays = []    #store raw strand volume array for each layer
-        layer_arrays = []    #store volume array adjusted for compression and strand-strand interaction
+        adjusted_layer_arrays = []    #store volume array adjusted for compression and strand-strand interaction
         #Generate each layer's thickness projection
         for layer_idx in range(n_layers):
             print(f"\t\t adding layer {layer_idx +1}")
+            layer_name = f"{voxel_name}_Layer-{layer_idx+1}"
             layer_dict = {
                 'ideal_layers':{},
                 'adjusted_layers':{},
@@ -295,21 +305,32 @@ def flat_ideal_volume_guess(structure_dict,
                     #Apply flat-plate compression (i.e. compression of strand against plate surface)
                     pass
                 else:
-                    pass
-                if save_layer_arrays:
-                    pass
+                    last_layer_array = ideal_layer_arrays[layer_idx-1]
+                    
             
                 #Handle images for each layer (ideal, no compression)
                 if show_layer_images:
-                    if save_layer_images:
-                        pass
-                
-                  # save the layer image if 'show_layer_images' is False
-                elif save_layer_images:
-                    pass
+                    plt.figure(figsize=(figure_width,figure_height))
+                    plt.imshow(this_layer)
+                    plt.title(layer_name)
+                    plt.show()
 
-                #Save the layer array
-                layer_arrays.append(this_layer)    #save adjusted layer; accounts for compression and strand-strand interactions
+                if save_layer_images:
+                    fig = plt.figure(frameon=False)
+                    fig.set_size_inches(figure_width,figure_height)
+                    ax = plt.Axes(fig, [0., 0., 1., 1.])
+                    ax.set_axis_off()
+                    fig.add_axes(ax)
+                    ax.imshow(this_layer, aspect='auto')
+                    fig.savefig(layer_name, figure_dpi)
+
+                #Save array if applicable
+                if save_layer_arrays:
+                    layer_array_savename = f"{layer_name}_RawArray"
+                    np.save(layer_array_savename, this_layer)
+
+                #Store the layer arrays in memory
+                adjusted_layer_arrays.append(this_layer)    #save adjusted layer; accounts for compression and strand-strand interactions
                 voxel_volume_array = voxel_volume_array + this_layer    #add adjusted layer to global volume array
         
             #Assign to dict for return
@@ -318,13 +339,26 @@ def flat_ideal_volume_guess(structure_dict,
             layer_dict['full_volume_prediction'] = voxel_volume_array
             return_volume_dict[voxel_name] = layer_dict
 
-            if show_final_image:
-                plt.figure(figsize=(10,10))
-                plt.imshow(voxel_volume_array)
-                plt.title(f"{voxel_name}")
-                if save_final_image:
-                    pass
-                plt.show()
+        #Save and/or show results
+        final_image_savename = f"FullStack_Image_{voxel_name}"
+        if show_final_image:
+            plt.figure(figsize=(10,10))
+            plt.imshow(voxel_volume_array)
+            plt.title(final_image_savename)
+            plt.show()
+        if save_final_image:
+            fig = plt.figure(frameon=False)
+            fig.set_size_inches(figure_width,figure_height)
+            ax = plt.Axes(fig, [0., 0., 1., 1.])
+            ax.set_axis_off()
+            fig.add_axes(ax)
+            ax.imshow(voxel_volume_array, aspect='auto')
+            fig.savefig(final_image_savename, figure_dpi)
+
+            # save the array as a numpy file
+        if save_final_array:
+            final_array_savename = f"FullStack_Array_{voxel_name}"
+            np.save(final_array_savename, voxel_volume_array)
         
     return return_volume_dict
 
@@ -359,15 +393,9 @@ def cartesian_ideal_volume_guess(structure_dict,
     pass
 
 
-def get_array_edges_for_line(seed_indices, 
-                             array_dimensions, 
-                             line_angle):
-    '''
-    Descscription: Get the array edge points for an arbitrary line
-    '''
-
-
-    pass
+#################################################################################################################
+###  Helper utilities  ##########################################################################################
+#################################################################################################################
 
 
 def apply_layer_slump(layers_array, 
@@ -389,3 +417,64 @@ def apply_layer_slump(layers_array,
 
 
     pass
+
+
+#################################################################################################################
+###  Analysis and Statistics  ###################################################################################
+#################################################################################################################
+
+
+def get_volumetric_array_statistics(array,
+                                 n_histogram_bins = 50,
+                                 n_rounding_places= 4):
+    '''
+    Description: 
+        Standardized reporting function for an array of volumetric data.
+    
+    INPUT:
+        ''      list or numpy.array of volumetric predictions
+
+    TODO:
+        - lor
+    '''
+    
+    #Process input and initialize variables
+    summary_dict = {
+        'max_opacity': 0,
+        'min_opacity': 0,
+        'stdev_opacity': 0,
+        'average_opacity': 0,
+        'opacity_sum': 0,
+        'opaque_region_sum': 0,
+        'opaque_fraction': 0,
+        'transmittance': 0,
+        'absorbance': 0,
+        'histogram_bins': [],
+        'histogram_cnts': [],
+        }
+    array = np.array(array)
+    
+    #NOTE: converting everything back to python native formats to allow for exporting dictionary as a JSON; otherwise it will shit itself
+    #Max, min, std dev., avg, sum
+    summary_dict['max_opacity']= float(round(array[array<1].max(), n_rounding_places))
+    summary_dict['min_opacity']= float(round(array.min(), n_rounding_places))
+    summary_dict['stdev_opacity']= float(round(array.std(), n_rounding_places))
+    summary_dict['average_opacity']= float(round(array.mean(), n_rounding_places))
+    opacity_sum = float(round(array.sum(), n_rounding_places))
+    summary_dict['opacity_sum']= float(round(opacity_sum, n_rounding_places))
+    
+    #Calculate other metrics
+    summary_dict['opaque_region_sum']= float(round(array[array<1].sum(), n_rounding_places))
+    array_pixel_count = float(round((array.shape[0]*array.shape[1])))
+    summary_dict['opaque_fraction']= float(round((array[array<1].shape[0]) / (array_pixel_count), n_rounding_places))
+    summary_dict['transmittance']= float(round(opacity_sum / array_pixel_count, n_rounding_places))
+    summary_dict['absorbance']= float(round(-1 * math.log10(opacity_sum / array_pixel_count), n_rounding_places+2))
+    
+    #Generate histogram values and make into JSON-writeable lists
+    cnts, bins = np.histogram(array, bins = n_histogram_bins)
+    cnts = cnts.tolist()
+    bins = np.round(bins[1::], n_rounding_places).tolist()
+    summary_dict['histogram_bins']= bins
+    summary_dict['histogram_cnts']= cnts
+    
+    return summary_dict

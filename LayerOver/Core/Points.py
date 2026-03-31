@@ -1896,6 +1896,9 @@ def pole_point_to_array_interior_point(pole_point,
         'interior_point'    list; (Y,X) of array indices of interior point 
     """
 
+    #Define hard-coded settings
+    pole_point_line_padding = 30    #distance 'left' and 'right' to draw a line through the pole_point;
+
     #Initialize variables
     interior_point = [-1,-1]  #default return value; improper trial point to flag failed process
     pole_point = np.array(pole_point)
@@ -1932,10 +1935,10 @@ def pole_point_to_array_interior_point(pole_point,
             left_angle = offset_angle - 180
             right_angle = offset_angle
           # round to avoid overflow errors in trig functions at extreme angles
-        right_y = round(math.sin(math.radians(right_angle)), 5)*5
-        right_x = round(math.cos(math.radians(right_angle)), 5)*5
-        left_y = round(math.sin(math.radians(left_angle)), 5)*5
-        left_x = round(math.cos(math.radians(left_angle)), 5)*5
+        right_y = round(math.sin(math.radians(right_angle)), 5) * pole_point_line_padding
+        right_x = round(math.cos(math.radians(right_angle)), 5) * pole_point_line_padding
+        left_y = round(math.sin(math.radians(left_angle)), 5) * pole_point_line_padding
+        left_x = round(math.cos(math.radians(left_angle)), 5) * pole_point_line_padding
         #NOTE: These are all (X,Y) to make vector math easier, but will need to be flipped back to (Y,X) for array indexing later
           # increment original 'pole_point' to create characterisitic line
         a0 = np.array([pole_point[1]+left_x, pole_point[0]+left_y])
@@ -2009,13 +2012,49 @@ def pole_point_to_array_interior_point(pole_point,
             #If closest edge was found, calculate interior point
             if smallest_distance < 1e5:
                 #Calculate closest point between abstract line from 'pole_point' and clampled line segment of closest edge
-                pole_line_closest_point, array_edge_closest_point, distance = \
-                    line_line_distance(a0,a1,b0,b1,
-                                        clampB0=True,
-                                        clampB1=True)
-                #Calculate orthogonal direction vecotr from to line from 'pole_point' to array edge
-                dx = array_edge_closest_point[0] - pole_line_closest_point[0]
-                dy = array_edge_closest_point[1] - pole_line_closest_point[1]
+                try:
+                    #Actual calculation
+                    pole_line_closest_point, array_edge_closest_point, distance = \
+                        line_line_distance(a0,a1,b0,b1,
+                                            clampB0=True,
+                                            clampB1=True)
+
+                    #Calculate orthogonal direction vector from line from 'pole_point' to array edge
+                    dx = array_edge_closest_point[0] - pole_line_closest_point[0]
+                    dy = array_edge_closest_point[1] - pole_line_closest_point[1]
+                
+                #There's an issue with 'line_line_distance' that only comes up with vertical lines, so try the following to get closer
+                #Check distance between middle of 'west' and 'east' edges and vertical line
+                except:
+                    y_offscale_high = False
+                    y_offscale_low = False
+                    x_offscale_high  = False
+                    x_offscale_low = False
+                    #If fancy math doesn't work, brute-force it
+                    if pole_point[0] >= array_dims[0]:
+                        y_offscale_high = True
+                    if pole_point[0] < 0:
+                        y_offscale_low = True
+                    if pole_point[1] >= array_dims[1]:
+                        x_offscale_high = True
+                    if pole_point[1] < 0:
+                        x_offscale_low = True
+                    #Check which side of the array to get closest points from
+                      # if vertical, this is easy; just fine the correct Y for a constant X
+                    if (offset_angle == 90) or (offset_angle == 270):
+                        if x_offscale_high:
+                            #Points in (X,Y)
+                            array_edge_closest_point = [array_dims[1], array_dims[0]/2]
+                            pole_line_closest_point = np.array([pole_point[1], array_dims[0]/2])
+                        if x_offscale_low:
+                            #Points in (X,Y)
+                            array_edge_closest_point = [0, array_dims[0]/2]
+                            pole_line_closest_point = np.array([pole_point[1], array_dims[0]/2])
+
+                    #Calculate orthogonal direction vector from line from 'pole_point' to array edge
+                    dx = array_edge_closest_point[0] - pole_line_closest_point[0]
+                    dy = array_edge_closest_point[1] - pole_line_closest_point[1]
+
                 distance = math.sqrt((dx)**2 + (dy)**2)
                 unit_dx = dx/distance
                 unit_dy = dy/distance

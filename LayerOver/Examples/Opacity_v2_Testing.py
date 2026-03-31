@@ -90,5 +90,5 @@ flat_ideal_volume_guess(diw_structure_dict,
                             save_layer_arrays= False,
                             save_final_image= False,
                             save_final_array= False,
-                            show_layer_images= True,
+                            show_layer_images= False,
                             show_final_image= True)

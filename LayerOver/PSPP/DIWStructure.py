@@ -223,9 +223,9 @@ standard_logbook_columnnames = [
 #######################################################################################################################
 
 
-def structure_dict_from_param_dict(diw_param_dict):
+def structure_dict_from_logbook_row(diw_param_dict):
     '''
-    Description: Given a 'blank_diw_param_dict'-like dictionary, generate a skeleton 'blank_structure_dict'.
+    Description: Generate a skeleton 'blank_structure_dict'.
     '''
     #Attempt to pull 
 
@@ -246,16 +246,69 @@ def structure_dict_from_param_kwargs(structure_code = None,
 
 def parse_structure(structure_string, flag = ''):
     '''
-    Description: Take a short, long, or complete structure string and generate a skeleton 'blank_structure_dict'.
+    Description: Take a short, long, or complete structure string and generate a list of it's layer codes.
+
+    TODO:
+        -Add parsing support for other structure strings. Currently only supports "S8H" type strings
     '''
     
-    #Try to parse 
+    #Flag option for changing parsing behavior 
     if flag == '':
-        pass
+        underscore_check = bool( len(structure_string.split("_")) > 1)
+        curly_bracket_check = bool( len(structure_string.split("{")) > 1)
+        flag = 'default'
 
-    #Split the structure string by 
-    pass
+    #Split the structure string character-by-character
+    initial_length = len(structure_string)
+    structure_parts = []
+    latest_part = ''
+    if flag == 'default':
+        for idx, character in enumerate(structure_string):
+            #add any numeric character to the string
+            if character.isnumeric():
+                structure_parts.append(latest_part)
+                latest_part = latest_part + character
+            else:
+                if latest_part == '':
+                    structure_parts.append(character)
+                else:
+                    latest_part = latest_part + character
+                    structure_parts.append(latest_part)
+                    latest_part = ''
 
+    #Now that the structure is split out, generate a list with the layer types
+    layer_list = []
+    for part in structure_parts:
+        #If part is only one character, let's hope it's one of the options below
+        if len(part) ==1:
+            if part.lower() == 's':
+                layer_list.append('skin')
+            if part.lower() == 'h':
+                layer_list.append('helicoidal')
+            if part.lower() == 'm':
+                layer_list.append('maze')
+        #Otherwise, if numerics are involved then parse to get number of layers and add that number to the return array
+        else:
+            layer_number_string = ''
+            type_string = ''
+            for character in part:
+                if character.isnumeric():
+                    layer_number_string = layer_number_string + character
+                else:
+                    if type_string == '':
+                        type_string = character.lower()
+                    else:
+                        print(f"Failure to parse string '{part}': too many layer type designators (ie. 's', 'h', 'm'")
+            number_of_layers = int(layer_number_string)
+            for i in range(number_of_layers):
+                if type_string == 's':
+                    layer_list.append('skin')
+                if type_string == 'h':
+                    layer_list.append('helicoidal')
+                if type_string == 'm':
+                    layer_list.append('maze')
+
+    return layer_list
 
 def match_structure_to_name(structure_dict):
     '''
@@ -274,3 +327,19 @@ def parse_logbook_row_for_structure(row_array):
     #Initialize variables
 
     return structure_dict
+
+
+def structure_name_from_structure_dict(structure_dict):
+    '''
+    Directory:
+        Lorem.
+    '''
+    
+    #Initialize variables
+    name_dict = {
+        'generic_structure':'',
+        'unique_structure_name': '',
+        'default_structure_name': '', 
+        }
+
+    return name_dict
