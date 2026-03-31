@@ -1,5 +1,5 @@
 """
-Copyright 2025. Triad National Security, LLC. All rights reserved.
+Copyright 2026. Triad National Security, LLC. All rights reserved.
 This program was produced under U.S. Government contract 89233218CNA000001 for Los Alamos National Laboratory (LANL), 
 which is operated by Triad National Security, LLC for the U.S. Department of Energy/National Nuclear Security 
 Administration. All rights in the program are reserved by Triad National Security, LLC, and the U.S. Department of 
@@ -7,12 +7,12 @@ Energy/National Nuclear Security Administration. The Government is granted for i
 a nonexclusive, paid-up, irrevocable worldwide license in this material to reproduce, prepare. derivative works, 
 distribute copies to the public, perform publicly and display publicly, and to permit others to do so.
 
-Created:   20YY-MM-DD
-Version:   0.1.0
+Created:   2026-03-31
+Version:   1.0.0
 
 @author: Aaron Pital (Los Alamos National Lab)
 
-Description: 
+Description: Quick script to run 'VolumetricPrediction' generation of layer images from ideal structures.
 
 """
 
@@ -23,23 +23,11 @@ import matplotlib.pyplot as plt
 from LayerOver.Analysis.VolumetricPrediction import flat_ideal_volume_guess
 from LayerOver.PSPP.DIWStructure import blank_diw_structure_dict
 
-
-# structure_dict keys:
-#     metadata
-#     number_of_layers
-#     layer_strand_extrusion
-#     layer_strand_diameter
-#     layer_types
-#     layer_type_modifiers
-#     layer_points
-#     layer_steps
-#     layer_angles
-#     layer_lateral_offsets
-#     layer_materials
-#     layer_pitches
-
-array_dims = (5000, 5000)
-
+#Size of the resulting generation array
+array_dims = (5000,5000)
+#Number of "identical" structures to generate
+number_of_duplicates = 5
+#Structure to generate
 diw_structure_dict = {
     'metadata': {
         'unique_structure_name': None,
@@ -80,15 +68,36 @@ diw_structure_dict = {
     'layer_pitches': [600, 600, 600, 600]
     }
 
-flat_ideal_volume_guess(diw_structure_dict,
-                            array_dims, 
-                            n_structures= 1, 
-                            voxel_side_length= 15,
-                            voxel_resolution_microns= 0,
-                            compression_factor= 0.7,
-                            save_layer_images= False,
-                            save_layer_arrays= False,
-                            save_final_image= False,
-                            save_final_array= False,
-                            show_layer_images= False,
-                            show_final_image= True)
+#Do the generatin'
+for i in range(number_of_duplicates):
+    try:
+        flat_ideal_volume_guess(diw_structure_dict,
+                                    array_dims, 
+                                    n_structures= 1, 
+                                    voxel_side_length= 15,
+                                    voxel_resolution_microns= 0,
+                                    compression_factor= 0.7,
+                                    save_layer_images= False,
+                                    save_layer_arrays= False,
+                                    save_final_image= False,
+                                    save_final_array= False,
+                                    show_layer_images= False,
+                                    show_final_image= True)
+    except Exception as e:
+        print()
+        print(f'Failed on exception: {e}')
+
+
+#Returned keys:
+#     metadata
+#     number_of_layers
+#     layer_strand_extrusion
+#     layer_strand_diameter
+#     layer_types
+#     layer_type_modifiers
+#     layer_points
+#     layer_steps
+#     layer_angles
+#     layer_lateral_offsets
+#     layer_materials
+#     layer_pitches

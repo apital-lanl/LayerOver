@@ -335,7 +335,7 @@ def flat_ideal_volume_guess(structure_dict,
         
             #Assign to dict for return
             layer_dict['ideal_layers'][layer_idx] = ideal_layer_arrays
-            layer_dict['adjusted_layers'][layer_idx] = layer_arrays
+            layer_dict['adjusted_layers'][layer_idx] = adjusted_layer_arrays
             layer_dict['full_volume_prediction'] = voxel_volume_array
             return_volume_dict[voxel_name] = layer_dict
 
