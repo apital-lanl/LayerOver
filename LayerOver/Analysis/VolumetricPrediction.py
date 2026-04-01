@@ -73,6 +73,7 @@ def flat_ideal_volume_guess(structure_dict,
                             save_layer_arrays= False,
                             save_final_image= False,
                             save_final_array= False,
+                            save_location = None,
                             show_layer_images= True,
                             show_final_image= True):
     '''
@@ -309,6 +310,10 @@ def flat_ideal_volume_guess(structure_dict,
                     
             
                 #Handle images for each layer (ideal, no compression)
+                if save_location:
+                    layer_save_name = os.path.join(save_location, layer_name)
+                else:
+                    layer_save_name = layer_name
                 if show_layer_images:
                     plt.figure(figsize=(figure_width,figure_height))
                     plt.imshow(this_layer)
@@ -322,11 +327,14 @@ def flat_ideal_volume_guess(structure_dict,
                     ax.set_axis_off()
                     fig.add_axes(ax)
                     ax.imshow(this_layer, aspect='auto')
-                    fig.savefig(layer_name, figure_dpi)
+                    fig.savefig(layer_save_name, figure_dpi)
 
                 #Save array if applicable
                 if save_layer_arrays:
-                    layer_array_savename = f"{layer_name}_RawArray"
+                    if save_location:
+                        layer_array_savename = os.path.join(save_location, f"{layer_name}_RawArray")
+                    else:
+                        layer_array_savename = f"{layer_name}_RawArray"
                     np.save(layer_array_savename, this_layer)
 
                 #Store the layer arrays in memory
@@ -340,11 +348,15 @@ def flat_ideal_volume_guess(structure_dict,
             return_volume_dict[voxel_name] = layer_dict
 
         #Save and/or show results
-        final_image_savename = f"FullStack_Image_{voxel_name}"
+        if save_location:
+            image_name = f"FullStack_Image_{voxel_name}"
+            final_image_savename = os.path.join(save_location, image_name)
+        else:
+            final_image_savename = f"FullStack_Image_{voxel_name}"
         if show_final_image:
             plt.figure(figsize=(10,10))
             plt.imshow(voxel_volume_array)
-            plt.title(final_image_savename)
+            plt.title(image_name)
             plt.show()
         if save_final_image:
             fig = plt.figure(frameon=False)
@@ -357,7 +369,10 @@ def flat_ideal_volume_guess(structure_dict,
 
             # save the array as a numpy file
         if save_final_array:
-            final_array_savename = f"FullStack_Array_{voxel_name}"
+            if save_location:
+                final_array_savename = os.path.join(save_location, f"FullStack_Array_{voxel_name}")
+            else:
+                final_array_savename = f"FullStack_Array_{voxel_name}"
             np.save(final_array_savename, voxel_volume_array)
         
     return return_volume_dict

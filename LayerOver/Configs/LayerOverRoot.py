@@ -21,6 +21,7 @@ TODO:
 """
 
 import os
+from pathlib import Path
 
 
 def create_layerover_root(alt_root = None,

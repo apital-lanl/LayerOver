@@ -16,6 +16,9 @@ Description: Module to parse, homogenize, store, and compare DIW strucuture code
 
 """
 
+from numpy._core import numeric
+from LayerOver.PSPP.Materials import parse_material_note
+
 #######################################################################################################################
 #####  Template Variables  ############################################################################################
 #######################################################################################################################
@@ -33,8 +36,9 @@ blank_diw_structure_dict = {
         'layerup_file': None,
         'version_number': None,
         'notes': None,
-        'mech_data_flag': None,
-        'keyence_data_flag': None,
+        'mech_data_note': None,
+        'mech_data_filepaths': None,
+        'keyence_data_note': None,
         'punch_diameter': None,
         'mass_g': None,
         'thickness_mm': None,
@@ -73,8 +77,9 @@ default_diw_structure_dict = {
         'layerup_file': '',
         'version_number': '',
         'notes':'',
-        'mech_data_flag': False,
-        'keyence_data_flag': False,
+        'mech_data_note': '',
+        'mech_data_filepaths': [],
+        'keyence_data_note': '',
         'punch_diameter': '',
         'mass_g': 0,
         'thickness_mm': 0,
@@ -235,80 +240,111 @@ def structure_dict_from_logbook_row(logbook_row):
     structure_dict = blank_diw_structure_dict.copy()
 
     #Add direct metadata and other fields
-    structure_dict['part_structure'] = logbook_row['Structure']
-    structure_dict['metadata'][''] = logbook_row['Strand Diameter, Skin']
-    structure_dict['metadata'][''] = logbook_row['Strand Diameter, Layer']
-    structure_dict['metadata'][''] = logbook_row['Angle of Rotation (deg)']
-    structure_dict['metadata'][''] = logbook_row['Lateral Offset (µm)']
-    structure_dict['metadata'][''] = logbook_row['Pitch (µm)']
-    structure_dict['metadata'][''] = logbook_row['Syringe/Material']
-    structure_dict['metadata'][''] = logbook_row['Project ']
-    structure_dict['metadata'][''] = logbook_row['Machine Name']
-    structure_dict['metadata'][''] = logbook_row['LayerUp File']
-    structure_dict['metadata'][''] = logbook_row['Version #']
-    structure_dict['metadata'][''] = logbook_row['Notes']
-    structure_dict['metadata'][''] = logbook_row['Mechanical Data? (initals)']
-    structure_dict['metadata'][''] = logbook_row['Punch Diameter']
-    structure_dict['metadata'][''] = logbook_row['Mass (g)']
-    structure_dict['metadata'][''] = logbook_row['Thickness (Checkline) (mm)']
-    structure_dict['metadata'][''] = logbook_row['Thickness (Confocal) (mm)']
-    structure_dict['metadata'][''] = logbook_row['Thickness (Fancy KCNSC) (mm)']
-    structure_dict['metadata'][''] = logbook_row['Density (g/cc)']
-    structure_dict['metadata'][''] = logbook_row['Thickness (Additional) (mm)']
-    structure_dict['metadata'][''] = logbook_row['Thickness/ Density Initials']
-    structure_dict['metadata'][''] = logbook_row['Humidity']
-    structure_dict['metadata'][''] = logbook_row['Column1']
-    structure_dict['layer_pitches'] = logbook_row['Pitch Layer List']
+    structure_dict['part_structure'] = logbook_row['Structure'].values[0]
+    structure_dict['part_skin_nozzle_size'] = logbook_row['Strand Diameter, Skin'].values[0]
+    structure_dict['part_layer_nozzle_size'] = logbook_row['Strand Diameter, Layer'].values[0]
+    structure_dict['part_angular_offset'] = logbook_row['Angle of Rotation (deg)'].values[0]
+    structure_dict['part_lateral_offset'] = logbook_row['Lateral Offset (µm)'].values[0]
+    structure_dict['metadata']['print_name'] = logbook_row['Name'].values[0]
+    structure_dict['metadata']['pitch_offset'] = logbook_row['Pitch (µm)'].values[0]
+    structure_dict['metadata']['machine_name'] = logbook_row['Machine Name'].values[0]
+    structure_dict['metadata']['layerup_file'] = logbook_row['LayerUp File'].values[0]
+    structure_dict['metadata']['version_number'] = logbook_row['Version #'].values[0]
+    structure_dict['metadata']['notes'] = logbook_row['Notes'].values[0]
+    structure_dict['metadata']['mech_data_note'] = logbook_row['Mechanical Data? (initals)'].values[0]
+    structure_dict['metadata']['punch_diameter'] = logbook_row['Punch Diameter'].values[0]
+    structure_dict['metadata']['mass_g'] = logbook_row['Mass (g)'].values[0]
+    structure_dict['metadata']['thickness_mm'] = logbook_row['Thickness (Checkline) (mm)'].values[0]
+    # structure_dict['metadata'][''] = logbook_row['Thickness (Confocal) (mm)']
+    # structure_dict['metadata'][''] = logbook_row['Thickness (Fancy KCNSC) (mm)']
+    structure_dict['metadata']['thickness_mm'] = logbook_row['Density (g/cc)'].values[0]
+    # structure_dict['metadata'][''] = logbook_row['Thickness (Additional) (mm)']
+    # structure_dict['metadata'][''] = logbook_row['Thickness/ Density Initials']
+    # structure_dict['metadata'][''] = logbook_row['Humidity']
+    # structure_dict['metadata'][''] = logbook_row['Column1']
+    structure_dict['layer_pitches'] = logbook_row['Pitch Layer List'].values[0]
 
-    #Pull variables
-    
+    #Pull variables that require interpretation
+      # parse structure code to get list of layer types and number of layers  
+    layer_list = parse_structure(logbook_row['Structure'].values[0])
+    number_of_layers = len(layer_list)
+    structure_dict['layer_types'] = layer_list
+    structure_dict['number_of_layers'] = number_of_layers
+      # material
+    raw_logbook_material_string = logbook_row['Syringe/Material'].values[0]
+    parsed_material_note = parse_material_note(raw_logbook_material_string)
+    split_material_note = parsed_material_note.split('_')
+    base_material = split_material_note[0]
+    layer_material_list = []
+    if 'homogenous' in parsed_material_note.lower():
+        structure_dict['metadata']['part_material'] = parsed_material_note
+        for i in range(number_of_layers):
+            layer_material_list.append(base_material)
+    else:
+        #TODO: add use case for parsing if multiple materials are used in the print
+        structure_dict['metadata']['part_material'] = parsed_material_note
+        for i in range(number_of_layers):
+            pass
+    structure_dict['layer_materials'] = layer_material_list   
+      # parse the pitch 
+      #TODO: add support for parsing the 'raw_pitch_string' 
+    raw_pitch_string = structure_dict['metadata']['pitch_offset']
+    pitch_entry = logbook_row['Pitch Layer List'].values[0]
+    if type(pitch_entry) == float:
+        pitch_list = []
+        for i in range(number_of_layers):
+            pitch_list.append(pitch_entry)
+    elif type(pitch_entry) == str:
+        pitch_list = []
+        list_split = pitch_entry.split(',')
+        if len(list_split) >1:
+            pitch_list = [float(part.strip()) for part in list_split]
+        else:
+            for i in range(number_of_layers):
+                pitch_list.append(float(pitch_entry))
+    else:
+        pitch_list = pitch_entry
+    structure_dict['layer_pitches'] = pitch_list
+      # layer strand diameters
+    skin_diam = structure_dict['part_skin_nozzle_size']
+    layer_diam = structure_dict['part_layer_nozzle_size']
+    strand_diam_list = []
+    for layer_type in layer_list:
+        if layer_type.lower() == 'skin':
+            strand_diam_list.append(skin_diam)
+        else:
+            strand_diam_list.append(layer_diam)
+    structure_dict['layer_strand_diameter'] = strand_diam_list
+      # lateral offsets
+      #TODO: add support for variable offsets by layer from logbook files
+    offset = structure_dict['part_lateral_offset']
+    offset_list = []
+    if type(offset)== 'numpy.float64':
+        for i in range(number_of_layers):
+            offset_list.append(offset)
+    else:
+        print(f"Defaulting to 0 lateral offset for entry {offset}")
+        for i in range(number_of_layers):
+            offset_list.append(0)
+    structure_dict['layer_lateral_offsets'] = offset_list       
+      # angular offsets
+    angle = structure_dict['part_angular_offset'].astype(numeric)
+    angle_list = []
+    if (str(angle).isnumeric()) or (type(angle)== float):
+        for i in range(number_of_layers):
+            if i == 0:
+                angle_list.append(0)
+            else:
+                this_angle = (angle * i) % 360
+                angle_list.append(this_angle)
+    else:
+        print(f"Failure in angular offset for angle {angle} of type {type(angle)}")
+    structure_dict['layer_angles'] = angle_list
 
-    #Condition row data for parsing and define terms  
-    layer_list = parse_structure(row['Structure'])
-    layer_length = len(layer_list)
+    #TODO: add better functionality to these entries
+    structure_dict['layer_strand_extrusion'] = [None for i in range(number_of_layers)]
 
-
-    # default_diw_structure_dict = {
-    # 'metadata': {
-    #     'unique_structure_name':'',
-    #     'print_name': '',
-    #     'structure': '',
-    #     'nozzle_size_um': '',
-    #     'pitch_offset': 0,
-    #     'syringe-material': '',
-    #     'project': '',
-    #     'machine_name':'',
-    #     'layerup_file': '',
-    #     'version_number': '',
-    #     'notes':'',
-    #     'mech_data_flag': False,
-    #     'keyence_data_flag': False,
-    #     'punch_diameter': '',
-    #     'mass_g': 0,
-    #     'thickness_mm': 0,
-    #     'density_g/cc': 0
-    #     },
-    # 'part_structure':'',
-    # 'part_skin_nozzle_size': 0,
-    # 'part_layer_nozzle_size': 0,
-    # 'part_angular_offset': 0,
-    # 'part_lateral_offset': 0,
-    # 'part_material': '',
-    # 'part_pitch': 0,
-    # 'number_of_layers': 0,
-    # 'layer_strand_extrusion': 'constant',
-    # 'layer_strand_diameter': [],
-    # 'layer_types': [],
-    # 'layer_type_modifiers': [],
-    # 'layer_points': [],
-    # 'layer_steps': [],
-    # 'layer_angles': [],
-    # 'layer_lateral_offsets': [],
-    # 'layer_materials': [],
-    # 'layer_pitches': []
-    # }
-
-    return 
+    return structure_dict
 
 
 def structure_dict_from_param_kwargs(structure_code = None,
@@ -339,6 +375,9 @@ def parse_structure(structure_string, flag = ''):
         -Add parsing support for other structure strings. Currently only supports "S8H" type strings
     '''
     
+    #Condition variables
+    structure_string = str(structure_string)
+
     #Flag option for changing parsing behavior 
     if flag == '':
         underscore_check = bool( len(structure_string.split("_")) > 1)
@@ -353,9 +392,8 @@ def parse_structure(structure_string, flag = ''):
         for idx, character in enumerate(structure_string):
             #add any numeric character to the string
             if character.isnumeric():
-                structure_parts.append(latest_part)
                 latest_part = latest_part + character
-            else:
+            elif character != '':
                 if latest_part == '':
                     structure_parts.append(character)
                 else:
@@ -386,7 +424,12 @@ def parse_structure(structure_string, flag = ''):
                         type_string = character.lower()
                     else:
                         print(f"Failure to parse string '{part}': too many layer type designators (ie. 's', 'h', 'm'")
-            number_of_layers = int(layer_number_string)
+            number_of_layers = layer_number_string
+            if type(number_of_layers) == str:
+                if number_of_layers == "":
+                    number_of_layers = 1
+                else:
+                    number_of_layers = int(number_of_layers)
             for i in range(number_of_layers):
                 if type_string == 's':
                     layer_list.append('skin')
@@ -398,23 +441,12 @@ def parse_structure(structure_string, flag = ''):
     return layer_list
 
 
-def match_structure_to_name(structure_dict):
+def match_structure_to_unique_name(structure_dict):
     '''
     Description: Take a set of structural parameters and return existing prints that are matches with an associated match score.
     '''
     
     pass
-
-
-def parse_logbook_row_for_structure(row_array):
-    '''
-    Directory:
-        Lorem.
-    '''
-    
-    #Initialize variables
-
-    return structure_dict
 
 
 def structure_name_from_structure_dict(structure_dict):

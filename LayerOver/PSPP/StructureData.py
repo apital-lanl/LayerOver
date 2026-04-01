@@ -30,10 +30,16 @@ import errno
 #######################################################################################################################
 
 generic_materials_dict = {
-        'll50': {},
+        'll50': {
+            'report_name':'',
+            'density': 0,
+            'viscosity': 0
+            },
         'll60': {},
         'SE1700': {},
-        'PDMS': {}
+        'PDMS': {},
+        'default': {
+            }
         }
 
 generic_ideality_dict = {
@@ -82,5 +88,24 @@ def find_data_by_structure_id(structure_name):
     #Load structure_dict from root
 
     pass
+
+
+def parse_material_note(raw_material_note):
+    """
+    Description:
+        lorem
+
+    INPUT:
+        'raw_material_note'         lorem
+    ACTION:
+        -lorem
+    OUTPUT:
+        'parsed_material_string'    materials from dict above
+    """
+    #Initialize variables
+
+
+
+
 
 
