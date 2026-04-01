@@ -43,11 +43,12 @@ for column_name in list(logbook_df.columns):
 
 #Condition logbook columns and add new columns as necessary
 
+
 #Iterate through data rows
 
 
-#Save DataFrame to CSV with a similar name
-savebook_filename = os.path.basename(logbook_filepath).replace('AutomatedAnalysis', 'AutomatedResults')
-savebook_filepath = os.path.join(os.path.dirname(logbook_filepath), savebook_filename)
-with open(savebook_filepath, 'w') as file:
-    logbook_df.to_csv(file, index= False, lineterminator='\n')
+# #Save DataFrame to CSV with a similar name
+# savebook_filename = os.path.basename(logbook_filepath).replace('AutomatedAnalysis', 'AutomatedResults')
+# savebook_filepath = os.path.join(os.path.dirname(logbook_filepath), savebook_filename)
+# with open(savebook_filepath, 'w') as file:
+#     logbook_df.to_csv(file, index= False, lineterminator='\n')

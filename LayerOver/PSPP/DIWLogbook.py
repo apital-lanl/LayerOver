@@ -26,6 +26,7 @@ from tkinter import filedialog, Tk
   # import other LayerOver modules or module parts
 from LayerOver.PSPP.DIWStructure import blank_diw_logbook_row_dict
 from LayerOver.PSPP.DIWStructure import standard_logbook_columnnames
+from LayerOver.PSPP.DIWStructure import parse_structure
 
 #Define variables
 #Define hard-coded thresholds and setting values
@@ -302,3 +303,31 @@ def check_logbook_for_printname(printname, logbook,
     matching_rows_dict = logbook[printname_match_mask]
 
     return matching_rows_dict
+
+
+#######################################################################################################################
+#####  Short functions for .apply() on Pandas DataFrame logbook objects  ##############################################
+#######################################################################################################################
+
+
+def add_layernumber_column(logbook_df):
+    '''
+    Description:
+        Take generic 'structure' column from logbook and derive data columns like 'number of layers'.
+
+    INPUT:
+        'logbook_df'      pandas.DataFrame; logbook DataFrame object 
+    ACTION:
+        -lorem
+    OUTPUT:
+        'logbook_df'      pandas.DataFrame; updated logbook DataFrame
+    '''
+    def layer_number(row):
+        layer_list = parse_structure(row['Structure'])
+        layer_length = len(layer_list)
+        return layer_length
+
+    logbook_df['Number of Layers'] = logbook_df.apply(layer_number, axis=1)
+
+    return logbook_df
+

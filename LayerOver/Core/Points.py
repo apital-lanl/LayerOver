@@ -2220,6 +2220,9 @@ def ideal_tile_from_initial_line(initial_line_points,
             #TODO: add this use case when point is external to array but within a strand radius of the edge; should be same as above but with different distance condition
             break
 
+        #Store the 'left' results
+        tile_dict['drawn_array'] = layer_array
+
     #Fill 'right'
     prior_line_points = [initial_start_point, initial_end_point]
     distance_right = 1e6  #arbitrary big number for initialization
@@ -2292,6 +2295,7 @@ def ideal_tile_from_initial_line(initial_line_points,
             #TODO: add this use case when point is external to array but within a strand radius of the edge; should be same as above but with different distance condition
             break
 
+        #Store 'right' results (updated 'left' results with 'right' results)
         tile_dict['drawn_array'] = layer_array
 
     if show_final_array:

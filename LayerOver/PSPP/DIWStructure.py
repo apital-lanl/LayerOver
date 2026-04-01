@@ -207,7 +207,9 @@ standard_logbook_columnnames = [
     'Thickness (Additional) (mm)',	
     r'Thickness/ Density Initials',	
     'Humidity',	
-    'Column1',	
+    'Column1',
+    'Strand Diameter, Skin',
+    'Strand Diameter, Layer'
     ]
 
 
@@ -223,13 +225,91 @@ standard_logbook_columnnames = [
 #######################################################################################################################
 
 
-def structure_dict_from_logbook_row(diw_param_dict):
+def structure_dict_from_logbook_row(logbook_row):
     '''
-    Description: Generate a skeleton 'blank_structure_dict'.
+    Description: Fill in a skeleton 'blank_diw_structure_dict' with values from a logbook DataFrame row.
+        If no values are found, fill with 'default_diw_structure_dict' values. 'None' entries are failed entries. 
     '''
-    #Attempt to pull 
 
-    pass
+    #Initialize variables
+    structure_dict = blank_diw_structure_dict.copy()
+
+    #Add direct metadata and other fields
+    structure_dict['part_structure'] = logbook_row['Structure']
+    structure_dict['metadata'][''] = logbook_row['Strand Diameter, Skin']
+    structure_dict['metadata'][''] = logbook_row['Strand Diameter, Layer']
+    structure_dict['metadata'][''] = logbook_row['Angle of Rotation (deg)']
+    structure_dict['metadata'][''] = logbook_row['Lateral Offset (µm)']
+    structure_dict['metadata'][''] = logbook_row['Pitch (µm)']
+    structure_dict['metadata'][''] = logbook_row['Syringe/Material']
+    structure_dict['metadata'][''] = logbook_row['Project ']
+    structure_dict['metadata'][''] = logbook_row['Machine Name']
+    structure_dict['metadata'][''] = logbook_row['LayerUp File']
+    structure_dict['metadata'][''] = logbook_row['Version #']
+    structure_dict['metadata'][''] = logbook_row['Notes']
+    structure_dict['metadata'][''] = logbook_row['Mechanical Data? (initals)']
+    structure_dict['metadata'][''] = logbook_row['Punch Diameter']
+    structure_dict['metadata'][''] = logbook_row['Mass (g)']
+    structure_dict['metadata'][''] = logbook_row['Thickness (Checkline) (mm)']
+    structure_dict['metadata'][''] = logbook_row['Thickness (Confocal) (mm)']
+    structure_dict['metadata'][''] = logbook_row['Thickness (Fancy KCNSC) (mm)']
+    structure_dict['metadata'][''] = logbook_row['Density (g/cc)']
+    structure_dict['metadata'][''] = logbook_row['Thickness (Additional) (mm)']
+    structure_dict['metadata'][''] = logbook_row['Thickness/ Density Initials']
+    structure_dict['metadata'][''] = logbook_row['Humidity']
+    structure_dict['metadata'][''] = logbook_row['Column1']
+    structure_dict['layer_pitches'] = logbook_row['Pitch Layer List']
+
+    #Pull variables
+    
+
+    #Condition row data for parsing and define terms  
+    layer_list = parse_structure(row['Structure'])
+    layer_length = len(layer_list)
+
+
+    # default_diw_structure_dict = {
+    # 'metadata': {
+    #     'unique_structure_name':'',
+    #     'print_name': '',
+    #     'structure': '',
+    #     'nozzle_size_um': '',
+    #     'pitch_offset': 0,
+    #     'syringe-material': '',
+    #     'project': '',
+    #     'machine_name':'',
+    #     'layerup_file': '',
+    #     'version_number': '',
+    #     'notes':'',
+    #     'mech_data_flag': False,
+    #     'keyence_data_flag': False,
+    #     'punch_diameter': '',
+    #     'mass_g': 0,
+    #     'thickness_mm': 0,
+    #     'density_g/cc': 0
+    #     },
+    # 'part_structure':'',
+    # 'part_skin_nozzle_size': 0,
+    # 'part_layer_nozzle_size': 0,
+    # 'part_angular_offset': 0,
+    # 'part_lateral_offset': 0,
+    # 'part_material': '',
+    # 'part_pitch': 0,
+    # 'number_of_layers': 0,
+    # 'layer_strand_extrusion': 'constant',
+    # 'layer_strand_diameter': [],
+    # 'layer_types': [],
+    # 'layer_type_modifiers': [],
+    # 'layer_points': [],
+    # 'layer_steps': [],
+    # 'layer_angles': [],
+    # 'layer_lateral_offsets': [],
+    # 'layer_materials': [],
+    # 'layer_pitches': []
+    # }
+
+    return 
+
 
 def structure_dict_from_param_kwargs(structure_code = None,
                                      nozzle_size = None,
@@ -247,6 +327,13 @@ def structure_dict_from_param_kwargs(structure_code = None,
 def parse_structure(structure_string, flag = ''):
     '''
     Description: Take a short, long, or complete structure string and generate a list of it's layer codes.
+
+    INPUT:
+        'structure_string'  str or stringlike object
+    ACTION:
+        -Split string into layer components
+    OUTPUT:
+        'layer_list'        list; each item in list is a layer type ('skin', 'hellicoidal, 'maze')
 
     TODO:
         -Add parsing support for other structure strings. Currently only supports "S8H" type strings
@@ -309,6 +396,7 @@ def parse_structure(structure_string, flag = ''):
                     layer_list.append('maze')
 
     return layer_list
+
 
 def match_structure_to_name(structure_dict):
     '''

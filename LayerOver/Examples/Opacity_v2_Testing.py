@@ -70,6 +70,9 @@ diw_structure_dict = {
 
 #Do the generatin'
 for i in range(number_of_duplicates):
+    print()
+    print('#'*50)
+    print(f"Running replicate {i+1}")
     try:
         flat_ideal_volume_guess(diw_structure_dict,
                                     array_dims, 
