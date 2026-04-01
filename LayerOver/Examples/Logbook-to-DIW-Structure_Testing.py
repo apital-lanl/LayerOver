@@ -30,7 +30,7 @@ from LayerOver.PSPP.DIWStructure import structure_dict_from_logbook_row
 array_dims  = (5000, 5000)
 number_of_replicates = 3    #Number of separate volumetric predictions to run
 array_side_length_mm = 15   #size of the array in mm (everything gets scaled)
-save_to_filepath = ''       #Optional; where to save images and arrays to;
+save_to_filepath = 'W:\Data & ML\2026-04_Waffle Testing\2026-04-01_Working Alpha'       #Optional; where to save images and arrays to;
     # ''                    save to same filepath that logbook is in
     # 'actual/filepath'     manual entry of valid filepath
     # 'dialog'
@@ -66,6 +66,7 @@ angle_list = []
 lateral_list = []
 pitch_list = []
 thickness_list = []
+mass_list = []
 density_list = []
 vox_1_average = []
 vox_1_sum = []
@@ -87,19 +88,21 @@ for idx, name in enumerate(print_names):
         #Pull logbook row and generate a structure dict from it
         this_logbook_row = logbook_df[logbook_df['Name'] == name]
           # store values for later
-        structure_list.append(this_logbook_row[''].values[0])
-        diameter_list.append(this_logbook_row[''].values[0])
-        angle_list.append(this_logbook_row[''].values[0])
-        lateral_list.append(this_logbook_row[''].values[0])
-        pitch_list.append(this_logbook_row[''].values[0])
-        thickness_list.append(this_logbook_row[''].values[0])
-        density_list.append(this_logbook_row[''].values[0])
+        structure_list.append(this_logbook_row['Structure'].values[0])
+        diameter_list.append(this_logbook_row['Strand Diameter, nominal (µm) (skin/heli)'].values[0])
+        angle_list.append(this_logbook_row['Angle of Rotation (deg)'].values[0])
+        lateral_list.append(this_logbook_row['Lateral Offset (µm)'].values[0])
+        pitch_list.append(this_logbook_row['Pitch (µm)'].values[0])
+        thickness_list.append(this_logbook_row['Thickness (Checkline) (mm)'].values[0])
+        mass_list.append(this_logbook_row['Mass (g)'].values[0])
+        density_list.append(this_logbook_row['Density (g/cc)'].values[0])
           # generate structure dict
         diw_structure_dict = structure_dict_from_logbook_row(this_logbook_row)
+
     except Exception as e:
         print()
         print(f'Failed structure parsing on exception: {e}')
-
+        #Store dummy variables
         structure_list.append(np.nan)
         diameter_list.append(np.nan)
         angle_list.append(np.nan)
@@ -120,7 +123,7 @@ for idx, name in enumerate(print_names):
                                             save_layer_arrays= True,
                                             save_final_image= True,
                                             save_final_array= True,
-                                            save_location = save_to_filepath
+                                            save_location = save_to_filepath,
                                             show_layer_images= False,
                                             show_final_image= False)
             #Returned keys:
@@ -159,14 +162,14 @@ for idx, name in enumerate(print_names):
 
         #Add dummy variables
         vox_1_average.append(np.nan)
-        vox_1_sum.append(this_sum)
-        vox_1_density.append(this_fractional_density)
-        vox_2_average.append(this_average)
-        vox_2_sum.append(this_sum)
-        vox_2_density.append(this_fractional_density)
-        vox_3_average.append(this_average)
-        vox_3_sum.append(this_sum)
-        vox_3_density.append(this_fractional_density)
+        vox_1_sum.append(np.nan)
+        vox_1_density.append(np.nan)
+        vox_2_average.append(np.nan)
+        vox_2_sum.append(np.nan)
+        vox_2_density.append(np.nan)
+        vox_3_average.append(np.nan)
+        vox_3_sum.append(np.nan)
+        vox_3_density.append(np.nan)
 
 
 
