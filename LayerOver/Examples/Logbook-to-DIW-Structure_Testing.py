@@ -120,9 +120,9 @@ for idx, name in enumerate(print_names):
                                             voxel_resolution_microns= 0,
                                             compression_factor= 0.7,
                                             save_layer_images= True,
-                                            save_layer_arrays= True,
+                                            save_layer_arrays= False,
                                             save_final_image= True,
-                                            save_final_array= True,
+                                            save_final_array= False,
                                             save_location = save_to_filepath,
                                             show_layer_images= False,
                                             show_final_image= False)
@@ -170,8 +170,6 @@ for idx, name in enumerate(print_names):
         vox_3_average.append(np.nan)
         vox_3_sum.append(np.nan)
         vox_3_density.append(np.nan)
-
-
 
 
 # #Save DataFrame to CSV with a similar name

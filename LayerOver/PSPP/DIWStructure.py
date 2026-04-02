@@ -16,7 +16,7 @@ Description: Module to parse, homogenize, store, and compare DIW strucuture code
 
 """
 
-from numpy._core import numeric
+import numpy as np
 from LayerOver.PSPP.Materials import parse_material_note
 
 #######################################################################################################################
@@ -322,15 +322,25 @@ def structure_dict_from_logbook_row(logbook_row):
     if type(offset)== 'numpy.float64':
         for i in range(number_of_layers):
             offset_list.append(offset)
+    elif type(offset) == float:
+        for i in range(number_of_layers):
+            offset_list.append(offset)
     else:
         print(f"Defaulting to 0 lateral offset for entry {offset}")
         for i in range(number_of_layers):
             offset_list.append(0)
     structure_dict['layer_lateral_offsets'] = offset_list       
       # angular offsets
-    angle = structure_dict['part_angular_offset'].astype(numeric)
+    angle = structure_dict['part_angular_offset']
     angle_list = []
     if (str(angle).isnumeric()) or (type(angle)== float):
+        for i in range(number_of_layers):
+            if i == 0:
+                angle_list.append(0)
+            else:
+                this_angle = (angle * i) % 360
+                angle_list.append(this_angle)
+    elif (type(angle)=='np.float64') or (type(angle)=='numpy.float64'):
         for i in range(number_of_layers):
             if i == 0:
                 angle_list.append(0)

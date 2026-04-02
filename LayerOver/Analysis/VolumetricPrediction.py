@@ -21,6 +21,7 @@ Description: Module for handling conversions between ideal structure assumptions
 import math
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import random
 import skimage.draw as draw
 
@@ -156,11 +157,8 @@ def flat_ideal_volume_guess(structure_dict,
         print(f"Generating structure {i}")
         #Generate a layer name
         voxel_idx = i+1
-        if 'unique_structure_name' in metadata_dict:
-            if metadata_dict['unique_structure_name']:
-                voxel_name = metadata_dict['unique_structure_name']+f'_Voxel-{voxel_idx}'
-            else:
-                voxel_name = f'UNK_Voxel-{voxel_idx}'
+        if metadata_dict['unique_structure_name']:
+            voxel_name = metadata_dict['unique_structure_name']+f'_Voxel-{voxel_idx}'
         elif 'print_name' in metadata_dict and metadata_dict['print_name']:
             voxel_name = metadata_dict['print_name']+f'_Voxel-{voxel_idx}'
           # generate generic voxel_name if everything else fails
@@ -327,7 +325,7 @@ def flat_ideal_volume_guess(structure_dict,
                     ax.set_axis_off()
                     fig.add_axes(ax)
                     ax.imshow(this_layer, aspect='auto')
-                    fig.savefig(layer_save_name, figure_dpi)
+                    fig.savefig(layer_save_name, dpi = figure_dpi)
 
                 #Save array if applicable
                 if save_layer_arrays:
@@ -365,7 +363,7 @@ def flat_ideal_volume_guess(structure_dict,
             ax.set_axis_off()
             fig.add_axes(ax)
             ax.imshow(voxel_volume_array, aspect='auto')
-            fig.savefig(final_image_savename, figure_dpi)
+            fig.savefig(final_image_savename, dpi = figure_dpi)
 
             # save the array as a numpy file
         if save_final_array:
