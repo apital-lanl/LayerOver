@@ -18,6 +18,8 @@ Description: Module to parse, homogenize, store, and compare DIW strucuture code
 
 import numpy as np
 from LayerOver.PSPP.Materials import parse_material_note
+import pandas as pd
+pd.options.mode.chained_assignment = None  # default='warn'
 
 #######################################################################################################################
 #####  Template Variables  ############################################################################################
@@ -217,6 +219,16 @@ standard_logbook_columnnames = [
     'Strand Diameter, Layer'
     ]
 
+blank_unique_structure_dict = {
+    'part_structure': None,
+    'layer_strand_diameter': None,
+    'layer_types': None,
+    'layer_angles': None,
+    'layer_lateral_offsets': None,
+    'layer_materials': None,
+    'layer_pitches': None
+    }
+
 
 #######################################################################################################################
 #####  Generic Functions  #############################################################################################
@@ -238,6 +250,30 @@ def structure_dict_from_logbook_row(logbook_row):
 
     #Initialize variables
     structure_dict = blank_diw_structure_dict.copy()
+      #Make sure types are correct; some values simply re-set to allow for future re-typing as required
+    logbook_row['Structure'] = logbook_row['Structure']
+    logbook_row['Strand Diameter, Skin'] = logbook_row['Strand Diameter, Skin'].astype(float)
+    logbook_row['Strand Diameter, Layer'] = logbook_row['Strand Diameter, Layer'].astype(float)
+    logbook_row['Angle of Rotation (deg)'] = logbook_row['Angle of Rotation (deg)'].astype(float)
+    logbook_row['Lateral Offset (µm)'] = logbook_row['Lateral Offset (µm)'].astype(float)
+    logbook_row['Name'] = logbook_row['Name']
+    logbook_row['Pitch (µm)'] = logbook_row['Pitch (µm)'].astype(float)
+    logbook_row['Machine Name'] = logbook_row['Machine Name']
+    logbook_row['LayerUp File'] = logbook_row['LayerUp File']
+    logbook_row['Version #'] = logbook_row['LayerUp File']
+    logbook_row['Notes'] = logbook_row['Notes']
+    logbook_row['Mechanical Data? (initals)'] = logbook_row['Mechanical Data? (initals)']
+    logbook_row['Punch Diameter'] = logbook_row['Punch Diameter']
+    logbook_row['Mass (g)'] = logbook_row['Mass (g)'].astype(float)
+    logbook_row['Thickness (Checkline) (mm)'] = logbook_row['Thickness (Checkline) (mm)'].astype(float)
+    logbook_row['Thickness (Confocal) (mm)'] = logbook_row['Thickness (Confocal) (mm)'].astype(float)
+    logbook_row['Thickness (Fancy KCNSC) (mm)'] = logbook_row['Thickness (Fancy KCNSC) (mm)'].astype(float)
+    logbook_row['Density (g/cc)'] = logbook_row['Density (g/cc)'].astype(float)
+    logbook_row['Thickness (Additional) (mm)'] = logbook_row['Thickness (Additional) (mm)'].astype(float)
+    logbook_row['Thickness/ Density Initials'] = logbook_row['Thickness/ Density Initials'].astype(str)
+    logbook_row['Humidity'] = logbook_row['Humidity']
+    logbook_row['Column1'] = logbook_row['Column1']
+    logbook_row['Pitch Layer List'] = logbook_row['Pitch Layer List'].astype(str)
 
     #Add direct metadata and other fields
     structure_dict['part_structure'] = logbook_row['Structure'].values[0]
@@ -290,11 +326,7 @@ def structure_dict_from_logbook_row(logbook_row):
       #TODO: add support for parsing the 'raw_pitch_string' 
     raw_pitch_string = structure_dict['metadata']['pitch_offset']
     pitch_entry = logbook_row['Pitch Layer List'].values[0]
-    if type(pitch_entry) == float:
-        pitch_list = []
-        for i in range(number_of_layers):
-            pitch_list.append(pitch_entry)
-    elif type(pitch_entry) == str:
+    if type(pitch_entry) == str:
         pitch_list = []
         list_split = pitch_entry.split(',')
         if len(list_split) >1:
@@ -302,6 +334,10 @@ def structure_dict_from_logbook_row(logbook_row):
         else:
             for i in range(number_of_layers):
                 pitch_list.append(float(pitch_entry))
+    elif type(pitch_entry) == float:
+        pitch_list = []
+        for i in range(number_of_layers):
+            pitch_list.append(pitch_entry)
     else:
         pitch_list = pitch_entry
     structure_dict['layer_pitches'] = pitch_list
@@ -319,28 +355,48 @@ def structure_dict_from_logbook_row(logbook_row):
       #TODO: add support for variable offsets by layer from logbook files
     offset = structure_dict['part_lateral_offset']
     offset_list = []
-    if type(offset)== 'numpy.float64':
+    if type(offset)== np.float64:
         for i in range(number_of_layers):
             offset_list.append(offset)
     elif type(offset) == float:
         for i in range(number_of_layers):
             offset_list.append(offset)
+    elif type(offset) == str:
+        try:
+            for i in range(number_of_layers):
+                offset_list.append(offset)
+        except:
+            print(f"str fail; Defaulting to 0 lateral offset for entry {offset}")
+            for i in range(number_of_layers):
+                offset_list.append(0)
     else:
-        print(f"Defaulting to 0 lateral offset for entry {offset}")
+        print(f"type fail; Defaulting to 0 lateral offset for entry {offset}: type {type(offset)}")
         for i in range(number_of_layers):
             offset_list.append(0)
     structure_dict['layer_lateral_offsets'] = offset_list       
       # angular offsets
     angle = structure_dict['part_angular_offset']
     angle_list = []
-    if (str(angle).isnumeric()) or (type(angle)== float):
+    if type(angle)== float:
         for i in range(number_of_layers):
             if i == 0:
                 angle_list.append(0)
             else:
                 this_angle = (angle * i) % 360
                 angle_list.append(this_angle)
-    elif (type(angle)=='np.float64') or (type(angle)=='numpy.float64'):
+    elif type(angle) == str:
+        try:
+            if angle.isnumeric():
+                angle = float(angle)
+                for i in range(number_of_layers):
+                    if i == 0:
+                        angle_list.append(0)
+                    else:
+                        this_angle = (angle * i) % 360
+                        angle_list.append(this_angle)
+        except:
+            print(f"Failure in angular offset for angle {angle} of type {type(angle)}")
+    elif (type(angle)== np.float64):
         for i in range(number_of_layers):
             if i == 0:
                 angle_list.append(0)
@@ -451,12 +507,58 @@ def parse_structure(structure_string, flag = ''):
     return layer_list
 
 
-def match_structure_to_unique_name(structure_dict):
+def match_structure_to_unique_name(structure_dict, unique_structure_dict):
     '''
     Description: Take a set of structural parameters and return existing prints that are matches with an associated match score.
+
+    OUTPUT:
+        is_unique_bool          bool; was a match found or not
+        unique_structure_id     str; unique structure ID for this run; not global
+        unique_structure_dict   dict; all unique structures with keys of unique structure id (e.g. SHS-1, S5HS-9, etc.)
+
     '''
+    #Initialize variables
+    unique_names = list(unique_structure_dict.keys())
+    this_structure = structure_dict['part_structure']
+    is_unique_bool = False   #"Is the 'structure_dict' already in the 'unique_structure_dict'
+      # create a dict with each structure's highest id number up to this point
+    unique_structure_numbers = {}
+    for name in unique_names:
+        structure, structure_id = name.split('_')
+        try:
+            last_id_number = unique_structure_numbers[structure]
+            if structure_id > last_id_number:
+                unique_structure_numbers[structure] = last_id_number
+        except KeyError:
+            unique_structure_numbers.update({structure: structure_id})
+      # initialize a list of structure fields to compare
+    structure_fields = list(blank_unique_structure_dict.keys())
     
-    pass
+    #Compare the passed structure with all other structures
+    if len(unique_names) > 0:
+        for structure_name in unique_names:
+            comparison_structure_dict = unique_structure_dict[structure_name]
+            matching_structure_bool = True
+            for structure_field in structure_fields:
+                comp_bool = comparison_structure_dict[structure_field] == structure_dict[structure_field]
+                matching_structure_bool &= comp_bool
+            if matching_structure_bool:
+                return is_unique_bool, structure_name, unique_structure_dict
+    else:
+        new_entry = blank_unique_structure_dict.copy()
+        for structure_field in structure_fields:
+                new_entry[structure_field] == structure_dict[structure_field]
+        try:
+            last_index = unique_structure_numbers[this_structure]
+        except KeyError:
+            last_index = 0
+        new_structure_id = this_structure+'_'+str(last_index +1)
+        unique_structure_dict.update({new_structure_id:new_entry})
+        is_unique_bool = True
+
+        return is_unique_bool, new_structure_id, unique_structure_dict
+
+    return is_unique_bool, structure_name, unique_structure_dict
 
 
 def structure_name_from_structure_dict(structure_dict):

@@ -75,7 +75,7 @@ def flat_ideal_volume_guess(structure_dict,
                             save_final_image= False,
                             save_final_array= False,
                             save_location = None,
-                            show_layer_images= True,
+                            show_layer_images= False,
                             show_final_image= True):
     '''
     Description: Take 'ideal' strucures 
@@ -116,8 +116,7 @@ def flat_ideal_volume_guess(structure_dict,
     y_array_dim= x_array_dim  #Array is square
     array_dims = (y_array_dim, x_array_dim)
     print(f"Array dimensions: {array_dims}")
-    return_volume_dict = {
-        'array_dims': array_dims}
+    return_volume_dict = {}
     pixel_half_length = voxel_resolution_microns/2
     x_distance_idcs = np.linspace(pixel_half_length, (voxel_side_length *1000)-pixel_half_length, x_array_dim-1)
     y_distance_idcs = np.linspace(pixel_half_length, (voxel_side_length *1000)-pixel_half_length, y_array_dim-1)
@@ -179,15 +178,22 @@ def flat_ideal_volume_guess(structure_dict,
                 'adjusted_layers':{},
                 'full_volume_prediction':[]}
             #Get layer specifics
-            strand_diameter = strand_diameters[layer_idx]
-            this_layer_type = layer_types[layer_idx]
-            this_layer_modifier = layer_modifiers[layer_idx]
-            these_layer_point_coordinates = layer_point_coordinates[layer_idx]
-            this_layer_height = layer_heights[layer_idx]
             this_angular_offset = layer_angular_offsets[layer_idx]
             this_lateral_offset = layer_lateral_offsets[layer_idx]
-            this_material = layer_materials[layer_idx]
+            strand_diameter = strand_diameters[layer_idx]
             this_pitch = layer_pitches[layer_idx]
+            #TODO: 4 of these are not used and passed 'None' values throw errors
+            #   -Add funcitonality for default value passing
+            #   -Implement functionality for modification of layer specs due to theses values
+            if layer_point_coordinates:
+                these_layer_point_coordinates = layer_point_coordinates[layer_idx]
+            else:
+                these_layer_point_coordinates = None
+            # this_layer_type = layer_types[layer_idx]
+            # this_layer_modifier = layer_modifiers[layer_idx]
+            # this_layer_height = layer_heights[layer_idx]
+            # this_material = layer_materials[layer_idx]
+            
 
             #Create layer blank
               # (Y,X) format to align with image libraries (i.e. CV2, Matplotlib, etc.)
@@ -206,8 +212,8 @@ def flat_ideal_volume_guess(structure_dict,
                                                             line_type = 'simple',
                                                             thickness_fcn = 'cylinder',
                                                             show_points = False,
-                                                            show_array_iterations = show_layer_images,
-                                                            show_final_array = False)
+                                                            show_array_iterations = False,
+                                                            show_final_array = show_layer_images)
 
                 drawn_array = array_dict['drawn_array']
                 drawn_mask = drawn_array[drawn_array > 0]
@@ -235,7 +241,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                                 thickness_fcn = 'cylinder',
                                                                 show_points = False,
                                                                 show_array_iterations = False,
-                                                                show_final_array = False)
+                                                                show_final_array = show_layer_images)
 
                     #Extend initial seed point to an arbitrary 'pole_point' that's used for every other layer
                     #NOTE: 'pole_point' is the point at which the strand will be drawn through for every layer.
@@ -266,7 +272,7 @@ def flat_ideal_volume_guess(structure_dict,
                                                                 thickness_fcn = 'cylinder',
                                                                 show_points = False,
                                                                 show_array_iterations = False,
-                                                                show_final_array = False)
+                                                                show_final_array = show_layer_images)
 
                 #Pull array and values from this layer's run
                 line_key = list(array_dict['line_dicts'].keys())[0]
@@ -326,6 +332,7 @@ def flat_ideal_volume_guess(structure_dict,
                     fig.add_axes(ax)
                     ax.imshow(this_layer, aspect='auto')
                     fig.savefig(layer_save_name, dpi = figure_dpi)
+                    plt.close(fig)
 
                 #Save array if applicable
                 if save_layer_arrays:
@@ -343,7 +350,7 @@ def flat_ideal_volume_guess(structure_dict,
             layer_dict['ideal_layers'][layer_idx] = ideal_layer_arrays
             layer_dict['adjusted_layers'][layer_idx] = adjusted_layer_arrays
             layer_dict['full_volume_prediction'] = voxel_volume_array
-            return_volume_dict[voxel_name] = layer_dict
+            return_volume_dict.update( {voxel_name: layer_dict})
 
         #Save and/or show results
         if save_location:
@@ -356,6 +363,7 @@ def flat_ideal_volume_guess(structure_dict,
             plt.imshow(voxel_volume_array)
             plt.title(image_name)
             plt.show()
+      
         if save_final_image:
             fig = plt.figure(frameon=False)
             fig.set_size_inches(figure_width,figure_height)
@@ -364,6 +372,7 @@ def flat_ideal_volume_guess(structure_dict,
             fig.add_axes(ax)
             ax.imshow(voxel_volume_array, aspect='auto')
             fig.savefig(final_image_savename, dpi = figure_dpi)
+            plt.close(fig)
 
             # save the array as a numpy file
         if save_final_array:
@@ -372,6 +381,9 @@ def flat_ideal_volume_guess(structure_dict,
             else:
                 final_array_savename = f"FullStack_Array_{voxel_name}"
             np.save(final_array_savename, voxel_volume_array)
+
+        #Close any open figures
+        plt.close('all')
         
     return return_volume_dict
 

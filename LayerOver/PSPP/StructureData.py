@@ -20,6 +20,8 @@ Description: Interact with and analyze data and predictions based on structure a
 import json
 from tkinter import Tk, filedialog
 from pathlib import Path
+import pandas as pd
+pd.options.mode.chained_assignment = None  # default='warn'
 import os
 import shutil
 import errno

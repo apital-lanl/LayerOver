@@ -1065,6 +1065,7 @@ def draw_2D_strand_line_bythickness(interior_points,
                     #Negative slope
                     right_edge_point = [(array_y_dim-1), x_at_right]
 
+
             #For the left side of the point
               # if both 'extend the line to the array edge' values are within array bounds, find out which is correct
             if y_left_bool and x_left_bool:
@@ -2302,6 +2303,7 @@ def ideal_tile_from_initial_line(initial_line_points,
         plt.imshow(layer_array)
         plt.title("Tiled array")
         plt.show()
+        plt.close()
 
     return tile_dict
 
