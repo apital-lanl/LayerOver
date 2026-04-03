@@ -531,6 +531,7 @@ def match_structure_to_unique_name(structure_dict, unique_structure_dict):
                 unique_structure_numbers[structure] = last_id_number
         except KeyError:
             unique_structure_numbers.update({structure: structure_id})
+
       # initialize a list of structure fields to compare
     structure_fields = list(blank_unique_structure_dict.keys())
     
@@ -544,6 +545,19 @@ def match_structure_to_unique_name(structure_dict, unique_structure_dict):
                 matching_structure_bool &= comp_bool
             if matching_structure_bool:
                 return is_unique_bool, structure_name, unique_structure_dict
+        if not matching_structure_bool:
+            new_entry = blank_unique_structure_dict.copy()
+            for structure_field in structure_fields:
+                    new_entry[structure_field] == structure_dict[structure_field]
+            try:
+                last_index = unique_structure_numbers[this_structure]
+            except KeyError:
+                last_index = 0
+            new_index = int(last_index) +1
+            new_structure_id = this_structure+'_'+str(new_index)
+            unique_structure_dict.update({new_structure_id:new_entry})
+            
+            return is_unique_bool, new_structure_id, unique_structure_dict
     else:
         new_entry = blank_unique_structure_dict.copy()
         for structure_field in structure_fields:
@@ -558,7 +572,7 @@ def match_structure_to_unique_name(structure_dict, unique_structure_dict):
 
         return is_unique_bool, new_structure_id, unique_structure_dict
 
-    return is_unique_bool, structure_name, unique_structure_dict
+    return is_unique_bool, 'failure', unique_structure_dict
 
 
 def structure_name_from_structure_dict(structure_dict):
