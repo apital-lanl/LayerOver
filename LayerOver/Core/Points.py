@@ -1932,7 +1932,7 @@ def pole_point_to_array_interior_point(pole_point,
         elif offset_angle < 270 and offset_angle > 180:
             left_angle = offset_angle
             right_angle = offset_angle - 180
-        elif offset_angle >270 and offset_angle < 360:
+        elif offset_angle > 270 and offset_angle < 360:
             left_angle = offset_angle - 180
             right_angle = offset_angle
           # round to avoid overflow errors in trig functions at extreme angles

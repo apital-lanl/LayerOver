@@ -532,14 +532,16 @@ def match_structure_to_unique_name(structure_dict, unique_structure_dict):
     
     #Create a dict with each structure's highest id number up to this point
     unique_structure_numbers = {}
+    last_id_number = 0
     for name in unique_names:
         structure, structure_id = name.split('_')
         try:
-            last_id_number = unique_structure_numbers[structure]
-            if structure_id > last_id_number:
-                unique_structure_numbers[structure] = last_id_number
+            this_id_number = unique_structure_numbers[structure]
+            if structure_id > this_id_number:
+                unique_structure_numbers[structure] = structure_id
         except KeyError:
             unique_structure_numbers.update({structure: structure_id})
+
     
     #Compare the passed structure with all other structures
     match_found = False

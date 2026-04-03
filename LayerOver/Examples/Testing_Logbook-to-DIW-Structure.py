@@ -40,8 +40,8 @@ save_to_filepath = 'W:\Data & ML\2026-04_Waffle Testing\2026-04-01_Working Alpha
 
 #Other settings and initializations
 #Volume array settings
-array_dims  = (5000, 5000)
-number_of_replicates = 3    #Number of separate volumetric predictions to run
+array_dims  = (500, 500)
+number_of_replicates = 1    #Number of separate volumetric predictions to run
 array_side_length_mm = 15   #size of the array in mm (everything gets scaled)
 #Initialize dict for storing structures to check for uniqueness
 unique_structure_dict ={}
@@ -205,6 +205,15 @@ for idx, name in enumerate(print_names):
         print(f"Volume prediction failed with error: {e}")
         print()
         print(print(traceback.format_exc()))
+
+        unique_structure_df = pd.DataFrame(unique_structure_dict)
+        unique_structure_df = unique_structure_df.reset_index()
+
+        #Save DataFrame to CSV with a similar name
+        savebook_filename = "Unique_structure_dict.csv"
+        savebook_filepath = os.path.join(os.path.dirname(logbook_filepath), savebook_filename)
+        with open(savebook_filepath, 'w') as file:
+            unique_structure_df.to_csv(file, index= False, lineterminator='\n')
 
 unique_structure_df = pd.DataFrame(unique_structure_dict)
 unique_structure_df = unique_structure_df.reset_index()
