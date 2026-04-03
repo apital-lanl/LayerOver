@@ -116,11 +116,11 @@ for idx, name in enumerate(print_names):
         diw_structure_dict = structure_dict_from_logbook_row(this_logbook_row)
 
         #Check if this is a new structure or not
-        is_unique_bool, unique_structure_id, unique_structure_dict = match_structure_to_unique_name(diw_structure_dict, unique_structure_dict)
+        is_unique_bool, unique_structure_id, trial_unique_structure_dict = match_structure_to_unique_name(diw_structure_dict, unique_structure_dict)
         
         if is_unique_bool:
             #Add some fields to this entry
-            unique_structure_dict[unique_structure_id].update({'example_printname': name})
+            trial_unique_structure_dict[unique_structure_id].update({'example_printname': name})
 
             #Run the structure to try and generate a volume prediction from it
             volume_dict = flat_ideal_volume_guess(diw_structure_dict,
@@ -157,23 +157,26 @@ for idx, name in enumerate(print_names):
                             vox_1_average.append(this_average)
                             vox_1_sum.append(this_sum)
                             vox_1_density.append(this_fractional_density)
-                            unique_structure_dict[unique_structure_id].update({'vox_1_average': this_average})
-                            unique_structure_dict[unique_structure_id].update({'vox_1_sum': this_sum})
-                            unique_structure_dict[unique_structure_id].update({'vox_1_density': this_fractional_density})
+                            trial_unique_structure_dict[unique_structure_id].update({'vox_1_average': this_average})
+                            trial_unique_structure_dict[unique_structure_id].update({'vox_1_sum': this_sum})
+                            trial_unique_structure_dict[unique_structure_id].update({'vox_1_density': this_fractional_density})
                         if vox_idx == 1:
                             vox_2_average.append(this_average)
                             vox_2_sum.append(this_sum)
                             vox_2_density.append(this_fractional_density)
-                            unique_structure_dict[unique_structure_id].update({'vox_2_average': this_average})
-                            unique_structure_dict[unique_structure_id].update({'vox_2_sum': this_sum})
-                            unique_structure_dict[unique_structure_id].update({'vox_2_density': this_fractional_density})
+                            trial_unique_structure_dict[unique_structure_id].update({'vox_2_average': this_average})
+                            trial_unique_structure_dict[unique_structure_id].update({'vox_2_sum': this_sum})
+                            trial_unique_structure_dict[unique_structure_id].update({'vox_2_density': this_fractional_density})
                         if vox_idx == 2:
                             vox_3_average.append(this_average)
                             vox_3_sum.append(this_sum)
                             vox_3_density.append(this_fractional_density)
-                            unique_structure_dict[unique_structure_id].update({'vox_3_average': this_average})
-                            unique_structure_dict[unique_structure_id].update({'vox_3_sum': this_sum})
-                            unique_structure_dict[unique_structure_id].update({'vox_3_density': this_fractional_density})
+                            trial_unique_structure_dict[unique_structure_id].update({'vox_3_average': this_average})
+                            trial_unique_structure_dict[unique_structure_id].update({'vox_3_sum': this_sum})
+                            trial_unique_structure_dict[unique_structure_id].update({'vox_3_density': this_fractional_density})
+
+                #If everything worked and no errors thrown, update 'unique_structure_dict' to the new 'trial_unique_structure_dict' with the new structure
+                unique_structure_dict = trial_unique_structure_dict
 
             else:
                 print()
@@ -193,6 +196,7 @@ for idx, name in enumerate(print_names):
         
         else:
             print("Not a unique structure. Moving on.")
+            print(f"\t Structure {diw_structure_dict['part_structure']} flagged as {unique_structure_id}")
             print()
 
     except Exception as e:

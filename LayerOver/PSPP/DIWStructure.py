@@ -521,7 +521,10 @@ def match_structure_to_unique_name(structure_dict, unique_structure_dict):
     unique_names = list(unique_structure_dict.keys())
     this_structure = structure_dict['part_structure']
     is_unique_bool = False   #"Is the 'structure_dict' already in the 'unique_structure_dict'
-      # create a dict with each structure's highest id number up to this point
+      # initialize a list of structure fields to compare
+    structure_fields = list(blank_unique_structure_dict.keys())
+    
+    #Create a dict with each structure's highest id number up to this point
     unique_structure_numbers = {}
     for name in unique_names:
         structure, structure_id = name.split('_')
@@ -531,47 +534,48 @@ def match_structure_to_unique_name(structure_dict, unique_structure_dict):
                 unique_structure_numbers[structure] = last_id_number
         except KeyError:
             unique_structure_numbers.update({structure: structure_id})
-
-      # initialize a list of structure fields to compare
-    structure_fields = list(blank_unique_structure_dict.keys())
     
     #Compare the passed structure with all other structures
-    if len(unique_names) > 0:
-        for structure_name in unique_names:
-            comparison_structure_dict = unique_structure_dict[structure_name]
-            matching_structure_bool = True
-            for structure_field in structure_fields:
-                comp_bool = comparison_structure_dict[structure_field] == structure_dict[structure_field]
-                matching_structure_bool &= comp_bool
-            if matching_structure_bool:
-                return is_unique_bool, structure_name, unique_structure_dict
-        if not matching_structure_bool:
-            new_entry = blank_unique_structure_dict.copy()
-            for structure_field in structure_fields:
-                    new_entry[structure_field] == structure_dict[structure_field]
-            try:
-                last_index = unique_structure_numbers[this_structure]
-            except KeyError:
-                last_index = 0
-            new_index = int(last_index) +1
-            new_structure_id = this_structure+'_'+str(new_index)
-            unique_structure_dict.update({new_structure_id:new_entry})
-            
-            return is_unique_bool, new_structure_id, unique_structure_dict
-    else:
-        new_entry = blank_unique_structure_dict.copy()
+    match_found = False
+    matching_structure = ''
+    for known_structure_id in unique_names:
+        comparison_structure_dict = unique_structure_dict[known_structure_id]
+        matching_structure_bool = True
+        #Compare each structure parameter set with all previous, unique structures
         for structure_field in structure_fields:
-                new_entry[structure_field] == structure_dict[structure_field]
+            comp_bool = comparison_structure_dict[structure_field] == structure_dict[structure_field]
+            #boolean AND between 'matching' flag and each field's match boolean above
+            matching_structure_bool &= comp_bool 
+        #Match found
+        if matching_structure_bool:
+            match_found = True
+            matching_structure = known_structure_id
+            #return 'False', <match_structure>, <pass-through original dict>
+            return is_unique_bool, known_structure_id, unique_structure_dict
+    
+    #No match found; update 'unique_structure_dict, find next index for unique structure id, flip 'is_unique_bool'
+    if not match_found:
+        #Create a blank structure dict to add to passed dict
+        new_entry = blank_unique_structure_dict.copy()
+        #Fill in each structure parameter field to be written to the passed dict below
+        for structure_field in structure_fields:
+            new_entry[structure_field] = structure_dict[structure_field]
+        #Look for latest index number to increment and append for the passed dict key
         try:
             last_index = unique_structure_numbers[this_structure]
+        #If 'KeyError', add as first iteration of that global structure
         except KeyError:
             last_index = 0
-        new_structure_id = this_structure+'_'+str(last_index +1)
+        #Create the new unique structure ID and add to passed structure dict
+        new_index = int(last_index) +1
+        unique_structure_numbers[this_structure]= new_index
+        new_structure_id = this_structure+'_'+str(new_index)
         unique_structure_dict.update({new_structure_id:new_entry})
         is_unique_bool = True
-
+        #return 'True', <new unique structure id>, <updated structure dict>
         return is_unique_bool, new_structure_id, unique_structure_dict
 
+    #Catch-all case; shouldn't ever evaluate unless something goes extremely wrong
     return is_unique_bool, 'failure', unique_structure_dict
 
 
