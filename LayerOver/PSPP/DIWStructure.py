@@ -332,12 +332,18 @@ def structure_dict_from_logbook_row(logbook_row):
         if len(list_split) >1:
             pitch_list = [float(part.strip()) for part in list_split]
         else:
-            for i in range(number_of_layers):
-                pitch_list.append(float(pitch_entry))
+            for i, layer_type in zip(range(number_of_layers), structure_dict['layer_types']):
+                if layer_type == 'skin':
+                    pitch_list.append(structure_dict['part_skin_nozzle_size'])
+                else:
+                    pitch_list.append(float(pitch_entry))
     elif type(pitch_entry) == float:
         pitch_list = []
-        for i in range(number_of_layers):
-            pitch_list.append(pitch_entry)
+        for i, layer_type in zip(range(number_of_layers), structure_dict['layer_types']):
+            if layer_type == 'skin':
+                pitch_list.append(structure_dict['part_skin_nozzle_size'])
+            else:
+                pitch_list.append(float(pitch_entry))
     else:
         pitch_list = pitch_entry
     structure_dict['layer_pitches'] = pitch_list

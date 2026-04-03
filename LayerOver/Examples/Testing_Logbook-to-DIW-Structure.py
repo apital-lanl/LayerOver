@@ -114,10 +114,12 @@ for idx, name in enumerate(print_names):
     
         #Generate structure dict
         diw_structure_dict = structure_dict_from_logbook_row(this_logbook_row)
+        print(f"Structure {diw_structure_dict['part_structure']}; Strand {diw_structure_dict['part_skin_nozzle_size']}\{diw_structure_dict['part_layer_nozzle_size']}; Angle {diw_structure_dict['part_angular_offset']}; Offset {diw_structure_dict['part_lateral_offset']}")
 
         #Check if this is a new structure or not
         is_unique_bool, unique_structure_id, trial_unique_structure_dict = match_structure_to_unique_name(diw_structure_dict, unique_structure_dict)
-        
+        print(f"\t Structure {diw_structure_dict['part_structure']} flagged as {unique_structure_id}")
+
         if is_unique_bool:
             #Add some fields to this entry
             trial_unique_structure_dict[unique_structure_id].update({'example_printname': name})
@@ -196,7 +198,6 @@ for idx, name in enumerate(print_names):
         
         else:
             print("Not a unique structure. Moving on.")
-            print(f"\t Structure {diw_structure_dict['part_structure']} flagged as {unique_structure_id}")
             print()
 
     except Exception as e:
