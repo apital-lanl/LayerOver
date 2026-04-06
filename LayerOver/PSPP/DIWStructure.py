@@ -16,10 +16,14 @@ Description: Module to parse, homogenize, store, and compare DIW strucuture code
 
 """
 
+#Import standard libraries
 import numpy as np
-from LayerOver.PSPP.Materials import parse_material_note
+import os
 import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn'
+from tkinter import Tk, filedialog
+#Import LayerOver components
+from LayerOver.PSPP.Materials import parse_material_note
 
 #######################################################################################################################
 #####  Template Variables  ############################################################################################
@@ -228,6 +232,24 @@ blank_unique_structure_dict = {
     'layer_materials': None,
     'layer_pitches': None
     }
+
+#The following list items are additional fields that may be appended to logbook entries based on various operations
+#  Possible operations: mechanical data import, opacity/volumetric prediction from structure, analysis of PSPP
+additional_structure_fields = [
+    'index',  #unique structure ID name from opacity/volumetric prediction
+    'vox_1_average',
+    'vox_1_sum',
+    'vox_1_density',
+    'vox_2_average',
+    'vox_2_sum',
+    'vox_2_density',
+    'vox_3_average',
+    'vox_3_sum',
+    'vox_3_density',
+    'full_voxel_dimensions',
+    'array_side_length_mm',
+    'vox_resolution_micron'
+    ]
 
 
 #######################################################################################################################
@@ -601,3 +623,29 @@ def structure_name_from_structure_dict(structure_dict):
         }
 
     return name_dict
+
+
+def open_wafflebook(waffledata_filepath,
+                    preview_loaded_df = False):
+    """
+    Description:
+        Open a '*WaffleData.csv' file output from a set of VolumetricPrediction runs.
+    """
+
+    #Initialize variables
+    if os.path.exists(waffledata_filepath):
+        pass
+    else:
+        print()
+        print('Invalid filepath given for WaffleData; prompting for a good filepath.')
+        root = Tk()
+        waffledata_filepath = filedialog.askopenfilename(title = "Select a logbook 'WaffleData' file", \
+                                                      filetypes = [('Waffle Structure Summary Files', '*WaffleData.csv')])
+        root.destroy()
+
+    waffledata_df = pd.read_csv(waffledata_filepath, encoding_errors= 'ignore')
+
+    if preview_loaded_df:
+        print(waffledata_df.head(10))
+
+    return waffledata_df

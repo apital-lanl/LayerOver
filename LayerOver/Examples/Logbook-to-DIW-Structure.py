@@ -40,10 +40,10 @@ from LayerOver.PSPP.DIWStructure import structure_dict_from_logbook_row
 from LayerOver.PSPP.DIWStructure import match_structure_to_unique_name
 
 #Main settings
-print_name_start_row  = 13   #default is 0; starting logbook row 
+print_name_start_row  = 1   #default is 0; starting logbook row 
 print_name_end_row = 0   #default is 0; ending logbook row
-save_final_unique_structure_dict = False
-save_to_filepath = 'W:\Data & ML\2026-04_Waffle Testing\2026-04-01_Working Alpha'       #Optional; where to save images and arrays to;
+save_final_unique_structure_dict = True
+save_to_filepath = 'dialog'       #Optional; where to save images and arrays to;
     # ''                    save to same filepath that logbook is in
     # 'actual/filepath'     manual entry of valid filepath
     # 'dialog'
