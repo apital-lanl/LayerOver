@@ -21,8 +21,8 @@ import os
 import pandas as pd
 from tkinter import Tk, filedialog
   # other LayerOver imports
-from LayerOver.DataAnalysis.MechanicalData import open_logbook
-from LayerOver.DataAnalysis.MechanicalData import split_filename_for_printname_guessing
+from LayerOver.Analysis.MechanicalData import open_logbook
+from LayerOver.Analysis.MechanicalData import split_filename_for_printname_guessing
 
 #Select the file to open
 root = Tk()

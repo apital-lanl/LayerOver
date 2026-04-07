@@ -46,9 +46,9 @@ import pandas as pd
 from tqdm.auto import tqdm
 
   #Import other LayerUp modules
-from Part import Gcode
-import Points
-import Voxel
+from LayerOver.Core.Part import Gcode
+import LayerOver.Core.Points as Points
+import LayerOver.Core.Voxel as Voxel
 
 
 blank_spec_dict = {

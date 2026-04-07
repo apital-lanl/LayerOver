@@ -21,6 +21,7 @@ TODO:
 """
 
 import os
+from pathlib import Path
 
 
 def create_layerover_root(alt_root = None,
@@ -39,7 +40,7 @@ def create_layerover_root(alt_root = None,
     current_workingdir = root_home
     generation_dict = {
         'root_status': 'existing',
-        'root_home':'',
+        'root_home': '',
         'is_main_root': True,
         'current_working_directory': '',
 

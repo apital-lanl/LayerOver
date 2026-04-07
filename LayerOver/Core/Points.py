@@ -9,7 +9,7 @@ a nonexclusive, paid-up, irrevocable worldwide license in this material to repro
 distribute copies to the public, perform publicly and display publicly, and to permit others to do so.
 
 Created:   2024-03-18
-Modified:  2025-07-15
+Modified:  2026-02-11
 Version:   0.6.1
 
 @author: Aaron Pital (Los Alamos National Lab)
@@ -23,14 +23,22 @@ Description: Class wrapper for handling 3D data; parametric conversion, 3D trans
         2025-04-16
             - Fixed # of points returned in 'generate_radial_points'
         2025-07-15
-            - Refactored STL 
+            - Refactored STL
+        2026-02
+
+TODO:
+    get_radial_neighbor_array_data
+        -Add functionality for interior and mixed interior/edge points
 
 """
 
 
   #System and built-ins
+import array
+from encodings.punycode import T
 import math
 import random
+from re import I, S
 from tkinter import Tk, filedialog
 
   #Visualizaiton
@@ -40,6 +48,7 @@ from matplotlib import animation
 
   #Data Handling
 import numpy as np
+from skimage.draw import line
 
   #Scientifiic algorithm packages
 from scipy.interpolate import interp1d
@@ -47,6 +56,9 @@ from scipy.spatial import KDTree
 from scipy.spatial import ConvexHull
 from scipy.spatial import Delaunay
 
+############################################################################################################################################################
+###  G-code specific point functions   #####################################################################################################################
+############################################################################################################################################################
     
 #take G-Code coordinates parsed from file and return a layer dictionary with XYZ-cartesian coordinates
 def AC_to_XYZ(xyzacf_array, substrate_dict, offset_adjust=False):
@@ -130,6 +142,10 @@ def AC_to_XYZ(xyzacf_array, substrate_dict, offset_adjust=False):
         
     return layer_dict
     
+
+############################################################################################################################################################
+###  Generic Geomoetry Functions   #########################################################################################################################
+############################################################################################################################################################
 
 #Simple unit-normal function for getting points on a circle
 def circle_circumference_xy(normal_vector, theta):
@@ -253,7 +269,7 @@ def check_point_line_distance(point, line_vector, reference_points = np.array([0
     ''' v0.2.0  created:2024-05-12  modified:2024-05-20 
         
     INPUT:   Point, line vector, and location bounds on line to define distance region
-                'reference_points'- np ndarray of either 1 or two points. If one, supply a 'reference_delta' to ge a line.
+                'reference_points'- np ndarray of either 1 or two points. If one, supply a 'reference_delta' to get a line.
                     If two points supplied, make a vector between them 
                 'reference_delta'- distance above and below reference along 'line' vector to generate reference points
     ACTION:  Calculate distance between line and point and reference_point and point
@@ -301,117 +317,12 @@ def check_point_line_distance(point, line_vector, reference_points = np.array([0
         
     return np.hypot(h, np.linalg.norm(c))
 
-
-def line_line_distance(a0,a1,b0,b1,\
-                                clampAll=False,clampA0=False,clampA1=False,clampB0=False,clampB1=False):
-    ''' v0.1.0  created:2024-05-20  modified:2024-05-20 
-    taken verbatim from https://stackoverflow.com/questions/2824478/shortest-distance-between-two-line-segments
         
-    INPUT:   Two 'a' and 'b' points; point a/b arbitrary, as is 0/1
-                'Clamp' options constrain distances within those segment bound(s); otherwise, the shortest line distance is calculated.
-    ACTION:  lorem
-    OUTPUT:  lorem
-    '''
-    
-    # If clampAll=True, set all clamps to True
-    if clampAll:
-        clampA0=True
-        clampA1=True
-        clampB0=True
-        clampB1=True
-    
-    
-    # Calculate denomitator
-    A = a1 - a0
-    B = b1 - b0
-    magA = np.linalg.norm(A)
-    magB = np.linalg.norm(B)
-        
-    _A = A / magA
-    _B = B / magB
-        
-    cross = np.cross(_A, _B);
-    denom = np.linalg.norm(cross)**2
-        
-        
-    # If lines are parallel (denom=0) test if lines overlap.
-    # If they don't overlap then there is a closest point solution.
-    # If they do overlap, there are infinite closest positions, but there is a closest distance
-    if not denom:
-        d0 = np.dot(_A,(b0-a0))
-            
-        # Overlap only possible with clamping
-        if clampA0 or clampA1 or clampB0 or clampB1:
-            d1 = np.dot(_A,(b1-a0))
-                
-            # Is segment B before A?
-            if d0 <= 0 >= d1:
-                if clampA0 and clampB1:
-                    if np.absolute(d0) < np.absolute(d1):
-                        return a0,b0,np.linalg.norm(a0-b0)
-                    return a0,b1,np.linalg.norm(a0-b1)
-                    
-                    
-            # Is segment B after A?
-            elif d0 >= magA <= d1:
-                if clampA1 and clampB0:
-                    if np.absolute(d0) < np.absolute(d1):
-                        return a1,b0,np.linalg.norm(a1-b0)
-                    return a1,b1,np.linalg.norm(a1-b1)
-                    
-                    
-        # Segments overlap, return distance between parallel segments
-        return None,None,np.linalg.norm(((d0*_A)+a0)-b0)
-            
-        
-        
-    # Lines criss-cross: Calculate the projected closest points
-    t = (b0 - a0);
-    detA = np.linalg.det([t, _B, cross])
-    detB = np.linalg.det([t, _A, cross])
-    
-    t0 = detA/denom;
-    t1 = detB/denom;
-    
-    pA = a0 + (_A * t0) # Projected closest point on segment A
-    pB = b0 + (_B * t1) # Projected closest point on segment B
-    
-    
-    # Clamp projections
-    if clampA0 or clampA1 or clampB0 or clampB1:
-        if clampA0 and t0 < 0:
-            pA = a0
-        elif clampA1 and t0 > magA:
-            pA = a1
-            
-        if clampB0 and t1 < 0:
-            pB = b0
-        elif clampB1 and t1 > magB:
-            pB = b1
-                
-        # Clamp projection A
-        if (clampA0 and t0 < 0) or (clampA1 and t0 > magA):
-            dot = np.dot(_B,(pA-b0))
-            if clampB0 and dot < 0:
-                dot = 0
-            elif clampB1 and dot > magB:
-                dot = magB
-            pB = b0 + (_B * dot)
-        
-        # Clamp projection B
-        if (clampB0 and t1 < 0) or (clampB1 and t1 > magB):
-            dot = np.dot(_A,(pB-a0))
-            if clampA0 and dot < 0:
-                dot = 0
-            elif clampA1 and dot > magA:
-                dot = magA
-            pA = a0 + (_A * dot)
-    
-        
-    return pA,pB,np.linalg.norm(pA-pB)
-        
-#
 def fibonnaci_points(lats, verts, points=1000):
+    """
+    Description:
+        Generate fibonnaci points in  radial spiral on a 3D surface
+    """
     if points <= 1:
         points = len(verts)
     else:
@@ -636,7 +547,7 @@ def visualize_3D(xyzarray, sphIndices, triangIndices, \
         plt.show()
     
 
-def point_line_distance(point, line_segment_start, line_segment_end):
+def point_linesegment_distance(point, line_segment_start, line_segment_end):
     '''
     Description: calculate the min distance between a 3D line segment and a point in 3D space; works in 2D as well, but coordinate systems can't be mixed.
     taken almost verbatim from https://stackoverflow.com/questions/56463412/distance-from-a-point-to-a-line-segment-in-3d-python
@@ -663,17 +574,47 @@ def point_line_distance(point, line_segment_start, line_segment_end):
     return np.hypot(h, np.linalg.norm(c))
 
 
+def point_line_distance(point, line_segment_start, line_segment_end):
+    """
+    Returns perpendicular distance between a point and an infinite line (i.e. not clamped to line segment).
+    Taken nearly verbatim from Gemini search output.
+    """
+
+    # Convert to numpy arrays
+    p1 = np.array(line_segment_start)
+    p2 = np.array(line_segment_end)
+    r = np.array(point)
+
+    # Vector representing the line's direction
+    line_vec = p2 - p1
+    # Vector from p1 to the point r
+    pnt_vec = r - p1
+
+    # Project pnt_vec onto line_vec to find the nearest point's parameter 't'
+    # 't' is a scalar representing the position on the line
+    t = np.dot(pnt_vec, line_vec) / np.dot(line_vec, line_vec)
+
+    # The formula below calculates the perpendicular distance
+    # The magnitude of the cross product of the vectors can also be used
+    distance = np.linalg.norm(pnt_vec - t * line_vec)\
+
+    return distance
+
+
 def line_line_distance(a0,a1,b0,b1,\
                         clampAll=True, \
                         clampA0=False,clampA1=False,\
                         clampB0=False,clampB1=False):
-    ''' v0.1.0  created:2024-05-20  modified:2024-05-20 
-    taken verbatim from https://stackoverflow.com/questions/2824478/shortest-distance-between-two-line-segments
+    ''' v0.2.0  created:2024-05-20  modified:2026-02-11 
+    taken verbatim from https://stackoverflow.com/questions/2824478/shortest-distance-between-two-line-segments and modified as needed
         
     INPUT:   Two 'a' and 'b' points; point a/b arbitrary, as is 0/1
                 'Clamp' options constrain distances within those segment bound(s); otherwise, the shortest line distance is calculated.
     ACTION:  lorem
-    OUTPUT:  lorem
+    OUTPUT:  
+        'pA'        Closest point on segment A
+        'pB'        Closest point on segment B
+        'distance'  Distance between the points
     '''
     
     # If clampAll=True, set all clamps to True
@@ -682,7 +623,16 @@ def line_line_distance(a0,a1,b0,b1,\
         clampA1=True
         clampB0=True
         clampB1=True
-    
+
+    #Make sure points are np.arrays
+    if type(a0) == list:
+        a0 = np.array(a0)
+    if type(a1) == list:
+        a1 = np.array(a1)
+    if type(b0) == list:
+        b0 = np.array(b0)
+    if type(b1) == list:
+        b1 = np.array(b1)
     
     # Calculate denomitator
     A = a1 - a0
@@ -693,7 +643,7 @@ def line_line_distance(a0,a1,b0,b1,\
     _A = A / magA
     _B = B / magB
         
-    cross = np.cross(_A, _B);
+    cross = np.cross(_A, _B)
     denom = np.linalg.norm(cross)**2
         
         
@@ -729,12 +679,22 @@ def line_line_distance(a0,a1,b0,b1,\
         
         
     # Lines criss-cross: Calculate the projected closest points
-    t = (b0 - a0);
-    detA = np.linalg.det([t, _B, cross])
-    detB = np.linalg.det([t, _A, cross])
+    t = (b0 - a0)
+
+    # If inputs are 2D, embed into 3D (z=0) so np.linalg.det gets 3-element rows
+    if t.size == 2:
+        t3     = np.array([t[0],     t[1],     0.0])
+        A3     = np.array([_A[0],    _A[1],    0.0])
+        B3     = np.array([_B[0],    _B[1],    0.0])
+        cross3 = np.array([0.0,      0.0,      float(cross)])  # cross is scalar z for 2D
+        detA = np.linalg.det([t3, B3, cross3])
+        detB = np.linalg.det([t3, A3, cross3])
+    else:
+        detA = np.linalg.det([t, _B, cross])
+        detB = np.linalg.det([t, _A, cross])
     
-    t0 = detA/denom;
-    t1 = detB/denom;
+    t0 = detA/denom
+    t1 = detB/denom
     
     pA = a0 + (_A * t0) # Projected closest point on segment A
     pB = b0 + (_B * t1) # Projected closest point on segment B
@@ -769,14 +729,105 @@ def line_line_distance(a0,a1,b0,b1,\
             elif clampA1 and dot > magA:
                 dot = magA
             pA = a0 + (_A * dot)
+
+    distance = np.linalg.norm(pA-pB)
     
         
-    return pA,pB,np.linalg.norm(pA-pB)
+    return pA,pB,distance
 
+
+def intersect_line_and_segment(p1_line, p2_line, p1_sec, p2_sec):
+    """
+    Description:
+        Finds the intersection point of an infinite line and a finite line segment.
+        (Taken almost verbatim from Gemini search output)
+
+    INPUTS:
+        p1_line
+        p2_line     Endpoints of the infinite line (tuples/lists of x, y).
+        p1_sec 
+        p2_sec      Endpoints of the line-section (tuples/lists of x, y).
+
+    Returns:
+        The intersection point (x, y) if it exists within the line-section, 
+        otherwise None (if parallel or intersection outside the section).
+    """
+
+    x1, y1 = p1_line
+    x2, y2 = p2_line
+    x3, y3 = p1_sec
+    x4, y4 = p2_sec
+
+    denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1)
+
+    # Check if lines are parallel (denominator is 0)
+    if abs(denom) < 1e-9: # Use a small tolerance for floating point comparisons
+        # Lines are parallel or coincident. No single intersection point for a line and line-section, 
+        # or the line-section is coincident with the line (infinite intersections). 
+        # This function returns None for no single point.
+        return None
+
+    # Calculate parametric parameters ua and ub
+    ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom
+    ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom
+
+    # Check if the intersection point lies on the *finite line-section* (ub must be in [0, 1])
+    # ua represents where the intersection is on the infinite line, which is always in range.
+    if not (0 <= ub <= 1):
+        return None
+
+    # Calculate the intersection point
+    x = x1 + ua * (x2 - x1)
+    y = y1 + ua * (y2 - y1)
+
+    return (x, y)
+
+
+def intersect_point_and_segment(p_external, p_line_start, p_line_end):
+    """
+    Description:
+            Finds the closest orthogonal point on a line segment to an external point.
+        Note: taken with additions from Gemini search output
+    INPUTS:
+            p_external      tuple,list; [x, y] of external point.
+            p_line_start    tuple,list; [x, y] of starting point of the line segment.
+            p_line_end      tuple,list; [x, y] of ending point of the line segment.
+    """
+
+    #Condition inputs
+    P = np.array(p_external)
+    A = np.array(p_line_start)
+    B = np.array(p_line_end)
+
+    # Calculate vectors
+    AB = B - A
+    AP = P - A
     
-###############################################################################
-####   Utility functions   ####################################################
-###############################################################################
+    # Calculate the scalar projection parameter 't' using the dot product formula
+    # t = (AP . AB) / |AB|^2 
+    # This value of 't' indicates how far along the line AB the projection lies.
+    # 0 <= t <= 1 means the projection is on the segment.
+    dot_product_AP_AB = np.dot(AP, AB)
+    squared_length_AB = np.dot(AB, AB) # |AB|^2
+
+    # Handle the case where A and B are the same point
+    if squared_length_AB == 0:
+        return None
+
+    t = dot_product_AP_AB / squared_length_AB
+
+    # Check if the projection is on the line segment
+    if 0 <= t <= 1:
+        # The projection point is A + t * AB
+        projection = A + t * AB
+        return projection
+    else:
+        # The orthogonal projection falls outside the line segment's endpoints
+        return None
+    
+###################################################################################################################################
+####   Utility functions   ########################################################################################################
+###################################################################################################################################
 
 
 # Helper function to interpolate between curve points to get a reasonable result
@@ -813,5 +864,1466 @@ def curve_interpolate(xs, zs, desired_number_of_points,
 
     return xsnew, zsnew
 
-    
 
+######################################################################################################################################
+####   Opacity/Volume Prediction v2 Functions   ######################################################################################
+######################################################################################################################################
+
+
+def draw_2D_strand_line_bythickness(interior_points,
+                                    angle,
+                                    strand_diam,
+                                    array_dim,
+                                    um_to_pix_conversion = 1,
+                                    length = None,
+                                    line_type = 'simple',
+                                    thickness_fcn = 'cylinder',
+                                    show_points = False,
+                                    show_array_iterations = False,
+                                    show_final_array = False):
+    """
+    Description:
+        Interpret line points as an ideal strand of radius 'strand_radius' and draw thickness on array with values of microns. 
+    INPUTS:
+        'interior_points'   array, tuple, or list of iterables; interpret as tuple of array indices (Y,X)
+        'strand_diam'       float or int; stand radius in number of pixels (i.e. array indices distance)
+                            NOTE: thickness will be 'strand_diam' at center of line; 
+        'angle'             float or int; angle between 'interior_point' and array horizontal axis
+                            if 'length' is None or 0, assume line is drawn across entire array with center at 'interior_point'
+                            otherwise, assume line is drawn in only one direction from 'interior_point' at 'angle'
+        'array_dim'         int, tuple, or list; dimensions of 2D array to draw line on
+      (optional)
+        'um_to_pix_conversion'    float or int; side-length of a pixel in microns; used to convert radius      
+        'length'            float or int; if NONE, assume line fills the screen edge-to-edge; othewise, assume 'interior_point' is the starting point
+                            NOTE: only option for drawing a line in both directions is if 'length'= None. Otherwise 'angle' determines a 2-D line direction.
+        'line_type'         str; 'simple'- 2D line from point-to-point
+                            'bezier'- bezier curve; control points will be interpolated
+        'drop_off_function' str; function defining how 'cylinder' is only function implemented currently
+    ACTIONS:
+        -lorem
+    OUTPUTS:
+        'control_point_dict'    dict; specifics of line end points and the 
+    """
+
+    #Initialize variables
+      # return dict
+    control_point_dict = {
+        'line_dicts': {},
+        'interior_only': True,
+        }
+      # blank dict for each strand that's drawn
+    line_dict = {
+        'start_coordinates': [],
+        'end_coordinates': [],
+        'radius_value': [],
+        'drawn_array': None
+        }
+      # store original length for passing to other functions
+    micron_strand_diam = strand_diam
+    micron_strand_radius= strand_diam/2
+      # convert from um to pixels
+    strand_diam= strand_diam/um_to_pix_conversion
+    strand_radius = strand_diam/2
+
+    #TODO: add options in the future
+      #if 'strand_thickness_func' is already a callable object, assume it's a function and just use it
+    if callable(thickness_fcn):
+        pass
+    #otherwise, start parsing what the input wants the functional form to look like
+      #standard circular strand assumptions
+    elif thickness_fcn == 'cylinder':
+        strand_thickness_func = lambda radial_distance: 2* math.sqrt(micron_strand_radius**2 - (radial_distance)**2)
+    
+    #Condition input coordinates
+    if type(interior_points) == tuple:
+        interior_points = np.array([[interior_points[0], interior_points[1]]])
+    if type(interior_points) == list:
+        #TODO: check that list elements are actually (Y,X) formatted
+        if type(interior_points[0])== list:
+            interior_points = np.array(interior_points)
+        elif (type(interior_points[0]==int) or (type(interior_points[0]==float))):
+            interior_points = np.array([interior_points])
+        # coerce to int because these are array indices
+    interior_points = interior_points.astype(np.int32)
+    
+    #Make sure angle is appropriate
+    if angle >360:
+        coerced_angle = angle
+        while coerced_angle >360:
+            coerced_angle = coerced_angle%360
+        angle= coerced_angle
+
+    #Condition array
+    if (type(array_dim) == int) or (type(array_dim) == float):
+        array_x_dim = int(array_dim)
+        array_y_dim = int (array_dim)
+    elif type(array_dim) == tuple:
+        if len(array_dim) == 2:
+            array_x_dim = array_dim[1]
+            array_y_dim = array_dim[0]
+        else:
+            print()
+            print("Bad input values for 'array_dim'; check values")
+            print()
+    elif type(array_dim) == list:
+        if len(array_dim) == 2:
+            array_x_dim = array_dim[1]
+            array_y_dim = array_dim[0]
+        else:
+            print()
+            print("Bad input values for 'array_dim'; check values")
+            print()
+    return_array = np.zeros((array_y_dim, array_x_dim))
+
+    #Get array coordinates for drawing the lines and set conditions
+      # if no length, go to edges of array from 
+    if (not length) and (line_type == 'simple'):
+        #In this case, assume a line should be drawn across the entire screen
+        control_point_dict['interior_only'] = False
+        
+        #Run through each passed point
+        for idx, point in enumerate(interior_points):
+            this_y = point[0]
+            this_x = point[1]
+            #Get upper line angle
+            if angle >180:
+                upper_angle = angle%180
+            else:
+                upper_angle = angle
+            #Get slope of line
+            slope = math.tan(math.radians(upper_angle))
+            #Get max_y at max_y and vice versa
+                # X is easy because it's always > to the right; 
+            y_at_right = round((((array_x_dim-1)-this_x) * slope *-1) + this_y)  #Flip sign of slope for delta-y
+            y_at_left =  round(((this_x) * slope) + this_y)
+                # Slope changes Y behaviour (i.e. how much 'Y' is left for each side), so both cases have to be accounted for
+            if slope > 0:
+                if abs(slope) > 1e-3:
+                    x_at_right = round(this_x + abs((this_y)/slope) )
+                    x_at_left = round(this_x - abs(((array_y_dim-1)- this_y)/slope))
+                #If slope is basically zero, just assume horizontal to avoid division by ~zero overflow error
+                else:
+                    x_at_left = 0
+                    x_at_right = (array_x_dim - 1)
+            elif slope < 0:
+                if abs(slope) > 1e-3:
+                    x_at_right = round(this_x + abs(((array_y_dim-1)- this_y)/slope) )
+                    x_at_left = round(this_x - abs((this_y)/slope))
+                #If slope is basically zero, just assume horizontal to avoid division by ~zero overflow error
+                else:
+                    x_at_left = 0
+                    x_at_right = (array_x_dim - 1)
+            else:
+                x_at_left = 0
+                x_at_right = (array_x_dim - 1)
+                
+            #Check to see if edge indices are within array bounds
+            y_right_bool = bool((y_at_right >=0) and (y_at_right<=(array_y_dim-1)))
+            x_right_bool = bool((x_at_right >=0) and (x_at_right<=(array_x_dim-1)))
+            y_left_bool = bool((y_at_left >=0) and (y_at_left<=(array_y_dim-1)))
+            x_left_bool = bool((x_at_left >=0) and (x_at_left<=(array_x_dim-1)))
+
+            #Find appropriate array edge coordinates
+            #   Take point in space and known slope, and find 'how much X/Y' is left to get to the edge of the array.
+            #   This results in two possible endpoints for each side of the line (i.e. one for the 'left' and one for the 'right'), 
+            #     both of which have an 'x_guess' and a 'y_guess' for which variable is limiting.
+            #   In other words, draw a line with 'slope' both left and right from the 'point', and find whether 'x_guess' or 'y_guess' hits
+            #      the edge of the array first. This is the point that should be used as the endpoint for that side of the line.
+            # For right side of point
+            if y_right_bool and x_right_bool:
+                #If both edges have valid indices, find the closest one
+                right_y_guess = [y_at_right ,(array_x_dim-1)]
+                if abs(slope)<1e-5:
+                    right_x_guess = [y_at_right, (array_x_dim-1)]
+                if slope>0:
+                    right_x_guess = [0, x_at_right]
+                elif slope<0: 
+                    right_x_guess = [(array_y_dim-1), x_at_right]
+
+                #Distance to top/bottom and right edges
+                x_edge_distance = math.sqrt((this_x-right_x_guess[1])**2 + 
+                                        (this_y-right_x_guess[0])**2)
+                y_edge_distance = math.sqrt((this_x-right_y_guess[1])**2 + 
+                                        (this_y-right_y_guess[0])**2)
+
+                if x_edge_distance<y_edge_distance:
+                    right_edge_point = right_x_guess
+                elif x_edge_distance > y_edge_distance:
+                    right_edge_point = right_y_guess
+                  # if equal, it's probably a horizontal line and just go with right_x_guess
+                else:
+                    right_edge_point = right_x_guess
+            elif y_right_bool:
+                right_edge_point = [y_at_right, (array_x_dim-1)]
+            elif x_right_bool:
+                if slope > 0:
+                    right_edge_point = [0, x_at_right]
+                elif abs(slope) < 1e-5:
+                    #Essentially 0 slope; allow for weird floating point errors by just treating as horizontal line
+                    right_edge_point = [y_at_right, (array_x_dim-1)]
+                else:
+                    #Negative slope
+                    right_edge_point = [(array_y_dim-1), x_at_right]
+
+
+            #For the left side of the point
+              # if both 'extend the line to the array edge' values are within array bounds, find out which is correct
+            if y_left_bool and x_left_bool:
+                #If both edges have valid indices, find the closest one
+                left_y_guess = [y_at_left ,(array_x_dim-1)]
+                if abs(slope)<1e-5:
+                    left_x_guess = [y_at_left, 0]
+                elif slope<0:
+                    left_x_guess = [0, x_at_left]
+                elif slope>0: 
+                    left_x_guess = [(array_y_dim-1), x_at_left]
+
+                #Distance to top/bottom and right edges
+                x_edge_distance = math.sqrt((this_x-left_x_guess[1])**2 + 
+                                        (this_y-left_x_guess[0])**2)
+                y_edge_distance = math.sqrt((this_x-left_y_guess[1])**2 + 
+                                        (this_y-left_y_guess[0])**2)
+
+                if x_edge_distance < y_edge_distance:
+                    left_edge_point = left_x_guess
+                elif x_edge_distance > y_edge_distance:
+                    left_edge_point = left_y_guess
+                  # if equal, it's probably a horizontal line and just go with left_y_guess
+                  #  Both will be equal in this case anyway.
+                else:
+                    left_edge_point = left_y_guess
+            elif y_left_bool:
+                left_edge_point = [y_at_left, 0]
+            elif x_left_bool:
+                if slope >0:
+                    left_edge_point = [(array_y_dim-1), x_at_left]
+                elif abs(slope) < 1e-5:
+                    #Essentially 0 slope; allow for weird floating point errors by just treating as horizontal line
+                    left_edge_point = [y_at_left, 0]
+                else:
+                    #Negative slope
+                    left_edge_point = [0, x_at_left]
+
+            #Fix garbage return of identical points; caused by slope being weird
+            if (left_edge_point == right_edge_point):
+                if (abs(slope) < 1e-5):
+                    #Convention is that right is bottom and left is top for horizontal line
+                    #NOTE: convention is Y=0 is UP, and Y= (array_y_dim -1) is DOWN
+                    left_edge_point = [left_edge_point[0], 0]
+                    right_edge_point = [right_edge_point[0], (array_x_dim-1)]
+            #Coerce any rounding errors to avoid index errors
+            if left_edge_point[0] > (array_y_dim-1):
+                left_edge_point[0] = array_y_dim-1
+            if left_edge_point[1] > (array_x_dim-1):
+                left_edge_point[1] = array_x_dim-1
+            if right_edge_point[0] > (array_y_dim-1):
+                right_edge_point[0] = array_y_dim-1
+            if right_edge_point[1] > (array_x_dim-1):
+                right_edge_point[1] = array_x_dim-1
+
+            #Initialize dict for these values and save to output dict
+            this_line_dict = line_dict.copy()
+            this_line_dict['start_coordinates'] = left_edge_point
+            this_line_dict['end_coordinates'] = right_edge_point
+            this_line_dict['radius_value'] = micron_strand_diam/2
+            control_point_dict['line_dicts'][f"line_{idx+1}_0"] = this_line_dict
+
+    elif (not length) and (line_type == 'bezier'):
+        #TODO: add special bezier flags; not currently implemented
+        control_point_dict['interior_only'] = False
+    
+    #I don't think we need this case anymore; first 'if' condition above covers multiple line draws?
+    #Retaining case for now until full code review and Tests generation
+
+    # elif length and (line_type == 'simple') and (len(interior_points)>=1):
+    #     #TODO: add case if multiple interior points are passed; should be just drag-and-drop from above
+    #     for idx, start_point in enumerate(interior_points):
+    #         #Find endpoint and coerce to array dimensions
+    #         y_change = start_point[0] * math.sin(math.radians(angle)) *-1  #Flip 'y_change' to match traditional system ((Y,X) with origin at top-left of image)
+    #         x_change = start_point[1] * math.cos(math.radians(angle))
+    #         end_point = [[round(start_point[0] + y_change), 
+    #                         round(start_point[1] + x_change)]]
+    #         #Initialize dict for these values and save to output dict 
+    #         this_line_dict = line_dict.copy()
+    #         this_line_dict['start_coordinates'] = start_point
+    #         this_line_dict['end_coordinates'] = end_point
+    #         this_line_dict['radius_value'] = strand_radius
+    #         control_point_dict['line_dicts'][f"line_{idx+1}_0"] = this_line_dict
+    
+    #Actually draw the thickness onto the return array
+    for line_key in list(control_point_dict['line_dicts'].keys()):
+        #Pull values to draw
+        this_line_dict = control_point_dict['line_dicts'][line_key]
+        this_start_point = this_line_dict['start_coordinates']
+        this_end_point = this_line_dict['end_coordinates']
+        this_radius = this_line_dict['radius_value']
+
+        #Initialize center of line
+        if (not length) and (line_type == 'simple'):
+            #Draw initial line thickness
+            rr, cc = line(int(this_start_point[0]), int(this_start_point[1]), int(this_end_point[0]), int(this_end_point[1]))
+            return_array[rr,cc] = this_radius*2
+        
+            #Find next-index over on each side of centerline, calculate thickness, and add to 
+            neighbor_dict = get_radial_neighbors_array_data(this_start_point,
+                                                           this_end_point,
+                                                           angle,
+                                                           micron_strand_diam,
+                                                           (array_y_dim, array_x_dim),
+                                                           um_to_pix_conversion = um_to_pix_conversion,
+                                                           print_intermediate_steps = False, 
+                                                           show_final_array = show_array_iterations)
+            #Select newly-drawn lines
+            drawn_array = neighbor_dict['drawn_array']
+            drawn_mask = drawn_array > 0
+            #Add to the global return array
+            return_array[drawn_mask] = drawn_array[drawn_mask]
+        
+        #TODO: implement bezier for smoother corners
+        elif (not length) and (line_type == 'bezier'):
+            pass
+    
+        #Store the global result for the return dict
+        control_point_dict['line_dicts'][f"line_{idx+1}_0"]['drawn_array'] = return_array
+
+    return control_point_dict
+ 
+
+
+def get_radial_neighbors_array_data(initial_start_coord,
+                                   initial_end_coord,
+                                   angle,
+                                   strand_diameter,
+                                   array_dim,
+                                   um_to_pix_conversion = 1,
+                                   thickness_fcn = 'cylinder',
+                                   print_intermediate_steps = False, 
+                                   show_final_array = False):
+    """
+    Description:
+        Handle stepping 1 pixel from centerline to produce a dict of line coordinates and associated thicknesses for radial neighboring points 
+        on a strand. I.e. the strand centerline is full thickness, walk 1 pixel to each side and draw a line of that thickness until you reach the
+        edge of the strand.
+
+        NOTE: There's probably a better way to do this (at least more elegant), but handling index edge cases is a pain.
+    
+    INPUTS:
+        ''
+        ''
+        ''
+    ACTIONS:
+        - 
+    OUTPUTS:
+        '' 
+    """
+
+    #Initialize variables
+    starting_points_list = [initial_start_coord]
+    ending_points_list = [initial_end_coord]
+    thickness_list = [strand_diameter] #Re-draws initial centerline later on; make sure it re-draws at full thickness
+      # function uses micron values of these parameters, but keep a separate 'raw' value for future development
+    micron_strand_diameter = strand_diameter
+    micron_strand_radius = strand_diameter/2
+    strand_diameter = micron_strand_diameter/um_to_pix_conversion
+    strand_radius = micron_strand_radius/um_to_pix_conversion
+
+    #Check that start-end points haven't hit an edge-limit
+    #  i.e. make sure they aren't continuing on the same edge
+    point_left_edge_hit = False
+    point_right_edge_hit = False
+    
+    #Pull array dimensions and initialize return array
+    array_y_dim = array_dim[0]
+    array_x_dim = array_dim[1]
+    return_array = np.zeros((array_y_dim, array_x_dim))
+
+    #Not sure whether 'end' or 'start' is to the right, so find that out and call the 'right' the end
+    x_diff = initial_end_coord[1]-initial_start_coord[1]
+    y_diff = initial_end_coord[0]-initial_start_coord[0]
+    if (x_diff > 0) and (abs(y_diff)>=1):
+        slope = (initial_end_coord[0]-initial_start_coord[0])/(initial_end_coord[1]-initial_start_coord[1])
+        right_coord = initial_end_coord
+        left_coord = initial_start_coord
+        if slope>0:
+            line_orient = 'up'
+        elif slope<0:
+            line_orient = 'down'
+    elif (x_diff < 0) and (abs(y_diff)>=1):
+        slope = (initial_start_coord[0]-initial_end_coord[0])/(initial_start_coord[1]-initial_end_coord[1])
+        right_coord = initial_start_coord
+        left_coord = initial_end_coord
+        if slope>0:
+            line_orient = 'up'
+        elif slope<0:
+            line_orient = 'down'
+      # purely vertical
+    elif x_diff == 0:
+        slope = 1e8
+        line_orient = 'vertical'
+        #Convention is that top coord is 'RIGHT'
+        if initial_start_coord[0] > initial_end_coord[0]:
+            right_coord = initial_end_coord
+            left_coord = initial_start_coord
+        else:
+            right_coord = initial_start_coord
+            left_coord = initial_end_coord
+      # purely horizontal; already handled the case if 'x_diff==0' above
+    elif abs(y_diff) <1:
+        slope = 0
+        line_orient = 'horizontal'
+        #Flip coordinates if slope is negative
+        if x_diff>0:
+            right_coord = initial_end_coord
+            left_coord = initial_start_coord
+        elif x_diff<0:
+            right_coord = initial_start_coord
+            left_coord = initial_end_coord
+
+    #TODO: add options in the future for other thickness drop-off shapes 
+      #if 'strand_thickness_func' is already a callable object, assume it's a function and just use it
+    if callable(thickness_fcn):
+        pass
+    #otherwise, start parsing what the input wants the functional form to look like
+      #standard circular strand assumptions
+    elif thickness_fcn == 'cylinder':
+        #'radial_distance' is converted to microns when evaluated in 'strand_thickness_func' below
+        strand_thickness_func = lambda radial_distance: 2* math.sqrt(micron_strand_radius**2 - (radial_distance)**2)
+
+    #####################################################
+    #Check for edge coordinates
+      # LEFT point/start coordinates
+    left_y = left_coord[0]
+    left_x = left_coord[1]
+    left_edge_pos = 'Unassigned'
+    if (left_y == 0) and ((left_x>0) and (left_x < array_x_dim)):
+        left_edge_pos = 'north'
+    elif (left_y == 0) and (left_x == 0):
+        #Northeast corner
+        left_edge_pos = 'west'
+    elif (left_y == 0) and (left_x== (array_x_dim-1)):
+        #Northeast corner
+        left_edge_pos = 'east'
+
+    elif (left_y == (array_y_dim-1)) and ((left_x>0) and (left_x < array_x_dim)):
+        left_edge_pos = 'south'
+    elif (left_y == (array_y_dim-1)) and (left_x == 0):
+        #Southwest corner
+        left_edge_pos = 'west'
+    elif (left_y == (array_y_dim-1)) and (left_x== (array_x_dim-1)):
+        #Southeast corner
+        left_edge_pos = 'east'
+
+    elif (left_x == 0) and ((left_y>0) and (left_y < array_y_dim)):
+        left_edge_pos = 'west'
+    elif (left_x == 0) and (left_y == 0):
+        #Northwest corner
+        left_edge_pos = 'west'
+    elif (left_x == 0) and (left_y== (array_y_dim-1)):
+        #Southwest corner
+        left_edge_pos = 'west'
+
+    elif (left_x == (array_x_dim-1)) and ((left_y>0) and (left_y < array_y_dim)):
+        left_edge_pos = 'east'
+    elif (left_x == (array_x_dim-1)) and (left_y == 0):
+        #Northeast corner
+        left_edge_pos = 'east'
+    elif (left_x == (array_x_dim-1)) and (left_y== (array_y_dim-1)):
+        #Southeast corner
+        left_edge_pos = 'east'
+    else:
+        left_edge_pos = 'interior'
+
+      # RIGHT point/end coordinates
+    right_y = right_coord[0]
+    right_x = right_coord[1]
+    right_edge_pos = 'Unassigned'
+    if (right_y == 0) and ((right_x>0) and (right_x < array_x_dim)):
+        right_edge_pos = 'north'
+    elif (right_y == 0) and (right_x == 0):
+        right_edge_pos = 'west'
+    elif (right_y == 0) and (right_x== (array_x_dim-1)):
+        right_edge_pos = 'east'
+
+    elif (right_y == (array_y_dim-1)) and ((right_x>0) and (right_x < array_x_dim)):
+        right_edge_pos = 'south'
+    elif (right_y == (array_y_dim-1)) and (right_x == 0):
+        right_edge_pos = 'west'
+    elif (right_y == (array_y_dim-1)) and (right_x== (array_x_dim-1)):
+        right_edge_pos = 'east'
+
+    elif (right_x == 0) and ((right_y>0) and (right_y < array_y_dim)):
+        right_edge_pos = 'west'
+    elif (right_x == 0) and (right_y == 0):
+        right_edge_pos = 'west'
+    elif (right_x == 0) and (right_y== (array_y_dim-1)):
+        right_edge_pos = 'west'
+
+    elif (right_x == (array_x_dim-1)) and ((right_y>0) and (right_y < array_y_dim)):
+        right_edge_pos = 'east'
+    elif (right_x == (array_x_dim-1)) and (right_y == 0):
+        right_edge_pos = 'east'
+    elif (right_x == (array_x_dim-1)) and (right_y== (array_y_dim-1)):
+        right_edge_pos = 'east'
+    else:
+        right_edge_pos = 'interior'
+
+
+    #Assign Point positions to sub-points
+    right_right_edge_pos = right_edge_pos
+    right_left_edge_pos = right_edge_pos
+    left_right_edge_pos = left_edge_pos
+    left_left_edge_pos = left_edge_pos
+
+    #Initialize moving direction variable
+    right_right_moving = 'Unassigned'
+    right_left_moving = 'Unassigned'   
+    left_right_moving = 'Unassigned'
+    left_left_moving = 'Unassigned'
+
+    #Assign variables for 'while' loop
+    last_right_right = right_coord
+    last_right_left = right_coord
+    last_left_right = left_coord
+    last_left_left = left_coord
+    new_right_right_coord = last_right_right
+    new_right_left_coord = last_right_left
+    new_left_right_coord = last_left_right
+    new_left_left_coord = last_left_left
+
+    #####################################################
+
+    #If points are on edges, proceeed with edge calcs
+    if (right_edge_pos != 'interior') and (left_edge_pos != 'interior'):
+        radial_distance = 0
+
+        if print_intermediate_steps:
+            print()
+            print('#'*75)
+            print(f"Initialization of points:")
+            print(f"Point_name \t\t Point_coord  \t\t Edge  \t\t Moving_direction")
+            print(f"  L-left   \t\t {new_left_left_coord} \t\t {left_left_edge_pos} \t\t ")
+            print(f"  L-right  \t\t {new_left_right_coord} \t\t {left_right_edge_pos} \t\t ")
+            print(f"  R-left   \t\t {new_right_left_coord} \t\t {right_left_edge_pos} \t\t ")
+            print(f"  R-right  \t\t {new_right_right_coord} \t\t {right_right_edge_pos} \t\t ")
+
+        #At each step: 
+        #   1) move 1 pixel in each direction from strand center
+        #   2) adjust for any crossing of corners or (for interior points) running into edges,
+        #   3) calculate an 'average' radial distance for both points
+        #   4) add points and distance to lists for return
+        #   5) increment distance until a line is drawn that is beyond the strand radius
+        iteration_cntr = 0
+        max_iterations = int(max(array_x_dim, array_y_dim))
+        while (radial_distance < micron_strand_radius) and (iteration_cntr<max_iterations):
+            #NOTE: 'Left' incremented down in X and down in Y; 'Right' increment
+            #
+            #      Confusing names here are because there are two points (left and right) defining the initial line.
+            #      In order to find next-line-over, we need to increment both points with new points on either side of the initial line.
+            #      This leads 'right' and 'left' center points to have two new points that are each propogated left and right.
+            #      First split is above.
+
+            #NOTE: 'slope' is misleading here because of the 'flipped' Y-axis. This means a negative slope actually looks 
+            #       like a positive slope. Initially wrote this section with standard slopes in mind and had to flip all of the 
+            #       signs of the 'slope' inequalities.
+            
+            #If top or bottom, shift 1 pixel in each direction and calculate effect
+            #If slope is positive, things are easy
+            if slope < 0:
+                if (right_right_edge_pos == 'north') or (right_right_edge_pos == 'south'):
+                    #RIGHT-right
+                      # try basic increment right
+                    if (last_right_right[1]+1 >= 0) and (last_right_right[1]+1 < array_x_dim):
+                        new_right_right_coord = [last_right_right[0], last_right_right[1]+1]
+                      # running off the edge north/south-east; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_right_right[1]+1 >= array_x_dim) and (slope > 1e7):
+                        new_right_right_coord = last_right_right
+                      # running off the edge north/south-east; move to 'east' edge
+                    elif (last_right_right[1]+1 >= array_x_dim):
+                        new_right_right_coord = [last_right_right[0]+1, last_right_right[1]]
+                        right_right_edge_pos = 'east'
+
+                if (right_left_edge_pos == 'north') or (right_left_edge_pos == 'south'):
+                    #RIGHT-left
+                      # try basic increment left
+                    if (last_right_left[1]-1 >= 0) and (last_right_left[1]-1 < array_x_dim):
+                        new_right_left_coord = [last_right_left[0], last_right_left[1]-1]
+                      # running off the edge north/south-west; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_right_left[1]-1 <0) and (slope > 1e7):
+                        new_right_left_coord = last_right_left
+                      # running off the edge north-west; move to 'west' edge
+                    elif (last_right_left[1]-1 <0):
+                        new_right_left_coord = [last_right_left[0]+1, last_right_left[1]]
+                        right_left_edge_pos = 'west'
+                
+            #If slope is negative, 'X' and 'Y' increments move in different directions
+            #  i.e. 'left' shift is +X and 'right' shift is -X  
+            if slope > 0:
+                if (right_right_edge_pos == 'north') or (right_right_edge_pos == 'south'):
+                    #RIGHT-right
+                      # try basic increment right
+                    if (last_right_right[1]-1 >= 0) and (last_right_right[1]-1 < array_x_dim):
+                        new_right_right_coord = [last_right_right[0], last_right_right[1]-1]
+                      # running off the edge north/south-west; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_right_right[1]-1 < 0) and (slope > 1e7):
+                        new_right_right_coord = last_right_right
+                      # running off the edge south-west; move to 'west'
+                    elif (last_right_right[1]-1 < 0):
+                        new_right_right_coord = [last_right_right[0]-1, last_right_right[1]]
+                        right_right_edge_pos = 'west'
+                
+                if (right_left_edge_pos == 'north') or (right_left_edge_pos == 'south'):
+                    #RIGHT-left
+                      # try basic increment left
+                    if (last_right_left[1]+1 >= 0) and (last_right_left[1]+1 < array_x_dim):
+                        new_right_left_coord = [last_right_left[0], last_right_left[1]+1]
+                      # running off the edge north/south-east; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_right_left[1]+1 >= array_x_dim) and (slope > 1e7):
+                        new_right_left_coord = last_right_left
+                      # running off the edge south-east; shift to 'east' position and increment -Y instead of +X
+                    elif (last_right_left[1]+1 >= array_x_dim):
+                        new_right_left_coord = [last_right_left[0]-1, last_right_left[1]]
+                        right_left_edge_pos = 'east'
+                
+            #If horizontal, easy case because point can't jump 'east' to 'north'/'south' and they're always on 'east' and 'west' edges; 
+            #  convention is 'left' shift is UP (-Y), and 'right' is DOWN (+Y)
+            if slope == 0:
+                #RIGHT-right
+                    # try basic increment down (+Y)
+                if (last_right_right[0]+1 >= 0) and (last_right_right[0]+1 < array_x_dim):
+                    new_right_right_coord = [last_right_right[0]+1, last_right_right[1]]
+                    # running off the south edge; just pass last coordinate
+                elif (last_right_right[1]+1 >= array_y_dim):
+                    new_right_right_coord = last_right_right
+                
+                #RIGHT-left
+                    # try basic increment up (-Y)
+                if (last_right_left[0]-1 >= 0) and (last_right_right[0]-1 < array_x_dim):
+                    new_right_left_coord = [last_right_right[0]-1, last_right_right[1]]
+                    # running off the 'north' edge; just pass last coordinate
+                elif (last_right_left[1]-1 < 0):
+                    new_right_left_coord = last_right_right
+
+            
+            #If slope is positive, things are easy
+            if slope < 0:
+                #LEFT-right
+                if (left_right_edge_pos == 'north') or (left_right_edge_pos == 'south'):
+                      # try basic increment right
+                    if (last_left_right[1]+1 >= 0) and (last_left_right[1]+1 < array_x_dim):
+                        new_left_right_coord = [last_left_right[0], last_left_right[1]+1]
+                      # running off the edge north/south-east; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_left_right[1]+1 >= array_x_dim) and (slope > 1e7):
+                        new_left_right_coord = last_left_right
+                      # running off the edge south-east; move to 'east' and start incrementing -Y
+                    elif (last_left_right[1]+1 >= array_x_dim):
+                        new_left_right_coord = [last_left_right[0]-1, last_left_right[1]]
+                        left_right_edge_pos = 'east'
+                    
+                if (left_left_edge_pos == 'north') or (left_left_edge_pos == 'south'):    
+                    #LEFT-left
+                      # try basic increment left
+                    if (last_left_left[1]-1 >= 0) and (last_left_left[1]-1 < array_x_dim):
+                        new_left_left_coord = [last_left_left[0], last_left_left[1]-1]
+                      # running off the edge north/south-west; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_left_left[1]-1 <0) and (slope > 1e7):
+                        new_left_left_coord = last_left_left
+                      # running off the edge south-west; move to 'west' edge and start incrementing -Y
+                    elif (last_left_left[1]-1 <0):
+                        new_left_left_coord = [last_left_left[0]+1, last_left_left[1]]
+                        left_left_edge_pos = 'west'
+                
+            #If slope is negative, 'X' and 'Y' increments move in different directions
+            #  i.e. 'left' shift is +X and 'right' shift is -X  
+            if slope > 0:
+                #LEFT-right
+                if (left_right_edge_pos == 'north') or (left_right_edge_pos == 'south'):
+                      # try basic increment right
+                    if (last_left_right[1]-1 >= 0) and (last_left_right[1]-1 < array_x_dim):
+                        new_left_right_coord = [last_left_right[0], last_left_right[1]-1]
+                      # running off the edge north/south-west; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_left_right[1]-1 < 0) and (slope > 1e7):
+                        new_left_right_coord = last_left_right
+                      # running off the edge north-west; shift to 'west' position and start walking down the 'west' edge
+                    elif (last_left_right[1]-1 < 0):
+                        new_left_right_coord = [last_left_right[0]+1, last_left_right[1]]
+                        left_right_edge_pos = 'west'
+                    
+                #LEFT-left
+                if (left_left_edge_pos == 'north') or (left_left_edge_pos == 'south'): 
+                      # try basic increment left
+                    if (last_left_left[1]+1 >= 0) and (last_left_left[1]+1 < array_x_dim):
+                        new_left_left_coord = [last_left_left[0], last_left_left[1]+1]
+                      # running off the edge north/south-east; vertical line, so just pass the last line again (nowhere to increment to)
+                    elif (last_left_left[1]+1 >= array_x_dim) and (slope > 1e7):
+                        new_left_left_coord = last_left_left
+                      # running off the edge north-east; transition to 'east' edge
+                    elif (last_left_left[1]+1 >= array_x_dim):
+                        new_left_left_coord = [last_left_left[0]+1, last_left_left[1]]
+                        left_left_edge_pos = 'east'
+                
+            #If horizontal, easy case because case shouldn't exist ; convention is "'left' shift is UP (-Y)"
+            if slope == 0:
+                pass
+
+            #If left or right, shift 1 pixel in each direction and calculate effect
+            #If slope is positive, things are easy
+            if slope < 0:
+                #RIGHT-right
+                if (right_right_edge_pos == 'east') or (right_right_edge_pos == 'west'):
+                      # try basic increment right
+                    if (last_right_right[0]+1 >= 0) and (last_right_right[0]+1 < array_y_dim):
+                        new_right_right_coord = [last_right_right[0]+1, last_right_right[1]]
+                      # running off the edge south-east; assume there's no where else to go
+                    elif (last_right_right[0]+1 >= array_y_dim):
+                        new_right_right_coord = [last_right_right[0], last_right_right[1]+1]
+                        right_left_edge_pos = 'south'
+                    
+                #RIGHT-left
+                if (right_left_edge_pos == 'east') or (right_left_edge_pos == 'west'):
+                      # try basic increment left
+                    if (last_right_left[0]-1 >= 0) and (last_right_left[0]-1 < array_y_dim):
+                        new_right_left_coord = [last_right_left[0]-1, last_right_left[1]]
+                      # running off the north-east edge; transition to north
+                    elif (last_right_left[0]-1 <0):
+                        new_right_left_coord = [last_right_left[0], last_right_left[1]+1]
+                        right_left_edge_pos = 'north'
+
+            #If slope is negative, 'X' and 'Y' increments move in different directions
+            #  i.e. 'left' shift is +X and 'right' shift is -X  
+            if slope > 0:
+                #RIGHT-right
+                if (right_right_edge_pos == 'east') or (right_right_edge_pos == 'west'):
+                      # try basic increment right
+                    if (last_right_right[0]+1 >= 0) and (last_right_right[0]+1 < array_y_dim):
+                        new_right_right_coord = [last_right_right[0]+1, last_right_right[1]]
+                      # running off the edge south-west; move to south edge and begin incrementing -X
+                    elif (last_right_right[0]+1 >= array_y_dim):
+                        new_right_right_coord = [last_right_right[0], last_right_right[1]-1]
+                        right_right_edge_pos = 'south'
+                    
+                #RIGHT-left
+                if (right_left_edge_pos == 'east') or (right_left_edge_pos == 'west'):
+                      # try basic increment left
+                    if (last_right_left[0]-1 >= 0) and (last_right_left[0]-1 < array_y_dim):
+                        new_right_left_coord = [last_right_left[0]-1, last_right_left[1]]
+                      # running off the edge north-east; shift to 'north' position and increment -X
+                    elif (last_right_left[0]-1 <0):
+                        new_right_left_coord = [last_right_left[0], last_right_left[1]-1]
+                        right_left_edge_pos = 'north'
+                
+            #If horizontal, easy case; convention is 'left' shift is UP (-Y)
+            if slope == 0:
+                #RIGHT-right
+                if (right_right_edge_pos == 'east') or (right_right_edge_pos == 'west'):
+                    if (last_right_right[0]+1 >= 0) and (last_right_right[0]+1 < array_y_dim):
+                        new_right_right_coord = [last_right_right[0]+1, last_right_right[1]]
+                      # running off south edge; ignore further incrementing
+                    elif (last_right_right[0]+1 >= array_y_dim):
+                        new_right_right_coord = last_right_right
+                #RIGHT-left
+                if (right_left_edge_pos == 'east') or (right_left_edge_pos == 'west'):
+                    if (last_right_left[0]-1 >= 0) and (last_right_left[0]-1 < array_y_dim):
+                        new_right_left_coord = [last_right_left[0]-1, last_right_left[1]]
+                      # running off south edge; ignore further incrementing
+                    elif (last_right_left[0]-1 < 0):
+                        new_right_left_coord = last_right_left
+
+            #If left or right, shift 1 pixel in each direction and calculate effect
+            #If slope is positive, things are easy
+            if slope < 0:
+                #LEFT-right
+                if (left_right_edge_pos == 'east') or (left_right_edge_pos == 'west'):
+                      # try basic increment right
+                    if (last_left_right[0]+1 >= 0) and (last_left_right[0]+1 < array_y_dim):
+                        new_left_right_coord = [last_left_right[0]+1, last_left_right[1]]
+                      # running off the edge south-west; transition to 'south' 
+                    elif (last_left_right[0]+1 >= array_y_dim):
+                        new_left_right_coord = [last_left_right[0], last_left_right[1]+1]
+                        left_right_edge_pos = 'south'
+                    
+                #LEFT-left
+                if (left_left_edge_pos == 'east') or (left_left_edge_pos == 'west'):
+                      # try basic increment left
+                    if (last_left_left[0]-1 >= 0) and (last_left_left[0]-1 < array_y_dim):
+                        new_left_left_coord = [last_left_left[0]-1, last_left_left[1]]
+                      # running off the north-east edge; transition to north
+                    elif (last_left_left[0]-1 <0):
+                        new_left_left_coord = [last_left_left[0], last_left_left[1]+1]
+                        left_left_edge_pos = 'north'
+
+            #If slope is negative, 'X' and 'Y' increments move in different directions
+            #  i.e. 'left' shift is +X and 'right' shift is -X  
+            if slope > 0:
+                #LEFT-right
+                if (left_right_edge_pos == 'east') or (left_right_edge_pos == 'west'):
+                      # try basic increment right
+                    if (last_left_right[0]+1 >= 0) and (last_left_right[0]+1 < array_y_dim):
+                        new_left_right_coord = [last_left_right[0]+1, last_left_right[1]]
+                      # running off the edge south-west; transition to 'south'
+                    elif (last_left_right[0]+1 >= array_y_dim):
+                        new_left_right_coord = [last_left_right[0], last_left_right[1]+1]
+                        left_right_edge_pos = 'south'
+                    
+                #LEFT-left
+                if (left_left_edge_pos == 'east') or (left_left_edge_pos == 'west'):
+                      # try basic increment left
+                    if (last_left_left[0]-1 >= 0) and (last_left_left[0]-1 < array_y_dim):
+                        new_left_left_coord = [last_left_left[0]-1, last_left_left[1]]
+                      # running off the edge north-west; shift to 'north' position and increment +X
+                    elif (last_left_left[0]-1 <0):
+                        new_left_left_coord = [last_left_left[0], last_left_left[1]+1]
+                        left_left_edge_pos = 'north'
+                
+            #If horizontal, easy case; convention is 'left' shift is UP (-Y)
+            if slope == 0:
+                #LEFT-right
+                if (left_right_edge_pos == 'east') or (left_right_edge_pos == 'west'):
+                    if (last_left_right[0]+1 >= 0) and (last_left_right[0]+1 < array_y_dim):
+                        new_left_right_coord = [last_left_right[0]+1, last_left_right[1]]
+                      # running off south edge; ignore further incrementing
+                    elif (last_left_right[0]+1 >= array_y_dim):
+                        new_left_right_coord = last_left_right
+                #LEFT-left
+                if (left_left_edge_pos == 'east') or (left_left_edge_pos == 'west'):
+                    if (last_left_left[0]-1 >= 0) and (last_left_left[0]-1 < array_y_dim):
+                        new_left_left_coord = [last_left_left[0]-1, last_left_left[1]]
+                      # running off south edge; ignore further incrementing
+                    elif (last_left_left[0]-1 < 0):
+                        new_left_left_coord = last_left_left
+
+            #Final check to coerce out of index values
+            #   Bad check somewhere above and I'm too lazy to find it
+            #   Obviously only works on a single increment; any more than that and it will get screwy
+              # do the Y's
+            if new_left_right_coord[0] == array_y_dim:
+                new_left_right_coord[0] = new_left_right_coord[0]-1
+            if new_left_left_coord[0] == array_y_dim:
+                new_left_left_coord[0] = new_left_left_coord[0]-1
+            if new_right_right_coord[0] == array_y_dim:
+                new_right_right_coord[0] = new_right_right_coord[0]-1
+            if new_right_left_coord[0] == array_y_dim:
+                new_right_left_coord[0] = new_right_left_coord[0]-1
+              # do the X's
+            if new_left_right_coord[1] == array_x_dim:
+                new_left_right_coord[1] = new_left_right_coord[1]-1
+            if new_left_left_coord[1] == array_x_dim:
+                new_left_left_coord[1] = new_left_left_coord[1]-1
+            if new_right_right_coord[1] == array_x_dim:
+                new_right_right_coord[1] = new_right_right_coord[1]-1
+            if new_right_left_coord[1] == array_x_dim:
+                new_right_left_coord[1] = new_right_left_coord[1]-1
+
+            #Check to make sure a line isn't being drawn along the edge again (allowed first time)
+            left_edge_bool = bool(
+                ((new_left_left_coord[0] == 0) and (new_right_left_coord[0] ==0)) or
+                ((new_left_left_coord[0] == array_y_dim) and (new_right_left_coord[0] == array_y_dim)) or
+                ((new_left_left_coord[1] == 0) and (new_right_left_coord[1] == 0)) or
+                ((new_left_left_coord[1] == array_x_dim) and (new_right_left_coord[1] == array_x_dim))
+                )
+            right_edge_bool = bool(
+                ((new_left_right_coord[0] == 0) and (new_right_right_coord[0] ==0)) or
+                ((new_left_right_coord[0] == array_y_dim) and (new_right_right_coord[0] == array_y_dim)) or
+                ((new_left_right_coord[1] == 0) and (new_right_right_coord[1] == 0)) or
+                ((new_left_right_coord[1] == array_x_dim) and (new_right_right_coord[1] == array_x_dim))
+                )
+              # change edge flag if just hit
+            if (left_edge_bool) and (not point_left_edge_hit):
+                point_left_edge_hit = True
+            if (right_edge_bool) and (not point_right_edge_hit):
+                point_right_edge_hit = True
+
+            #Calculate distance between initial centerline and this new line
+            #NOTE: still in units of 'pixels' here
+            left_distances = [point_line_distance(new_left_left_coord, initial_start_coord, initial_end_coord),
+                              point_line_distance(new_right_left_coord, initial_start_coord, initial_end_coord)]
+            right_distances = [point_line_distance(new_left_right_coord, initial_start_coord, initial_end_coord),
+                              point_line_distance(new_right_right_coord, initial_start_coord, initial_end_coord)]
+            average_left_distance = sum(left_distances)/2 * um_to_pix_conversion  #converted to microns
+            average_right_distance = sum(right_distances)/2 * um_to_pix_conversion  #converted to microns
+
+            #Avoid math domain error by ignoring average distances close to strand radius
+            if (micron_strand_radius-average_left_distance) > 1e-5:
+                average_left_thickness = strand_thickness_func(average_left_distance)
+            else:
+                average_left_thickness = 0 
+            if (micron_strand_radius-average_right_distance) > 1e-5:
+                average_right_thickness = strand_thickness_func(average_right_distance)
+            else:
+                average_right_thickness = 0
+
+            #Each side doesn't increment equally in terms of radial distance because of the way the array grid indexing differs from spatial distance
+            #Use this to flag the minimum distance and keep calculating left-right radial points until it's met
+            radial_distance = min(average_left_distance, average_right_distance)         
+                        
+            #Store values if progression isn't continuing down the same array edge (store first instance and no others)
+            #NOTE: order doesn't matter here, but trying to maintain 'left = start', 'right = end' convention for (some) clarity
+              #new ->right line
+            #NOTE: keep adding each side until distance is > strand_radius; i.e. if one side hits that distance first, keep adding the other until that side reaches the limit
+            if not point_right_edge_hit and ((right_distances[0]<=micron_strand_radius) and (right_distances[1]<=micron_strand_radius)):
+                starting_points_list.append(new_left_right_coord)
+                ending_points_list.append(new_right_right_coord)
+                thickness_list.append(average_right_thickness)
+            if not point_left_edge_hit and ((left_distances[0]<=micron_strand_radius) and (left_distances[1]<=micron_strand_radius)):
+                starting_points_list.append(new_left_left_coord)
+                ending_points_list.append(new_right_left_coord)
+                thickness_list.append(average_left_thickness)
+
+            #Report
+            if print_intermediate_steps:
+                #
+                print()
+                
+                print(f"Iteration {iteration_cntr}: ")
+                print(f"Point_name \t\t Point_coord  \t\t Edge  \t\t Radial-distances \t\t Calc. Thickness")
+                print('-'*75)
+                print(f"  L-left   \t\t {new_left_left_coord} \t\t {left_left_edge_pos} \t\t {left_distances[0]} \t\t {average_left_thickness}")
+                print(f"  L-right  \t\t {new_left_right_coord} \t\t {left_right_edge_pos} \t\t {left_distances[1]} \t\t {average_left_thickness}")
+                print(f"  R-left   \t\t {new_right_left_coord} \t\t {right_left_edge_pos} \t\t {right_distances[0]} \t\t {average_right_thickness}")
+                print(f"  R-right  \t\t {new_right_right_coord} \t\t {right_right_edge_pos} \t\t {right_distances[1]} \t\t {average_right_thickness}")
+
+            #Store current position for next iteration
+            last_right_right = new_right_right_coord
+            last_right_left = new_right_left_coord
+            last_left_right = new_left_right_coord
+            last_left_left = new_left_left_coord
+
+            #Increment cntr in case things go poorly above
+            iteration_cntr += 1
+
+
+    #If points are interior, proceed with interior calcs
+    elif (right_edge_pos == 'interior') and (left_edge_pos == 'interior'):
+        pass
+    
+    #If points are mixed, do both interior and edge calcs
+    #TODO: fill in these cases
+      # end pos only edge
+    elif (right_edge_pos != 'interior'):
+        pass
+      # start pos only edge
+    elif (left_edge_pos != 'interior'):
+        pass
+
+    #Store the starting, ending, and distance values for passing
+    neighbor_dict = {
+        'starting_points': starting_points_list,
+        'ending_points': ending_points_list,
+        'thickness_list': thickness_list
+        }
+
+    #Step through array and draw lines for each starting and ending point
+    for start, end, thickness in zip(starting_points_list, ending_points_list, thickness_list):
+        rr, cc = line(start[0], start[1], end[0], end[1])
+        return_array[rr,cc] = thickness
+
+    neighbor_dict['drawn_array'] = return_array
+
+    if show_final_array:
+        plt.imshow(return_array)
+        plt.title("Single-line draw; radial thickness")
+        plt.show()
+
+    return neighbor_dict
+
+
+def generate_random_pole_point_2D(starting_point,
+                                   starting_angle,
+                                   array_dims
+                                   ):
+    """
+    Description:
+        Starting from a point within the 2D array, generate a line along its trajectory and define
+        a random point outside the array at a random distance to serve as a 'pole_point' for
+        starting each new layer's lines. Return a dictionary with specifics about distance 
+        and angles between the new 'pole_point' and the array's points/edges.
+
+    INPUTS:
+        'starting_point'    iterable (tuple, list, numpy.array) of int; initial starting point within the array bounds
+        'starting_angle'    int or float; intial line angle at 'starting_point'
+                            NOTE: line is drawn in each direction; 'angle' and 360-(180-'angle')
+        'array_dims'        iterable (tuple, list, numpy.array) of int; size of array in pixels
+    ACTIONS:
+        -lorem
+    OUTPUTS:
+        'pole_point_dict'   lorem
+
+    """
+
+    #Initialize and format variables
+    starting_point = np.array(starting_point).astype(np.int_)
+    array_dims = np.array(array_dims).astype(np.int_)
+    array_shape = array_dims.shape[0]
+      # initialize a maximum distance from the array to step when generating the new 'pole_point'
+      # NOTE: intention is to allow it to be 'far' away without being pointlessly far, hence the hard-coded multiplier below
+    max_step_distance = max(array_dims) *3  #hard-coded distance limit
+    step_distance = random.randint(-1*max_step_distance, max_step_distance)
+    
+    #Generate values for 'pole_point'
+    if (starting_angle == 0) or (starting_angle ==180):
+        #If horizontal, step is purely in X
+        new_pole_point = np.array([starting_point[0], starting_point[1]+step_distance])
+        line_direction = 'horizontal'
+    elif (starting_angle == 90) or (starting_angle == 270):
+        #If vertical, step is purely in Y
+        new_pole_point = np.array([starting_point[0]+step_distance, starting_point[1]])
+        line_direction = 'vertical'
+    elif (starting_angle <90) or ((starting_angle >180) and (starting_angle <270)):
+        #If "+" slope, line can extend in either direction. Convention is neg. ste
+        new_pole_point = np.array([starting_point[0], starting_point[1]+step_distance])
+        line_direction = 'horizontal'
+
+    # new_pole_point = [dim+step_distance for dim in array_dims]
+    pole_start_distance = math.sqrt(sum([(pole-start)**2 for pole, start in zip(new_pole_point, starting_point)]))
+    
+    return new_pole_point
+
+
+def pole_point_to_array_interior_point(pole_point,
+                                        offset_angle,
+                                        strand_pitch,
+                                        lateral_offset,
+                                        array_dims,
+                                        strand_diameter,
+                                        um_to_pix_conversion = 1,
+                                        line_type = 'simple'
+                                        ):
+    """
+    Description:
+        From a 'pole_point' dictionary, generate a line from the 'pole_point' to the array and calculate the angles and distances between the 'pole_point' and the array's points/edges.
+        NOTE: Calculations are done in (X,Y) to make vector math easier, but are flipped back to (Y,X) for array indexing at the end.
+    INPUTS:
+        'pole_point_dict'   dictionary; output of 'generate_random_pole_point_2D' function)
+    OUTPUT:
+        'interior_point'    list; (Y,X) of array indices of interior point 
+    """
+
+    #Define hard-coded settings
+    pole_point_line_padding = 30    #distance 'left' and 'right' to draw a line through the pole_point;
+
+    #Initialize variables
+    interior_point = [-1,-1]  #default return value; improper trial point to flag failed process
+    pole_point = np.array(pole_point)
+    #Convert 'micron' values into 'pixels'
+    strand_radius = strand_diameter/2 / um_to_pix_conversion
+    strand_pitch = strand_pitch/ um_to_pix_conversion
+    lateral_offset = lateral_offset/ um_to_pix_conversion
+
+    #Test to see if 'pole_point' is within the array boundaries (i.e. 'interior' to array)
+    dim_bools = [((point<dim)and(point>=0)) for point, dim in zip(pole_point, array_dims)]
+    interior_bool = all(dim_bools)
+
+    #If pole_point is interior to array, no more calculations needed
+    if interior_bool:
+        interior_point = pole_point
+    
+    #If 'pole_point' is exterior to array (most common case by far), calculate angles and distances to array points/edges
+    else:
+        #Generate a line at the 'pole_point' based on structure values and calculate the intersection of that line with the array boundaries
+        #Step ~5 pixels along the line in each direction
+        if (offset_angle < 90 and offset_angle  >= 0):
+            left_angle = 180 + offset_angle
+            right_angle = offset_angle
+        elif offset_angle ==90 or offset_angle == 270:
+            left_angle = 270
+            right_angle = 90
+        elif offset_angle <= 180 and offset_angle > 90:
+            left_angle = offset_angle
+            right_angle = offset_angle + 180
+        elif offset_angle < 270 and offset_angle > 180:
+            left_angle = offset_angle
+            right_angle = offset_angle - 180
+        elif offset_angle > 270 and offset_angle < 360:
+            left_angle = offset_angle - 180
+            right_angle = offset_angle
+          # round to avoid overflow errors in trig functions at extreme angles
+        right_y = round(math.sin(math.radians(right_angle)), 5) * pole_point_line_padding
+        right_x = round(math.cos(math.radians(right_angle)), 5) * pole_point_line_padding
+        left_y = round(math.sin(math.radians(left_angle)), 5) * pole_point_line_padding
+        left_x = round(math.cos(math.radians(left_angle)), 5) * pole_point_line_padding
+        #NOTE: These are all (X,Y) to make vector math easier, but will need to be flipped back to (Y,X) for array indexing later
+          # increment original 'pole_point' to create characterisitic line
+        a0 = np.array([pole_point[1]+left_x, pole_point[0]+left_y])
+        a1 = np.array([pole_point[1]+right_x, pole_point[0]+right_y])
+
+        #Set up variables for calculating distances to array boundaries
+          # hard-coded edge point list for array boundaries; (X,Y) format for vector math
+        edges = [
+            [[0,0], [array_dims[1], 0]], 
+            [[array_dims[1], 0], [array_dims[1], array_dims[0]]],
+            [[0, array_dims[0]], [array_dims[1], array_dims[0]]],
+            [[0, array_dims[0]], [0,0]]
+                 ]
+        edge_names = ['south', 'east', 'north', 'west']
+        edge_distances = []
+        intersected_edges=[]
+        intersected_edge_names = []
+        
+        #Check to see if 'pole_point_line' intersects with array boundaries and calculate intersection point (i.e. 'interior_point')
+        for idx, edge in enumerate(edges):
+            b0 = np.array(edge[0])
+            b1 = np.array(edge[1])
+            #Calculate distance between infinite line and segment of array boundary;
+            #  'clamp' values below ensure distance to line segment of boundary is calculated, not infinite line at the boundary location
+            _,_,this_distance = line_line_distance(a0,a1,b0,b1,
+                                                clampB0=True,
+                                                clampB1=True)
+            #round to get 0-comparison-capable distance measures; otherwise float-to-int comparison can be iffy
+            #  i.o.w. condition 'near-zero' distances
+            if this_distance < 1e-10:
+                edge_distances.append(0)
+                intersected_edges.append(edge)
+                intersected_edge_names.append(edge_names[idx])
+            else:
+                edge_distances.append(round(this_distance))
+
+        if len(intersected_edges) >0:
+            intersected_bool = True
+        else:
+            intersected_bool = False
+
+        #Calculate interior points
+          # if intersection exists, calculate an interior point 
+        if intersected_bool:
+            boundary_coordinates= []
+            if len(intersected_edges) == 2:
+                for edge_coords, edge_name in zip(intersected_edges, intersected_edge_names):
+                    #NOTE: this is (X,Y) format; will need to be flipped back to (Y,X) for array indexing later
+                    b0 = np.array(edge_coords[0])
+                    b1 = np.array(edge_coords[1])
+                    boundary_x, boundary_y = intersect_line_and_segment(a0, a1, b0, b1)
+                    boundary_coordinates.append([boundary_x, boundary_y])
+                interior_point_x = (boundary_coordinates[0][0] + boundary_coordinates[1][0])/2
+                interior_point_y = (boundary_coordinates[0][1] + boundary_coordinates[1][1])/2
+                interior_point = [int(round(interior_point_y)), int(round(interior_point_x))]
+            #If trial line from 'pole_point' intersects with any other number than 0 or 2 boundaries, something is pathalogical
+            else:
+                print(f"Innapropriate number of intersected boundaries- {len(intersected_edges)} edges:")
+                for edge in intersected_edges:
+                    print(f"\t {edge[0]} \t {edge[1]}")
+          # if line doesn't intersect with ANY array boundaries, find closest edge and calculate an interior point 
+        else:
+            smallest_distance = 1e6  #should be way bigger than any possible distance
+            for distance, edge_coords, edge_name in zip(edge_distances, edges, edge_names):
+                if distance < smallest_distance:
+                    closest_edge = edge_coords
+                    closest_edge_name = edge_name
+                    smallest_distance = distance
+                    b0 = edge_coords[0]
+                    b1 = edge_coords[1]
+            #If closest edge was found, calculate interior point
+            if smallest_distance < 1e5:
+                #Calculate closest point between abstract line from 'pole_point' and clampled line segment of closest edge
+                try:
+                    #Actual calculation
+                    pole_line_closest_point, array_edge_closest_point, distance = \
+                        line_line_distance(a0,a1,b0,b1,
+                                            clampB0=True,
+                                            clampB1=True)
+
+                    #Calculate orthogonal direction vector from line from 'pole_point' to array edge
+                    dx = array_edge_closest_point[0] - pole_line_closest_point[0]
+                    dy = array_edge_closest_point[1] - pole_line_closest_point[1]
+                
+                #There's an issue with 'line_line_distance' that only comes up with vertical lines, so try the following to get closer
+                #Check distance between middle of 'west' and 'east' edges and vertical line
+                except:
+                    y_offscale_high = False
+                    y_offscale_low = False
+                    x_offscale_high  = False
+                    x_offscale_low = False
+                    #If fancy math doesn't work, brute-force it
+                    if pole_point[0] >= array_dims[0]:
+                        y_offscale_high = True
+                    if pole_point[0] < 0:
+                        y_offscale_low = True
+                    if pole_point[1] >= array_dims[1]:
+                        x_offscale_high = True
+                    if pole_point[1] < 0:
+                        x_offscale_low = True
+                    #Check which side of the array to get closest points from
+                      # if vertical, this is easy; just fine the correct Y for a constant X
+                    if (offset_angle == 90) or (offset_angle == 270):
+                        if x_offscale_high:
+                            #Points in (X,Y)
+                            array_edge_closest_point = [array_dims[1], array_dims[0]/2]
+                            pole_line_closest_point = np.array([pole_point[1], array_dims[0]/2])
+                        if x_offscale_low:
+                            #Points in (X,Y)
+                            array_edge_closest_point = [0, array_dims[0]/2]
+                            pole_line_closest_point = np.array([pole_point[1], array_dims[0]/2])
+
+                    #Calculate orthogonal direction vector from line from 'pole_point' to array edge
+                    dx = array_edge_closest_point[0] - pole_line_closest_point[0]
+                    dy = array_edge_closest_point[1] - pole_line_closest_point[1]
+
+                distance = math.sqrt((dx)**2 + (dy)**2)
+                unit_dx = dx/distance
+                unit_dy = dy/distance
+                  # step at lateral_offset towards array
+                step_coord_x = pole_line_closest_point[0] + unit_dx*lateral_offset
+                step_coord_y = pole_line_closest_point[1] + unit_dy*lateral_offset
+
+                #Starting at closest 'pole_point' line point, add offset and step at 'strand_pitch' until within a 'strand_radius' distance of the array
+                interior_reached = False
+                stepping_counter = 0   #safety counter to avoid infinite loops in pathological cases
+                while (not interior_reached) and (stepping_counter<10000):
+                    if (step_coord_x >= 0 and step_coord_x < array_dims[1]) and (step_coord_y >= 0 and step_coord_y < array_dims[0]):
+                        interior_reached = True
+                        interior_point = [int(round(step_coord_y)), int(round(step_coord_x))]
+                        break
+                    else:
+                        step_coord_x += unit_dx*strand_pitch
+                        step_coord_y += unit_dy*strand_pitch
+                        stepping_counter += 1
+
+    return interior_point
+
+
+def ideal_tile_from_initial_line(initial_line_points,
+                                offset_angle, 
+                                strand_pitch,
+                                array_dims,
+                                strand_diameter,
+                                um_to_pix_conversion = 1,
+                                show_final_array = False):
+    """
+    Description:
+        Tile from an ideal structure (i.e. not from points or toolpath). From an intial point within an array, tile in each direction until the array is filled.
+        NOTE: 'array_dims' and 'drawn_array' are (Y,X) but all points w/in this function are (X,Y).
+
+    INPUTS:
+            'initial_line_points'   iterable (tuple, list, numpy.array); (Y,X) coordinates
+            'strand_diameter'       int or float; strand diameter in microns
+    OUTPUTS:
+            'tile_dict'     dict; contains the following keys:
+                            'drawn_array'   numpy array of size 'array_dims' with tiled structure drawn in; values represent thickness of strand at each point
+    """
+
+    #Initialize and format variables
+    tile_dict = {
+        'drawn_array': None,
+        }
+    layer_array = np.zeros((array_dims[0], array_dims[1]))
+    array_x_dim = array_dims[1]
+    array_y_dim = array_dims[0]
+      # convert from microns to pixels for calculations
+    micron_strand_pitch = strand_pitch
+    micron_strand_diameter = strand_diameter
+    micron_strand_radius = micron_strand_diameter/2
+    strand_pitch = strand_pitch/um_to_pix_conversion
+    strand_diameter = strand_diameter / um_to_pix_conversion
+    strand_radius = strand_diameter/2
+        #Flip initial points from (Y,X) to (X,Y) for calculations
+    initial_start_point = [initial_line_points[0][1], initial_line_points[0][0]]
+    initial_end_point = [initial_line_points[1][1], initial_line_points[1][0]]
+    if (initial_end_point[0]-initial_start_point[0]) != 0:
+        slope = (initial_end_point[1]-initial_start_point[1])/(initial_end_point[0]-initial_start_point[0])
+    else:
+        slope = 1e7  #arbitrary large number to represent vertical line
+
+
+    #Define 'left' and 'right' boundary points (corners of the array)
+    #NOTE: 'array_dims' and 'drawn_array' are (Y,X) but all points w/in this function are (X,Y)
+    #NOTE: image array is flipped-Y, but calculations here are Cartesian
+    if abs(slope) < 1e-5:
+        #horizontal
+        left_coord = [(array_x_dim-1)/2, (array_y_dim-1)]
+        right_coord = [(array_x_dim-1)/2, 0]
+    elif slope > 0:
+        if slope > 1e6:
+            line_type = 'vertical'
+            left_coord = [0, (array_y_dim-1)/2]
+            right_coord = [(array_x_dim-1), (array_y_dim-1)/2]
+        else:
+            #negative slope in the drawn array, positive Cartesian
+            line_type = 'negative'
+            left_coord = [(array_y_dim-1), 0]
+            right_coord = [0, (array_x_dim-1)]
+    elif slope < 0:
+        if abs(slope) > 1e6:
+            line_type = 'vertical'
+            left_coord = [0, (array_y_dim-1)/2]
+            right_coord = [(array_x_dim-1), (array_y_dim-1)/2]
+        else:
+            #positive slope in the drawn array, negative Cartesian
+            line_type = 'positive'
+            left_coord = [0,0]
+            right_coord = [(array_x_dim-1),(array_y_dim-1)]
+    
+    #Fill the array by stepping 'left'
+    prior_line_points = [initial_start_point, initial_end_point]
+    distance_left = 1e6  #arbitrary big number for initialization
+    stepping_counter = 0
+    exterior_hit = False
+    while (distance_left >= strand_pitch) and (stepping_counter <100) and (not exterior_hit):
+        #'left_coord' is left boundary point on the array
+        p_left_line = intersect_point_and_segment(left_coord, prior_line_points[0], prior_line_points[1])
+        if p_left_line is None:
+            #If point has no intercept with clamped line segment within the array, quite the loop.
+            #  This should only happen if the orthogonal distance is undefined, which SHOULD only happen when no more lines can be drawn in this direction
+            break
+        #Check if the new 'p_leftline' is outside the array boundaries
+        if (p_left_line[0] < 0) or (p_left_line[1] < 0) or (p_left_line[0] >= array_x_dim) or (p_left_line[1] >= array_y_dim):
+            exterior_hit = True
+            #TODO: use 'exterior_hit' flag to draw a line if it's within 'strand_radius' of the array boundary
+            #  break for now until implemented
+            break
+        #Total distance from
+        dx = left_coord[0]-p_left_line[0]
+        dy = left_coord[1]-p_left_line[1]
+        distance_left = math.sqrt((dx)**2 + (dy)**2)
+        if (distance_left >= strand_pitch) and (not exterior_hit):
+            unit_dx = dx/distance_left
+            unit_dy = dy/distance_left
+            step_coord_x = p_left_line[0] + unit_dx*strand_pitch
+            step_coord_y = p_left_line[1] + unit_dy*strand_pitch
+            line_dict = draw_2D_strand_line_bythickness([step_coord_y, step_coord_x],
+                                                        offset_angle,
+                                                        micron_strand_diameter,
+                                                        array_dims,
+                                                        um_to_pix_conversion = um_to_pix_conversion,
+                                                        length = None,
+                                                        line_type = 'simple',
+                                                        thickness_fcn = 'cylinder',
+                                                        show_points = False,
+                                                        show_array_iterations = False,
+                                                        show_final_array = False)
+
+            #Pull return dict data and condition
+            line_key = list(line_dict['line_dicts'].keys())[0]   #pull first key; should be only entry in dict
+            drawn_array = line_dict['line_dicts'][line_key]['drawn_array']
+            drawn_mask = drawn_array > 0
+            layer_array[drawn_mask] = drawn_array[drawn_mask]
+              # 'line_dict' points are (Y,X), flip to (X,Y)
+            new_line_start = line_dict['line_dicts'][line_key]['start_coordinates']
+            new_line_start = [new_line_start[1], new_line_start[0]]
+            new_line_end = line_dict['line_dicts'][line_key]['end_coordinates']
+            new_line_end = [new_line_end[1], new_line_end[0]]
+
+            #Set values for next iteration
+            if prior_line_points == [new_line_start, new_line_end]:
+                break
+            else:
+                prior_line_points = [new_line_start, new_line_end]
+            stepping_counter += 1
+
+        elif abs(distance_left) <= strand_radius:
+            #TODO: add this use case when point is external to array but within a strand radius of the edge
+            # raw_2D_external_line_bythickness(external_point,
+            #                               strand_radius_in_pix,
+            #                               array_dims,
+            #                               um_to_pix_conversion = 1,
+            #                               line_type = 'simple')
+
+            break
+
+        else:
+            #TODO: add this use case when point is external to array but within a strand radius of the edge; should be same as above but with different distance condition
+            break
+
+        #Store the 'left' results
+        tile_dict['drawn_array'] = layer_array
+
+    #Fill 'right'
+    prior_line_points = [initial_start_point, initial_end_point]
+    distance_right = 1e6  #arbitrary big number for initialization
+    stepping_counter = 0
+    exterior_hit = False
+    while (distance_right >= strand_pitch) and (stepping_counter <100) and (not exterior_hit):
+        #'right_coord' is left boundary point on the array
+        p_right_line = intersect_point_and_segment(right_coord, prior_line_points[0], prior_line_points[1])
+        #If point has no intercept with clamped line segment within the array, quite the loop.
+        if p_right_line is None:
+            #  This should only happen if the orthogonal distance is undefined, which SHOULD only happen when no more lines can be drawn in this direction
+            break
+        #Check if the new 'p_right_line' is outside the array boundaries
+        if (p_right_line[0] < 0) or (p_right_line[1] < 0) or (p_right_line[0] >= array_dims[0]) or (p_right_line[1] >= array_dims[1]):
+            exterior_hit = True
+            #TODO: use 'exterior_hit' flag to draw a line if it's within 'strand_radius' of the array boundary
+            #  break for now until implemented
+            break
+        #Either it's not possible to draw another orthogonal point, or a failure occured.
+        #  Either way, break and move on
+        dx = right_coord[0]- p_right_line[0]
+        dy = right_coord[1]- p_right_line[1]
+        distance_right = math.sqrt((dx)**2 + (dy)**2)
+        #Normal case; inside array, do normal things
+        if (distance_right > strand_pitch) and (not exterior_hit):
+            unit_dx = dx/distance_right
+            unit_dy = dy/distance_right
+            step_coord_x = p_right_line[0] + unit_dx*strand_pitch
+            step_coord_y = p_right_line[1] + unit_dy*strand_pitch
+            line_dict = draw_2D_strand_line_bythickness([step_coord_y, step_coord_x],
+                                                        offset_angle,
+                                                        micron_strand_diameter,
+                                                        array_dims,
+                                                        um_to_pix_conversion = um_to_pix_conversion,
+                                                        length = None,
+                                                        line_type = 'simple',
+                                                        thickness_fcn = 'cylinder',
+                                                        show_points = False,
+                                                        show_array_iterations = False,
+                                                        show_final_array = False)
+
+            line_key = list(line_dict['line_dicts'].keys())[0]   #pull first key; should be only entry in dict
+            drawn_array = line_dict['line_dicts'][line_key]['drawn_array']
+            drawn_mask = drawn_array > 0
+            layer_array[drawn_mask] = drawn_array[drawn_mask]
+              # 'line_dict' points are (Y,X), flip to (X,Y)
+            new_line_start = line_dict['line_dicts'][line_key]['start_coordinates']
+            new_line_start = [new_line_start[1], new_line_start[0]]
+            new_line_end = line_dict['line_dicts'][line_key]['end_coordinates']
+            new_line_end = [new_line_end[1], new_line_end[0]]
+
+            #Set values for next iteration
+            if prior_line_points == [new_line_start, new_line_end]:
+                break
+            else:
+                prior_line_points = [new_line_start, new_line_end]
+            stepping_counter += 1
+        
+        #Case where point just exited array; more complicated calculation needed, but just using stand-in code for now
+        elif abs(distance_right) <= strand_radius:
+            #TODO: add this use case when point is external to array but within a strand radius of the edge
+            # raw_2D_external_line_bythickness(external_point,
+            #                               strand_radius_in_pix,
+            #                               array_dims,
+            #                               um_to_pix_conversion = 1,
+            #                               line_type = 'simple')
+            break
+
+        else:
+            #TODO: add this use case when point is external to array but within a strand radius of the edge; should be same as above but with different distance condition
+            break
+
+        #Store 'right' results (updated 'left' results with 'right' results)
+        tile_dict['drawn_array'] = layer_array
+
+    if show_final_array:
+        plt.imshow(layer_array)
+        plt.title("Tiled array")
+        plt.show()
+        plt.close()
+
+    return tile_dict
+
+
+def draw_2D_external_line_bythickness(external_point,
+                                    strand_diameter,
+                                    array_dims,
+                                    um_to_pix_conversion = 1,
+                                    line_type = 'simple'):
+    """
+    Description:
+        For strands that have some thickness within array boundaries, but whose centerline points are exterior to the array bounds: draw appropriate lines.
+    """
+    #Initialize and format variables
+    drawn_array = np.zeros(array_dims)
+    strand_radius_in_pixels = strand_diameter/2 / um_to_pix_conversion
+    #Draw line between start and end points
+    rr, cc = line(start_point[0], start_point[1], end_point[0], end_point[1])
+    drawn_array[rr,cc] = thickness
+    if show_final_array:
+        plt.imshow(drawn_array)
+        plt.show()
+    return drawn_array

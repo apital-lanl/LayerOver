@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 import traceback
   
 #Imports from LayerOver 
-from LayerOver.DataAnalysis import MechanicalData as mech
+from LayerOver.Analysis import MechanicalData as mech
 
 
 #Specify some options
