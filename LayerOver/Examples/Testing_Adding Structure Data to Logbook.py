@@ -48,7 +48,7 @@ update_with_mechanical_data = False #option to add mech data;
 #######################################################################################################################
 
 #Initialize variables
-update_key_names = additional_structure_fields   #additional structure values not in 'diw_structure_dict' 
+updating_key_names = additional_structure_fields   #additional structure values not in 'diw_structure_dict' 
   # select a logbook to update
 root = Tk()
 logbook_filepath = filedialog.askopenfilename(title = "Select a logbook 'AutomatedAnalysis.csv' file", \
@@ -69,7 +69,7 @@ logbook_df = open_logbook(logbook_filepath,
                           target_excel_sheetname = None)
 waffledata_df = open_wafflebook(waffledata_filepath)
 unique_structure_dict = waffledata_df.set_index('index').to_dict(orient='index')
-unique_structureids = list(unique_structure_dict.keys())
+unique_structure_id_list = list(unique_structure_dict.keys())
 
     #'wafflebook' standard columns (i.e. columns in logbook)
         # part_structure	
@@ -129,7 +129,7 @@ for idx, name in enumerate(print_names):
 
     try:
         #Pull logbook row
-        this_logbook_row = logbook_df[logbook_df['Name'] == name]
+        this_logbook_row = logbook_df[logbook_df['Name'] == name].copy()
     
         #Generate a generalized and homogenous structure dict
         diw_structure_dict = structure_dict_from_logbook_row(this_logbook_row)
@@ -141,18 +141,22 @@ for idx, name in enumerate(print_names):
         ############################################################################################################################
         
         #Check if this is a new structure or not; don't update 'unique_structure_dict' as we're just checking
-        is_unique_bool,unique_structure_id,_ = match_structure_to_unique_name(diw_structure_dict, unique_structure_dict)
-        print(f"\t Structure {diw_structure_dict['part_structure']} flagged as {unique_structure_id}")
+        is_unique_bool, unique_structure_id,_ = match_structure_to_unique_name(diw_structure_dict, unique_structure_dict)
+        print(f"\t Structure {diw_structure_dict['part_structure']} flagged as {unique_structure_id}: unique={is_unique_bool}")
         logbook_df.loc[logbook_df['Name']==name, 'unique_structure_id'] = unique_structure_id
 
-        for structure_key in update_key_names:
-            #Try and find any of the expected analyses values to add to the logbook row for that structure
-            try:
-                update_value = waffledata_df[waffledata_df['index']==unique_structure_id][structure_key]
-                logbook_df.loc[logbook_df['Name']==name, structure_key] = update_value
-            #Make some exceptions for column names that change for clarity in the final 'An
-            except KeyError:
-                print(f"Key '{unique_structure_id}' does not have sub-key '{structure_key}'")
+        if unique_structure_id in unique_structure_id_list:
+            unique_structure_id = str(unique_structure_id)
+            for structure_key in updating_key_names:
+                structure_key = str(structure_key)
+                #Try and find any of the expected analyses values to add to the logbook row for that structure
+                try:
+                    update_value = waffledata_df[waffledata_df['index']==unique_structure_id][structure_key].values[0]
+                    logbook_df.loc[logbook_df['Name']==name, structure_key] = update_value
+                #Catch incorrect key pull attempts
+                except KeyError:
+                    print(f"\t Dict lookup error:")
+                    print(f"\t {traceback.format_exc()}")
 
 
         ############################################################################################################################
