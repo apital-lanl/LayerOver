@@ -76,7 +76,8 @@ def flat_ideal_volume_guess(structure_dict,
                             save_final_array= False,
                             save_location = None,
                             show_layer_images= False,
-                            show_final_image= True):
+                            show_final_image= True,
+                            report_line_drawing_iterations = False):
     '''
     Description: Take 'ideal' strucures 
 

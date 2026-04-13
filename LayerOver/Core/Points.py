@@ -880,7 +880,8 @@ def draw_2D_strand_line_bythickness(interior_points,
                                     thickness_fcn = 'cylinder',
                                     show_points = False,
                                     show_array_iterations = False,
-                                    show_final_array = False):
+                                    show_final_array = False, 
+                                    report_line_drawing_iterations = False):
     """
     Description:
         Interpret line points as an ideal strand of radius 'strand_radius' and draw thickness on array with values of microns. 
@@ -1171,7 +1172,7 @@ def draw_2D_strand_line_bythickness(interior_points,
                                                            micron_strand_diam,
                                                            (array_y_dim, array_x_dim),
                                                            um_to_pix_conversion = um_to_pix_conversion,
-                                                           print_intermediate_steps = False, 
+                                                           print_intermediate_steps = report_line_drawing_iterations, 
                                                            show_final_array = show_array_iterations)
             #Select newly-drawn lines
             drawn_array = neighbor_dict['drawn_array']

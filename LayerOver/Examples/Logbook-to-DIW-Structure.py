@@ -51,7 +51,7 @@ save_to_filepath = 'dialog'       #Optional; where to save images and arrays to;
 
 #Other settings and initializations
 #Volume array settings
-array_dims  = (5000, 5000)
+array_dims  = (1000, 1000)
 number_of_replicates = 3    #Number of separate volumetric predictions to run
 array_side_length_mm = 15   #size of the array in mm (everything gets scaled)
 #Initialize dict for storing structures to check for uniqueness
