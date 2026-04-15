@@ -65,20 +65,26 @@ namerow_example_parsing_dict = {
     'mech-generic': {
         'stress_columnn_name': 'Stress',
         'strain_column_name': 'Strain',
+        'extension_column_name': 'Extension',
         'stress_exclusion_terms': ['peak'],
-        'strain_exclusion_terms': [' Ex1 ']
+        'strain_exclusion_terms': [' Ex1 '],
+        'extension_exclusion_terms': []
         },
     'mech-type1': {
         'stress_columnn_name': 'Stress (kPa)',
         'strain_column_name': r'Strain (mm/mm)',
+        'extension_column_name': 'PrimaryExtension (mm)',
         'stress_exclusion_terms': ['peak'],
-        'strain_exclusion_terms': []
+        'strain_exclusion_terms': [],
+        'extension_exclusion_terms': []
         },
     'mech-type2': {
         'stress_columnn_name': 'Stress (kPa)',
         'strain_column_name': r'Strain (mm/mm)',
+        'extension_column_name': 'Extension (mm)',
         'stress_exclusion_terms': ['peak'],
-        'strain_exclusion_terms': []
+        'strain_exclusion_terms': [],
+        'extension_exclusion_terms': ['ex1']
         }
     }
 
@@ -301,20 +307,24 @@ def process_directory_for_mech_files(directory=None,
 def process_mechanical_file_against_logbook(data_filepath, logbook_df,
                                             alternate_save_directory = None,
                                             show_each_file_results = False,
-                                            save_last_replicate_graph = False):
+                                            save_last_replicate_graph = False,
+                                            displacement_column = 'extension'):
     """
     Description:
         Open a mechanical data file (CSV or XLSX) and attempt parse data relative to a logbook 
     
     INPUTS:
-        'data_filepath'     str; filepath to CSV or XLSX mechanical data.
-        'logbook_df'        pd.DataFrame; logbook-like-DataFrame with information for printnames that the mechanical data file can be matched against.
+        'data_filepath'             str; filepath to CSV or XLSX mechanical data.
+        'logbook_df'                pd.DataFrame; logbook-like-DataFrame with information for printnames that the mechanical data file can be matched against.
         (OPTIONAL)
         'alternate_save_directory'  str; directory path for a global save locaiton; i.e. if processing a whole directory, that directory path is passed
                                     here to allow for ALL the directory's file results to be saved in one location.
                                     NOTE: ONLY PASS A PRIMARY DIRECTORY. If  directory location is passed, new folders are created in that location. 
         'show_each_file_results'
-        'save_last_replicate_graph'
+        'save_last_replicate_graph' lorem;
+        'displacement_column'       str; 'strain'  'extension'
+            'strain'    use strain as the displacement column
+            'extension'       use raw data as the displacement column; i.e. raw extension 0-indexed to first value with real stress
 
     ACTION:
         -lorem
@@ -353,6 +363,7 @@ def process_mechanical_file_against_logbook(data_filepath, logbook_df,
         data_df = file_output_dict['dataframe']
         this_file_dict['filetype'] = 'csv'
     elif data_filepath.lower().endswith('xlsx'):
+        namerow_dict = check_for_namerow(data_filepath, show_peaks = False)
         good_sheet_check = bool(namerow_dict['successful_parse'] and (namerow_dict['data_sheetname'] != ''))
         if good_sheet_check:
             file_output_dict = parse_mech_data_fromxlsx(data_filepath, data_dict=namerow_dict)
@@ -384,6 +395,8 @@ def process_mechanical_file_against_logbook(data_filepath, logbook_df,
                 stress_col_name = column
             if 'strain' in column.lower():
                 strain_col_name = column
+            if 'extension' in column.lower():
+                extension_col_name = column
 
         print()
         print(data_df.head(7))
@@ -391,13 +404,19 @@ def process_mechanical_file_against_logbook(data_filepath, logbook_df,
         #Plot all the curves
         if show_each_file_results:
             plt.figure(figsize = (10,10))
-            plt.scatter(data_df[strain_col_name], data_df[stress_col_name])
+            if displacement_column == 'strain':
+                plt.scatter(data_df[strain_col_name], data_df[stress_col_name])
+                plt.xlabel("Strain (mm/mm)")
+            elif displacement_column == 'extension':
+                plt.scatter(data_df[extension_col_name], data_df[stress_col_name])
+                plt.xlabel("Extension (mm)")
             plt.title(f"All mech data in {os.path.basename(data_filepath)}")
-            plt.xlabel("Strain")
             plt.ylabel("Stress")
             plt.show()
 
-        replicate_dict = pull_mechanical_replicates(data_df, data_dict = None, report_nonnegative_strain = False)
+        replicate_dict = pull_mechanical_replicates(data_df, data_dict = None, 
+                                                    report_nonnegative_strain = False,
+                                                    displacement_column = displacement_column)
             # pull keys from returned dict
         replicate_parse_success =  replicate_dict['replicate_parse_success']
         number_of_replicates = replicate_dict['number_of_replicates']
@@ -742,7 +761,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
                                    stress_threshold = None,
                                    strain_zero_offset = 10,
                                    strain_min_thresh = None,
-                                   report_nonnegative_strain = True):
+                                   report_nonnegative_strain = True,
+                                   displacement_column = 'extension'):
     '''
     Description: Take cyclic load test data and just return the final loading/unloading cycle as separate columns.
     INPUT:
@@ -782,18 +802,21 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         'testing_index': [],
         'all_strain_data': [],
         'all_stress_data': [],
+        'all_extension_data': []
         }
 
     data_dict = {
         'mech_units_info': {
             'testing_index': 'UNK',
             'stress_units': 'UNK',
-            'strain_units': 'UNK'
+            'strain_units': 'UNK',
+            'extension_units': 'UNK'
             },
         }
     columns = list(data_df.columns)
     stress_flag = False
     strain_flag = False
+    extension_flag = False
 
     #Check for 'data_df' data
     #TODO: add DataFrame type check
@@ -833,9 +856,22 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             print
             print(f"Multiple strain columns passed. Ignoring {column_name}")
 
+        if ('extension' in column_name.lower()) and not extension_flag:
+            mech_dict['all_extension_data'] = data_df[column_name]
+            print()
+            print(f"Added {column_name} as extension data")
+            extension_flag = True
+            data_dict['mech_units_info']['extension_units'] = unit_guess
+            extension_units = unit_guess
+            extension_col_name = f"Extension ({extension_units})"
+        elif ('extension' in column_name.lower()):
+            print
+            print(f"Multiple extension columns passed. Ignoring {column_name}")
+
     #Use peak finding to grab last loading/unloading cycl
     raw_df = pd.DataFrame(data= {stress_col_name: mech_dict['all_stress_data'],
-                                  strain_col_name: mech_dict['all_strain_data']})
+                                  strain_col_name: mech_dict['all_strain_data'],
+                                  extension_col_name: mech_dict['all_extension_data']})
     
       # get reasonable peak height and distance between peak expectations
     length = raw_df[f'Strain ({strain_units})'].values.shape[0]
@@ -850,7 +886,7 @@ def pull_mechanical_replicates(data_df, data_dict = None,
     
     if len(peaks) == 0:
         print("No peaks found in strain data")
-    #Use last peak to define variables
+    #Use strain data to define replicate regions of the entire raw data Series
     elif len(peaks) == 1:
         #Find the last peak index
         last_peak_index = peaks[-1]
@@ -877,27 +913,48 @@ def pull_mechanical_replicates(data_df, data_dict = None,
     if show_peaks and replicate_dict['replicate_parse_success']:
         #Pull relevant indices and graph values for replicate indices
         strain_max = mech_dict['all_strain_data'].max()
+        extension_max = mech_dict['all_extension_data'].max()
 
         #Generate the graph
-        plt.figure(figsize = (10,10))
-        plt.scatter(list(range(mech_dict['all_strain_data'].shape[0])), mech_dict['all_strain_data'])
-        plt.title(f"Strain peaks found")
-        for peak in peaks:
-            plt.scatter(peak, mech_dict['all_strain_data'][peak], marker = 'x', s = 200, color = 'gray')
-          # start of last loading replicate
-        plt.plot([last_valley_guess_index, last_valley_guess_index], [0, strain_max], color='r', linewidth=3, alpha=0.6)
-          # start of last unloading replicate
-        plt.plot([last_peak_index, last_peak_index], [0, strain_max], color='g', linewidth=3, alpha=0.6)
-        plt.xlabel("Index of strain value")
-        plt.ylabel("Strain value (mm/mm)")
-        plt.show()
+        if displacement_column == 'strain':
+            plt.figure(figsize = (10,10))
+            plt.scatter(list(range(mech_dict['all_strain_data'].shape[0])), mech_dict['all_strain_data'])
+            plt.title(f"Strain peaks found")
+            #Show peak start/stop locations defining replicates
+            for peak in peaks:
+                plt.scatter(peak, mech_dict['all_strain_data'][peak], marker = 'x', s = 200, color = 'gray')
+              # start of last loading replicate
+            plt.plot([last_valley_guess_index, last_valley_guess_index], [0, strain_max], color='r', linewidth=3, alpha=0.6)
+              # start of last unloading replicate
+            plt.plot([last_peak_index, last_peak_index], [0, strain_max], color='g', linewidth=3, alpha=0.6)
+            plt.xlabel("Index of strain value")
+            plt.ylabel("Strain value (mm/mm)")
+            plt.show()
+        elif displacement_column == 'extension':
+            plt.figure(figsize = (10,10))
+            plt.scatter(list(range(mech_dict['all_extension_data'].shape[0])), mech_dict['all_extension_data'])
+            plt.title(f"Extension peaks found")
+            #Show peak start/stop locations defining replicates
+            for peak in peaks:
+                plt.scatter(peak, mech_dict['all_strain_data'][peak], marker = 'x', s = 200, color = 'gray')
+              # start of last loading replicate
+            plt.plot([last_valley_guess_index, last_valley_guess_index], [0, extension_max], color='r', linewidth=3, alpha=0.6)
+              # start of last unloading replicate
+            plt.plot([last_peak_index, last_peak_index], [0, extension_max], color='g', linewidth=3, alpha=0.6)
+            plt.xlabel("Index of extension value")
+            plt.ylabel("Extension value (mm)")
+            plt.show()
     #If replicate parsing not successful, show a graph that might hint at why
     elif show_peaks:
         plt.figure(figsize = (10,10))
-        plt.scatter(list(range(mech_dict['all_strain_data'].shape[0])), mech_dict['all_strain_data'])
-        plt.xlabel("Strain (mm/mm)")
+        if displacement_column == 'strain':
+            plt.scatter(list(range(mech_dict['all_strain_data'].shape[0])), mech_dict['all_strain_data'])
+            plt.xlabel("Strain (mm/mm)")
+        elif displacement_column == 'extension':
+            plt.scatter(list(range(mech_dict['all_extension_data'].shape[0])), mech_dict['all_extension_data'])
+            plt.xlabel("Extension (mm)")
         plt.ylabel("Stress")
-        plt.title(f"Failed to find strain peaks")
+        plt.title(f"Failed to parse replicates from this data")
         plt.show()
     
     #Loading cycles start at (peak_idx-valley_idx), Unloading cycles end at (peak_idx+valley_idx)
@@ -923,6 +980,7 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             #Grap the loading curve for analysis of strain 0 offset
             strain_loading = raw_df[strain_col_name].iloc[load_start_idx:peak_idx]
             stress_loading = raw_df[stress_col_name].iloc[load_start_idx:peak_idx]
+            extension_loading = raw_df[extension_col_name].iloc[load_start_idx:peak_idx]
 
             #We'll only consider the first loading cycle
             stress_loading_avg = stress_loading.rolling(5, center=True, min_periods = 1).mean()
@@ -931,23 +989,33 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             first_valid_strain_index = first_valid_stress_index-strain_zero_offset
             if first_valid_strain_index < 0:
                 first_valid_strain_index = 0
+              # get these values before resetting the strain data so we can apply the same offset to all replicates
             strain_offset = strain_loading.values[first_valid_strain_index]
+            extension_offset = extension_loading.values[first_valid_strain_index]
             #Get the strain value at new predicted '0 strain' value
-            first_valid_strain = raw_df[stress_col_name].iloc[first_valid_strain_index]
+            first_valid_strain = strain_loading.iloc[first_valid_strain_index]
             if first_valid_strain <0:
                 first_valid_strain = 0
+            first_valid_extension = extension_loading.iloc[first_valid_strain_index]
+            if first_valid_extension <0:
+                first_valid_extension = 0
             #Reset the entire strain data
             raw_df[strain_col_name] = raw_df[strain_col_name]- first_valid_strain
+            raw_df[extension_col_name] = raw_df[extension_col_name]- first_valid_extension
 
         #Grab cycle data
           # pull cyles
         strain_loading = raw_df[strain_col_name].iloc[load_start_idx:peak_idx]
         stress_loading = raw_df[stress_col_name].iloc[load_start_idx:peak_idx]
+        extension_loading = raw_df[extension_col_name].iloc[load_start_idx:peak_idx]
         strain_unloading = raw_df[strain_col_name].iloc[peak_idx:unload_end_idx]
         stress_unloading = raw_df[stress_col_name].iloc[peak_idx:unload_end_idx]
+        extension_unloading = raw_df[extension_col_name].iloc[peak_idx:unload_end_idx]
           # apply 0-strain offset; not sure why this isn't handled on import
         strain_loading = strain_loading - strain_offset
         strain_unloading = strain_unloading - strain_offset
+        extension_loading = extension_loading - extension_offset
+        extension_unloading = extension_unloading - extension_offset
         
         #If flagged, make sure non-negative data is reported
         if report_nonnegative_strain:
@@ -968,7 +1036,9 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             'strain_data_loading': strain_loading,
             'strain_data_unloading': strain_unloading,
             'stress_data_loading': stress_loading,
-            'stress_data_unloading': stress_unloading
+            'stress_data_unloading': stress_unloading,
+            'extension_data_loading': extension_loading,
+            'extension_data_unloading': extension_unloading
             })
     
         #TODO: fix this; not sure why it kept throwing errors and it doesn't really matter so I've moved on  
@@ -1100,8 +1170,10 @@ def parse_mech_data_fromcsv(mech_data_filepath,
             this_parsing_dict = namerow_example_parsing_dict['mech-generic']
         stress_name = this_parsing_dict['stress_columnn_name']
         strain_name = this_parsing_dict['strain_column_name']
+        extension_name = this_parsing_dict['extension_column_name']
         stress_name_exclusions = this_parsing_dict['stress_exclusion_terms']
         strain_name_exclusions = this_parsing_dict['strain_exclusion_terms']
+        extension_name_exclusions = this_parsing_dict['extension_exclusion_terms']
 
         #Handle CSV
         if mech_data_filepath.lower().endswith('.csv'):
@@ -1114,22 +1186,29 @@ def parse_mech_data_fromcsv(mech_data_filepath,
             
             #Walk through header row and find which column index has the stress and strain columns
             for col_idx, cell_text in enumerate(header_row):
-                if stress_name in cell_text:
+                if stress_name.lower() in cell_text.lower():
                     #Make sure no exlcusion terms are in the cell text
                     exclusion_sum = sum([1 for term in stress_name_exclusions if term.lower() in cell_text.lower()])
                     if exclusion_sum == 0:
                         stress_col_idx = col_idx
                         stress_col_name = cell_text
-                if strain_name in cell_text:
+                if strain_name.lower() in cell_text.lower():
                     #Make sure no exlcusion terms are in the cell text
                     exclusion_sum = sum([1 for term in strain_name_exclusions if term.lower() in cell_text.lower()])
                     if exclusion_sum == 0:
                         strain_col_idx = col_idx
                         strain_col_name = cell_text
 
+                if extension_name.lower() in cell_text.lower():
+                    #Make sure no exlcusion terms are in the cell text
+                    exclusion_sum = sum([1 for term in extension_name_exclusions if term.lower() in cell_text.lower()])
+                    if exclusion_sum == 0:
+                        extension_col_idx = col_idx
+                        extension_col_name = cell_text
+
             #Finally, try to open the data
             try:
-                data_df = pd.read_csv(mech_data_filepath, usecols=[stress_col_idx, strain_col_idx], skiprows=(start_row_idx) )
+                data_df = pd.read_csv(mech_data_filepath, usecols=[stress_col_idx, strain_col_idx, extension_col_idx], skiprows=(start_row_idx) )
             except UnboundLocalError:
                 #If you don't find a 'stress_column_name' or 'strain_column_name', assume this isn't a good mechanical file
                 file_output_dict['dataframe'] = pd.DataFrame({})
@@ -1144,30 +1223,48 @@ def parse_mech_data_fromcsv(mech_data_filepath,
                 strain_series = data_df[strain_col_name].copy()
             except KeyError:
                 #if keyerror, parsing has failed and take a look at the data_df to see what's going on
-                print(data_df.head(10))
-            
+                print("Strain column parse fail; check 'data_df' below:")
+                print(f"\t {data_df.head(10)}")
               # get info about strain
             pos_strain_sum = len(strain_series[strain_series>0])
             neg_strain_sum = len(strain_series[strain_series<0])
             this_min_strain = strain_series.min()
-            
               # flip strain if negative
             if neg_strain_sum > pos_strain_sum:
                 # adj_strain_series = strain_series -this_min_strain
                 # adj_strain_series = abs(this_min_strain)-adj_strain_series
                 adj_strain_series = strain_series * -1
                 strain_series = adj_strain_series  #reset series
-            
               # check if a lead-in is artificially skewing 0
             data_start_idx = round(len(strain_series)*0.25)  #ignore first part
             new_min = strain_series[data_start_idx::].min()  #find real '0' without lead-in garbage
-            strain_series = strain_series + abs(new_min)  #reset series minimum to a more useful 0
-
+            strain_series = strain_series - new_min  #reset series minimum to a more useful 0
               # re-assign strain series
             data_df[strain_col_name] = strain_series
 
-            #Adjust for any 0-stress lead-in
-  
+            #Make sure the extension is right-side up (i.e. positive values only), ignore lead-in if not at 0, and set minimum at 0
+            try:
+                extension_series = data_df[extension_col_name].copy()
+            except KeyError:
+                #if keyerror, parsing has failed and take a look at the data_df to see what's going on
+                print("Extension column parse fail; check 'data_df' below:")
+                print(f"\t {data_df.head(10)}")
+              # get info about strain
+            pos_ext_sum = len(extension_series[extension_series>0])
+            neg_ext_sum = len(extension_series[extension_series<0])
+            this_min_ext = extension_series.min()
+              # flip strain if negative
+            if neg_ext_sum > pos_ext_sum:
+                # adj_ext_series = extension_series -this_min_ext
+                # adj_ext_series = abs(this_min_ext)-adj_ext_series
+                adj_ext_series = extension_series * -1
+                extension_series = adj_ext_series  #reset series
+              # check if a lead-in is artificially skewing 0
+            data_start_idx = round(len(extension_series)*0.25)  #ignore first part
+            new_min = extension_series[data_start_idx::].min()  #find real '0' without lead-in garbage
+            strain_series = strain_series - new_min  #reset series minimum to a more useful 0
+              # re-assign strain series
+            data_df[extension_col_name] = extension_series
 
             #Assign everything to the output dict
             file_output_dict['dataframe'] = data_df
@@ -1255,8 +1352,10 @@ def parse_mech_data_fromxlsx(mech_data_filepath,
             this_parsing_dict = namerow_example_parsing_dict['mech-generic']
         stress_name = this_parsing_dict['stress_columnn_name']
         strain_name = this_parsing_dict['strain_column_name']
+        extension_name = this_parsing_dict['exclusion_column_name']
         stress_name_exclusions = this_parsing_dict['stress_exclusion_terms']
         strain_name_exclusions = this_parsing_dict['strain_exclusion_terms']
+        extension_name_exclusions = this_parsing_dict['extension_exclusion_terms']
 
         #Handle XLSX
         if mech_data_filepath.lower().endswith('.xlsx'):
@@ -1275,18 +1374,24 @@ def parse_mech_data_fromxlsx(mech_data_filepath,
             
             #Walk through header row and find which column index has the stress and strain columns
             for col_idx, cell_text in enumerate(header_row):
-                if stress_name in str(cell_text):
+                if stress_name.lower() in str(cell_text).lower():
                     #Make sure no exlcusion terms are in the cell text
                     exclusion_sum = sum([1 for term in stress_name_exclusions if term.lower() in cell_text.lower()])
                     if exclusion_sum == 0:
                         stress_col_idx = col_idx
                         stress_col_name = cell_text
-                if strain_name in str(cell_text):
+                if strain_name.lower() in str(cell_text).lower():
                     #Make sure no exlcusion terms are in the cell text
                     exclusion_sum = sum([1 for term in strain_name_exclusions if term.lower() in cell_text.lower()])
                     if exclusion_sum == 0:
                         strain_col_idx = col_idx
                         strain_col_name = cell_text
+                if extension_name.lower() in cell_text.lower():
+                    #Make sure no exlcusion terms are in the cell text
+                    exclusion_sum = sum([1 for term in extension_name_exclusions if term.lower() in cell_text.lower()])
+                    if exclusion_sum == 0:
+                        extension_col_idx = col_idx
+                        extension_col_name = cell_text
 
             #Finally, open the data
             if column_names_good:
@@ -1301,29 +1406,48 @@ def parse_mech_data_fromxlsx(mech_data_filepath,
                 strain_series = data_df[strain_col_name].copy()
             except KeyError:
                 #if keyerror, parsing has failed and take a look at the data_df to see what's going on
-                print(data_df.head(10))
-            
+                print("Strain column parse fail; check 'data_df' below:")
+                print(f"\t {data_df.head(10)}")
               # get info about strain
             pos_strain_sum = len(strain_series[strain_series>0])
             neg_strain_sum = len(strain_series[strain_series<0])
             this_min_strain = strain_series.min()
-            
               # flip strain if negative
             if neg_strain_sum > pos_strain_sum:
                 # adj_strain_series = strain_series -this_min_strain
                 # adj_strain_series = abs(this_min_strain)-adj_strain_series
                 adj_strain_series = strain_series * -1
                 strain_series = adj_strain_series  #reset series
-            
               # check if a lead-in is artificially skewing 0
             data_start_idx = round(len(strain_series)*0.25)  #ignore first part
             new_min = strain_series[data_start_idx::].min()  #find real '0' without lead-in garbage
             strain_series = strain_series - new_min  #reset series minimum to a more useful 0
-
               # re-assign strain series
             data_df[strain_col_name] = strain_series
 
-            #Adjust for any 0-stress lead-in
+            #Make sure the extension is right-side up (i.e. positive values only), ignore lead-in if not at 0, and set minimum at 0
+            try:
+                extension_series = data_df[extension_col_name].copy()
+            except KeyError:
+                #if keyerror, parsing has failed and take a look at the data_df to see what's going on
+                print("Extension column parse fail; check 'data_df' below:")
+                print(f"\t {data_df.head(10)}")
+              # get info about strain
+            pos_ext_sum = len(extension_series[extension_series>0])
+            neg_ext_sum = len(extension_series[extension_series<0])
+            this_min_ext = extension_series.min()
+              # flip strain if negative
+            if neg_ext_sum > pos_ext_sum:
+                # adj_ext_series = extension_series -this_min_ext
+                # adj_ext_series = abs(this_min_ext)-adj_ext_series
+                adj_ext_series = extension_series * -1
+                extension_series = adj_ext_series  #reset series
+              # check if a lead-in is artificially skewing 0
+            data_start_idx = round(len(extension_series)*0.25)  #ignore first part
+            new_min = extension_series[data_start_idx::].min()  #find real '0' without lead-in garbage
+            strain_series = strain_series - new_min  #reset series minimum to a more useful 0
+              # re-assign strain series
+            data_df[extension_col_name] = extension_series
 
             #Assign everything to the output dict
             file_output_dict['dataframe'] = data_df
