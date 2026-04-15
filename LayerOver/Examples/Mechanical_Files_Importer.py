@@ -35,7 +35,7 @@ show_each_file_results = True       #show outputs from each file that's read
 root = Tk()
 filenames = filedialog.askopenfilenames(title= "Select mech data files to import", filetypes = [('Spredsheet files', '*.csv *.xlsx')])
 root.destroy()
-
+r
 #Select a logbook to import
 root = Tk()
 directory = filedialog.askdirectory(title= "Select a folder with an updated logbook for comparison")

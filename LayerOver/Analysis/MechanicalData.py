@@ -44,7 +44,7 @@ from LayerOver.PSPP.DIWLogbook import get_latest_logbook
 
 #Define variables
 #Define hard-coded thresholds and setting values
-default_stress_threshold = 0.2   #in kPa; for silicone elastomers, but should be relatively general
+default_stress_threshold = 0.05   #in kPa; for silicone elastomers, but should be relatively general
 strain_minimum_mask_threshold = -0.1  #minimum strain to accept (<0 to allow for noise at 0 strain)
   # default name for the digital logbook sheet with all the actual logbook data
 default_digital_logbok_sheetname = 'Digital Logbook'   #Appropriate sheet as of 2026-01-21
@@ -759,7 +759,7 @@ def check_for_namerow(spreadsheet_filepath,
 def pull_mechanical_replicates(data_df, data_dict = None,
                                    show_peaks = False,
                                    stress_threshold = None,
-                                   strain_zero_offset = 10,
+                                   strain_zero_offset = 1,
                                    strain_min_thresh = None,
                                    report_nonnegative_strain = True,
                                    displacement_column = 'extension'):
@@ -959,7 +959,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
     
     #Loading cycles start at (peak_idx-valley_idx), Unloading cycles end at (peak_idx+valley_idx)
     for replicate_idx, peak_idx in enumerate(peaks):
-        load_start_idx = peak_idx-cycle_index_diff_guess-strain_zero_offset
+        # load_start_idx = peak_idx-cycle_index_diff_guess-strain_zero_offset   #too many issues with this offset
+        load_start_idx = peak_idx-cycle_index_diff_guess
         unload_end_idx = peak_idx+cycle_index_diff_guess
         #Make sure indices are in-bounds for data size
         if load_start_idx<0:
@@ -994,14 +995,14 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             extension_offset = extension_loading.values[first_valid_strain_index]
             #Get the strain value at new predicted '0 strain' value
             first_valid_strain = strain_loading.iloc[first_valid_strain_index]
-            if first_valid_strain <0:
-                first_valid_strain = 0
+            # if first_valid_strain <0:
+            #     first_valid_strain = 0
             first_valid_extension = extension_loading.iloc[first_valid_strain_index]
-            if first_valid_extension <0:
-                first_valid_extension = 0
+            # if first_valid_extension <0:
+            #     first_valid_extension = 0
             #Reset the entire strain data
-            raw_df[strain_col_name] = raw_df[strain_col_name]- first_valid_strain
-            raw_df[extension_col_name] = raw_df[extension_col_name]- first_valid_extension
+            # raw_df[strain_col_name] = raw_df[strain_col_name]- first_valid_strain
+            # raw_df[extension_col_name] = raw_df[extension_col_name]- first_valid_extension
 
         #Grab cycle data
           # pull cyles
@@ -1011,11 +1012,11 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         strain_unloading = raw_df[strain_col_name].iloc[peak_idx:unload_end_idx]
         stress_unloading = raw_df[stress_col_name].iloc[peak_idx:unload_end_idx]
         extension_unloading = raw_df[extension_col_name].iloc[peak_idx:unload_end_idx]
-          # apply 0-strain offset; not sure why this isn't handled on import
-        strain_loading = strain_loading - strain_offset
-        strain_unloading = strain_unloading - strain_offset
-        extension_loading = extension_loading - extension_offset
-        extension_unloading = extension_unloading - extension_offset
+          # apply 0-strain offset; not sure why this isn't handled on import; actually it might be: commenting out for now
+        # strain_loading = strain_loading - strain_offset
+        # strain_unloading = strain_unloading - strain_offset
+        # extension_loading = extension_loading - extension_offset
+        # extension_unloading = extension_unloading - extension_offset
         
         #If flagged, make sure non-negative data is reported
         if report_nonnegative_strain:
