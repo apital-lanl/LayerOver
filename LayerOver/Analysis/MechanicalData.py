@@ -48,7 +48,7 @@ default_stress_threshold = 0.05   #in kPa; for silicone elastomers, but should b
 strain_minimum_mask_threshold = -0.1  #minimum strain to accept (<0 to allow for noise at 0 strain)
   # default name for the digital logbook sheet with all the actual logbook data
 default_digital_logbok_sheetname = 'Digital Logbook'   #Appropriate sheet as of 2026-01-21
-assymptotic_stress_threshold = 15000   # in kPa; for silicone elastomers, but should be relatively general; stupid-high number for 'max lock-up stress threshold'
+assymptotic_stress_threshold = 5e4   # in kPa; stupid-high number for 'max lock-up stress threshold'; quadratic stress increase is calculated as mostly-linear, so a huge number is needed and isn't physical
 
 #Example column names for various types of report from mechanical testing instruments
 # used to guess which 1) type of mech data is being parsed, 2) which row in the spreadsheet contains the column names, 
@@ -265,12 +265,12 @@ def process_directory_for_mech_files(directory=None,
             this_file_dict['successful_columname_parse'] = process_dict['data_namerow_dict']['successful_parse']
             this_file_dict['file_namerow_index'] = process_dict['data_namerow_dict']['likely_name_row']
             this_file_dict['pandas_readable'] = process_dict['pandas_readable']
-            this_file_dict['strain_assymptote'] = process_dict['strain_lockup']
-            this_file_dict['extension_assymptote'] = process_dict['extension_lockup']
+            this_file_dict['strain_assymptote'] = process_dict['last_strain_lockup']
+            this_file_dict['extension_assymptote'] = process_dict['last_extension_lockup']
             for strain_value in strain_reporting_points:
                 this_name = f"stress_at_{strain_value}_strain"
                 try:
-                    this_file_dict[this_name] = process_dict['stress_list'][strain_value]
+                    this_file_dict[this_name] = process_dict['stress_dict'][strain_value]
                 except:
                     this_file_dict[this_name] = 'nan'
             # this_file_dict[''] = process_dict['']
@@ -455,9 +455,13 @@ def process_mechanical_file_against_logbook(data_filepath, logbook_df,
         last_strain_peak_index = replicate_dict['last_strain_peak_index']
         last_strain_valley_index = replicate_dict['last_strain_valley_index']
         peak_to_valley_index_diff = replicate_dict['peak_to_valley_index_diff']
-        this_file_dict['strain_lockup']= replicate_dict[number_of_replicates]['strain_lockup']
-        this_file_dict['extension_lockup']= replicate_dict[number_of_replicates]['extension_lockup']
-        this_file_dict['stress_list']= replicate_dict[number_of_replicates]['stress_list']
+        #The following are passed as DataFrames because I was too lazy to change it
+        #Convert to values and just pull the first one; otherwise a series is returned with N identical values
+        last_strain_lockup = replicate_dict['replicate_data'][number_of_replicates]['strain_lockup'].values[0]
+        this_file_dict['last_strain_lockup']= last_strain_lockup
+        last_extension_lockup = replicate_dict['replicate_data'][number_of_replicates]['extension_lockup'].values[0]
+        this_file_dict['last_extension_lockup']= last_extension_lockup
+        this_file_dict['stress_dict']= replicate_dict['last_replicate_stress_dict']
 
             # each value in "replicate_data_dict" is a pandas.DataFrame (hopefully)
             # replicate numbering starts at 1
@@ -486,18 +490,20 @@ def process_mechanical_file_against_logbook(data_filepath, logbook_df,
                     plt.figure(figsize = (10,10))
                     plt.scatter(last_df['strain_data_loading'], last_df['stress_data_loading'], color = 'r')
                     plt.scatter(last_df['strain_data_unloading'], last_df['stress_data_unloading'], color = 'g')
+                    plt.plot([last_strain_lockup, last_strain_lockup], [0,last_df['stress_data_loading'].max()], color = 'lime', linewidth = 4)
                     plt.title(f"Final replicate cycle for {os.path.basename(data_filepath)}")
                     plt.xlabel("Strain")
                     plt.ylabel("Stress")
-                    plt.legend([f"Replicate {number_of_replicates} Loading curve", f"Replicate {number_of_replicates} Unloading curve"])
+                    plt.legend([f"Replicate {number_of_replicates} Loading curve", f"Replicate {number_of_replicates} Unloading curve", "Lockup assymp. guess"])
                 elif displacement_column == 'extension':
                     plt.figure(figsize = (10,10))
-                    plt.scatter(last_df['strain_data_loading'], last_df['stress_data_loading'], color = 'r')
-                    plt.scatter(last_df['strain_data_unloading'], last_df['stress_data_unloading'], color = 'g')
+                    plt.scatter(last_df['extension_data_loading'], last_df['stress_data_loading'], color = 'r')
+                    plt.scatter(last_df['extension_data_unloading'], last_df['stress_data_unloading'], color = 'g')
+                    plt.plot([last_extension_lockup, last_extension_lockup], [0,last_df['stress_data_loading'].max()], color = 'lime', linewidth = 4)
                     plt.title(f"Final replicate cycle for {os.path.basename(data_filepath)}")
-                    plt.xlabel("Strain")
+                    plt.xlabel("Extension")
                     plt.ylabel("Stress")
-                    plt.legend([f"Replicate {number_of_replicates} Loading curve", f"Replicate {number_of_replicates} Unloading curve"])
+                    plt.legend([f"Replicate {number_of_replicates} Loading curve", f"Replicate {number_of_replicates} Unloading curve", "Lockup assymp. guess"])
                 if save_last_replicate_graph:
                     if alternate_save_directory:
                         plot_save_directory = os.path.join(alternate_save_directory, "Extracted Mechanical Summary Data", "Last Stress-Strain Replicate Graphs")
@@ -510,13 +516,24 @@ def process_mechanical_file_against_logbook(data_filepath, logbook_df,
                     plt.savefig(plot_save_name, dpi=300)
                 plt.show()
             elif save_last_replicate_graph:
-                plt.figure(figsize = (10,10))
-                plt.scatter(last_df['strain_data_loading'], last_df['stress_data_loading'], color = 'r')
-                plt.scatter(last_df['strain_data_unloading'], last_df['stress_data_unloading'], color = 'g')
-                plt.title(f"Final replicate cycle for {os.path.basename(data_filepath)}")
-                plt.xlabel("Strain")
-                plt.ylabel("Stress")
-                plt.legend([f"Replicate {number_of_replicates} Loading curve", f"Replicate {number_of_replicates} Unloading curve"])
+                if displacement_column == 'strain':
+                    plt.figure(figsize = (10,10))
+                    plt.scatter(last_df['strain_data_loading'], last_df['stress_data_loading'], color = 'r')
+                    plt.scatter(last_df['strain_data_unloading'], last_df['stress_data_unloading'], color = 'g')
+                    plt.plot([last_strain_lockup, last_strain_lockup], [0,last_df['stress_data_loading'].max()], color = 'lime', linewidth = 4)
+                    plt.title(f"Final replicate cycle for {os.path.basename(data_filepath)}")
+                    plt.xlabel("Strain")
+                    plt.ylabel("Stress")
+                    plt.legend([f"Replicate {number_of_replicates} Loading curve", f"Replicate {number_of_replicates} Unloading curve", "Lockup assymp. guess"])
+                elif displacement_column == 'extension':
+                    plt.figure(figsize = (10,10))
+                    plt.scatter(last_df['extension_data_loading'], last_df['stress_data_loading'], color = 'r')
+                    plt.scatter(last_df['extension_data_unloading'], last_df['stress_data_unloading'], color = 'g')
+                    plt.plot([last_extension_lockup, last_extension_lockup], [0,last_df['stress_data_loading'].max()], color = 'lime', linewidth = 4)
+                    plt.title(f"Final replicate cycle for {os.path.basename(data_filepath)}")
+                    plt.xlabel("Extension")
+                    plt.ylabel("Stress")
+                    plt.legend([f"Replicate {number_of_replicates} Loading curve", f"Replicate {number_of_replicates} Unloading curve", "Lockup assymp. guess"])
                 if alternate_save_directory:
                     plot_save_directory = os.path.join(alternate_save_directory, "Extracted Mechanical Summary Data", "Last Stress-Strain Replicate Graphs")
                     if not os.path.isdir(plot_save_directory):
@@ -526,6 +543,7 @@ def process_mechanical_file_against_logbook(data_filepath, logbook_df,
                     plot_save_directory = os.path.dirname(data_filepath)
                 plot_save_name = os.path.join(plot_save_directory, f"LastMechReplicateGraph_{this_file_dict['filename']}.png")
                 plt.savefig(plot_save_name, dpi=300)
+                plt.close()
 
         except:
             print()
@@ -914,6 +932,32 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             print
             print(f"Multiple extension columns passed. Ignoring {column_name}")
 
+    #Check that strain and extension are positive; if not, flip them and the stress data
+    # strain_check = bool(mech_dict['all_strain_data'].iloc[-10:-1].sum() > mech_dict['all_strain_data'].iloc[0:10].sum())
+    # if not strain_check:
+    #     #Flip the x-axis data
+    #     #NOTE: also 0-corrects the data by default
+    #     initial_max = mech_dict['all_strain_data'].max()
+    #     mech_dict['all_strain_data'] = mech_dict['all_strain_data'] - initial_max
+    #     mech_dict['all_strain_data'] = mech_dict['all_strain_data'].abs()
+    ext_check = bool(mech_dict['all_extension_data'].iloc[-10:-1].sum() > mech_dict['all_extension_data'].iloc[0:10].sum())
+    if not ext_check:
+        #Flip the x-axis data
+        #NOTE: also 0-corrects the data by default
+        initial_max = mech_dict['all_extension_data'].max()
+        mech_dict['all_extension_data'] = mech_dict['all_extension_data'] - initial_max
+        mech_dict['all_extension_data'] = mech_dict['all_extension_data'].abs()
+    # #If stress or strain is flipped, check stress and flip if necessary
+    # #If non-used displacemnt values are flipped, ignore and move on
+    # if (not strain_check) and (displacement_column == 'strain'):
+    #     stress_check = bool(mech_dict['all_stress_data'].iloc[-10:-1].sum() > mech_dict['all_stress_data'].iloc[0:10].sum())
+    #     if not stress_check:
+    #         mech_dict['all_stress_data'] = mech_dict['all_stress_data'][::-1]
+    # if (not ext_check) and (displacement_column == 'extension'):
+    #     stress_check = bool(mech_dict['all_stress_data'].iloc[-10:-1].sum() > mech_dict['all_stress_data'].iloc[0:10].sum())
+    #     if not stress_check:
+    #         mech_dict['all_stress_data'] = mech_dict['all_stress_data'][::-1]
+
     #Use peak finding to grab last loading/unloading cycl
     raw_df = pd.DataFrame(data= {stress_col_name: mech_dict['all_stress_data'],
                                   strain_col_name: mech_dict['all_strain_data'],
@@ -1017,7 +1061,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             unload_end_idx = smallest_data_index
 
         #Find strain minimum where stress actually starts increasing above a threshold
-        strain_offset = 0
+        strain_zero_offset = 0
+        extension_zero_offset = 0
           # Use first 'replicate' to avoid lead-in garbage data
         if (replicate_idx == 0):
               # if no setting is passed, use module default
@@ -1037,8 +1082,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             if first_valid_strain_index < 0:
                 first_valid_strain_index = 0
               # get these values before resetting the strain data so we can apply the same offset to all replicates
-            strain_offset = strain_loading.values[first_valid_strain_index]
-            extension_offset = extension_loading.values[first_valid_strain_index]
+            strain_zero_offset = strain_loading.values[first_valid_strain_index]
+            extension_zero_offset = extension_loading.values[first_valid_strain_index]
             #Get the strain value at new predicted '0 strain' value
             first_valid_strain = strain_loading.iloc[first_valid_strain_index]
             # if first_valid_strain <0:
@@ -1059,10 +1104,10 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         stress_unloading = raw_df[stress_col_name].iloc[peak_idx:unload_end_idx]
         extension_unloading = raw_df[extension_col_name].iloc[peak_idx:unload_end_idx]
           # apply 0-strain offset; not sure why this isn't handled on import; actually it might be: commenting out for now
-        # strain_loading = strain_loading - strain_offset
-        # strain_unloading = strain_unloading - strain_offset
-        # extension_loading = extension_loading - extension_offset
-        # extension_unloading = extension_unloading - extension_offset
+        strain_loading = strain_loading - strain_zero_offset
+        strain_unloading = strain_unloading - strain_zero_offset
+        extension_loading = extension_loading - extension_zero_offset
+        extension_unloading = extension_unloading - extension_zero_offset
         
         #If flagged, make sure non-negative data is reported
         if report_nonnegative_strain:
@@ -1080,26 +1125,39 @@ def pull_mechanical_replicates(data_df, data_dict = None,
 
         #Try and find an assymptote for the loading curve
           # get derivatives
+          # only pull the positive derivates to avoid issues from the way data is collected (probably because of time resolution errors and noise)
         extension_loading_diff = extension_loading.diff()
+        extension_loading_diff = extension_loading_diff[extension_loading_diff>0]
         strain_loading_diff = strain_loading.diff()
+        strain_loading_diff = strain_loading_diff[strain_loading_diff>0]
         loading_stress_diff = stress_loading.diff()
+        loading_stress_diff = loading_stress_diff[loading_stress_diff>0]
           # get second derivatives
         extension_loading_d2 = extension_loading_diff.diff()
+        extension_loading_d2 = extension_loading_d2[extension_loading_d2>0]
         strain_loading_d2 = strain_loading_diff.diff()
+        strain_loading_d2 = strain_loading_d2[strain_loading_d2>0]
         loading_stress_d2 = loading_stress_diff.diff()
-          # pull last 10 values and get a slope of the lock-up acceleration
-        extension_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / (extension_loading_d2.tail(points_n_for_assymptote).mean())
-        strain_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / (strain_loading_d2.tail(points_n_for_assymptote).mean())
+        loading_stress_d2 = loading_stress_d2[loading_stress_d2>0]
+          # pull last 10 values and get a slope for the lock-up acceleration
+        if (extension_loading_d2.tail(points_n_for_assymptote).mean()) <0.000001:    
+            extension_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / 0.000001   #avoid division by zero with a very low threshold
+        else:
+            extension_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / (extension_loading_d2.tail(points_n_for_assymptote).mean())
+        if (strain_loading_d2.tail(points_n_for_assymptote).mean()) <0.000001:    
+            strain_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / 0.000001   #avoid division by zero with a very low threshold
+        else:
+            strain_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / (strain_loading_d2.tail(points_n_for_assymptote).mean())
           #strain assymptote
           #NOTE: could solve  analytically, but this is easier and more clear; never more than a few thousand of these to do in total
         last_stress = stress_loading.tail(1).values[0]
         last_strain = strain_loading.tail(1).values[0]
-        strain_step = strain_loading_diff.tail(10).mean()
-        strain_velocity = strain_loading_diff.tail(1).values[0]
+        strain_step = strain_loading_diff.mean()
+        strain_velocity = strain_loading_diff.tail(3).mean()
         iteration_counter = 0
         strain_delta = 0
         while (last_stress<assymptotic_stress_threshold) and (iteration_counter <100):
-            last_stress = last_stress + (strain_velocity*strain_step) + (0.5 * strain_accel * strain_step**2)
+            last_stress = last_stress + (strain_velocity) + (0.5 * strain_accel)
             strain_delta = strain_delta + strain_step
             iteration_counter += 1
         strain_lockup = last_strain + strain_delta
@@ -1107,24 +1165,28 @@ def pull_mechanical_replicates(data_df, data_dict = None,
           #NOTE: could solve  analytically, but this is easier and more clear; never more than a few thousand of these to do in total
         last_stress = stress_loading.tail(1).values[0]
         last_ext = extension_loading.tail(1).values[0]
-        ext_step = extension_loading_diff.tail(10).mean()
-        ext_velocity = extension_loading_diff.tail(1).values[0]
+        ext_step = extension_loading_diff.mean()
+        ext_velocity = extension_loading_diff.tail(3).mean()
         iteration_counter = 0
         ext_delta = 0
         while (last_stress<assymptotic_stress_threshold) and (iteration_counter <100):
-            last_stress = last_stress + (ext_velocity*ext_step) + (0.5 * extension_accel * ext_step**2)
+            last_stress = last_stress + (ext_velocity) + (0.5 * extension_accel)
             ext_delta = ext_delta + ext_step
             iteration_counter += 1
         ext_lockup = last_ext + ext_delta
 
         strain_dict ={}
         #Finally, grab each stress for every 0.01 value of strain
-        strain_list = [round(num, 4) for num in np.linspace(0, 1, 101)]
+        strain_list = [round(num, 4).item() for num in np.linspace(0, 1, 101)]
         for number in strain_list:
             closest_strain_idx = (strain_loading - number).abs().idxmin()
-            closest_strain_value = strain_loading.iloc[closest_strain_idx]
-            closest_stress_value = stress_loading.iloc[closest_strain_idx]
-            strain_dict[number] = closest_stress_value
+            try:
+                closest_strain_value = strain_loading.iloc[closest_strain_idx]
+                closest_stress_value = stress_loading.iloc[closest_strain_idx]
+                strain_dict[number] = closest_stress_value
+            except IndexError:
+                #If there's an index error, just pass on and hope for the best
+                strain_dict[number] = 'nan'
             
         #Create output DataFrame for this replicate
         output_df = pd.DataFrame({
@@ -1134,9 +1196,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             'stress_data_unloading': stress_unloading,
             'extension_data_loading': extension_loading,
             'extension_data_unloading': extension_unloading,
-            'strain_lockup': strain_lockup,
-            'extension_lockup': ext_lockup,
-            'stress_list': strain_dict
+            'strain_lockup': strain_lockup.item(),      #convert to python native
+            'extension_lockup': ext_lockup.item(),      #convert to python native
             })
     
         #TODO: fix this; not sure why it kept throwing errors and it doesn't really matter so I've moved on  
@@ -1146,6 +1207,9 @@ def pull_mechanical_replicates(data_df, data_dict = None,
 
         #Store replicate data with replicate index (starts at 1)
         replicate_dict['replicate_data'][replicate_idx+1] = output_df
+
+    #Whatever the last 'strain_dict' to be processed was, pass that as the last replicate stress list
+    replicate_dict['last_replicate_stress_dict'] = strain_dict
 
     return replicate_dict
 
