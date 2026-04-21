@@ -2172,7 +2172,7 @@ def ideal_tile_from_initial_line(initial_line_points,
     distance_left = 1e6  #arbitrary big number for initialization
     stepping_counter = 0
     exterior_hit = False
-    while (distance_left >= strand_pitch) and (stepping_counter <100) and (not exterior_hit):
+    while (distance_left >= strand_pitch) and (stepping_counter <500) and (not exterior_hit):
         #'left_coord' is left boundary point on the array
         p_left_line = intersect_point_and_segment(left_coord, prior_line_points[0], prior_line_points[1])
         if p_left_line is None:
@@ -2246,7 +2246,7 @@ def ideal_tile_from_initial_line(initial_line_points,
     distance_right = 1e6  #arbitrary big number for initialization
     stepping_counter = 0
     exterior_hit = False
-    while (distance_right >= strand_pitch) and (stepping_counter <100) and (not exterior_hit):
+    while (distance_right >= strand_pitch) and (stepping_counter <500) and (not exterior_hit):
         #'right_coord' is left boundary point on the array
         p_right_line = intersect_point_and_segment(right_coord, prior_line_points[0], prior_line_points[1])
         #If point has no intercept with clamped line segment within the array, quite the loop.
