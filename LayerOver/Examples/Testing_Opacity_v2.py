@@ -24,9 +24,9 @@ from LayerOver.Analysis.VolumetricPrediction import flat_ideal_volume_guess
 from LayerOver.PSPP.DIWStructure import blank_diw_structure_dict
 
 #Size of the resulting generation array
-array_dims = (5000,5000)
+array_dims = (1000,1000)
 #Number of "identical" structures to generate
-number_of_duplicates = 5
+number_of_duplicates = 7
 #Structure to generate
 diw_structure_dict = {
     'metadata': {
@@ -48,24 +48,24 @@ diw_structure_dict = {
         'thickness_mm': None,
         'density_g/cc': None
         },
-    'part_structure': None,
-    'part_skin_nozzle_size': 150,
-    'part_layer_nozzle_size': 150,
-    'part_angular_offset': 45,
+    'part_structure': 'SHH',
+    'part_skin_nozzle_size': 250,
+    'part_layer_nozzle_size': 250,
+    'part_angular_offset': 60,
     'part_lateral_offset': 0,
     'part_material': '',
     'part_pitch': None,
-    'number_of_layers': 4,
+    'number_of_layers': 3,
     'layer_strand_extrusion': None,
-    'layer_strand_diameter': [250, 250],
-    'layer_types': ['skin', 'helicoidal', 'helicoidal', 'helicoidal'],
-    'layer_type_modifiers': ['None', 'None', 'None', 'None'],
+    'layer_strand_diameter': [250, 250,250],
+    'layer_types': ['skin', 'helicoidal', 'helicoidal'],
+    'layer_type_modifiers': ['None', 'None', 'None'],
     'layer_points': [[],[],[],[]],
-    'layer_steps': [0, 125],
+    'layer_steps': [0, 125, 250],
     'layer_angles': [0, 60, 120],
-    'layer_lateral_offsets': [0, 0],
-    'layer_materials': ['LL50', 'LL50', 'LL50', 'LL50'],
-    'layer_pitches': [600, 600]
+    'layer_lateral_offsets': [0, 0, 0],
+    'layer_materials': ['LL50', 'LL50', 'LL50'],
+    'layer_pitches': [600, 600, 600]
     }
 
 #Do the generatin'

@@ -354,8 +354,8 @@ def flat_ideal_volume_guess(structure_dict,
             return_volume_dict.update( {voxel_name: layer_dict})
 
         #Save and/or show results
+        image_name = f"FullStack_Image_{voxel_name}"
         if save_location:
-            image_name = f"FullStack_Image_{voxel_name}"
             final_image_savename = os.path.join(save_location, image_name)
         else:
             final_image_savename = f"FullStack_Image_{voxel_name}"
