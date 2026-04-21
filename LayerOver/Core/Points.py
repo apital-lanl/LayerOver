@@ -1739,8 +1739,11 @@ def get_radial_neighbors_array_data(initial_start_coord,
                               point_line_distance(new_right_left_coord, initial_start_coord, initial_end_coord)]
             right_distances = [point_line_distance(new_left_right_coord, initial_start_coord, initial_end_coord),
                               point_line_distance(new_right_right_coord, initial_start_coord, initial_end_coord)]
-            average_left_distance = sum(left_distances)/2 * um_to_pix_conversion  #converted to microns
-            average_right_distance = sum(right_distances)/2 * um_to_pix_conversion  #converted to microns
+            
+            #If line is drawn 'corner-wise (ie. North to West), one pixel is a longer distance.
+            #Taking the longer distance lines up with the results for parallel lines (i.e. North to South), so keep that version
+            average_left_distance = max(left_distances) * um_to_pix_conversion  #converted to microns
+            average_right_distance = max(right_distances) * um_to_pix_conversion  #converted to microns
 
             #Avoid math domain error by ignoring average distances close to strand radius
             if (micron_strand_radius-average_left_distance) > 1e-5:
@@ -1760,28 +1763,41 @@ def get_radial_neighbors_array_data(initial_start_coord,
             #NOTE: order doesn't matter here, but trying to maintain 'left = start', 'right = end' convention for (some) clarity
               #new ->right line
             #NOTE: keep adding each side until distance is > strand_radius; i.e. if one side hits that distance first, keep adding the other until that side reaches the limit
-            if not point_right_edge_hit and ((right_distances[0]<=micron_strand_radius) and (right_distances[1]<=micron_strand_radius)):
+            # if not point_right_edge_hit and ((right_distances[0]<=micron_strand_radius) and (right_distances[1]<=micron_strand_radius)):
+            if ((right_distances[0]<=micron_strand_radius) and (right_distances[1]<=micron_strand_radius)):
                 starting_points_list.append(new_left_right_coord)
                 ending_points_list.append(new_right_right_coord)
                 thickness_list.append(average_right_thickness)
-            if not point_left_edge_hit and ((left_distances[0]<=micron_strand_radius) and (left_distances[1]<=micron_strand_radius)):
+            # if not point_left_edge_hit and ((left_distances[0]<=micron_strand_radius) and (left_distances[1]<=micron_strand_radius)):
+            if ((left_distances[0]<=micron_strand_radius) and (left_distances[1]<=micron_strand_radius)):
                 starting_points_list.append(new_left_left_coord)
                 ending_points_list.append(new_right_left_coord)
                 thickness_list.append(average_left_thickness)
 
-            #Report
+     
+            #Check for R/L-left and R/L-right distance mismatch because of corner drawing
+            #If one is larger than the other, hold the larger one constant to give the other side time to catch up.
+            #This will see-saw back and forth until the radius condition is met
+            if left_distances[0] > left_distances[1]:
+                new_left_left_coord = last_left_left
+            elif left_distances[1] > left_distances[0]:
+                new_right_left_coord = last_right_left
+            if right_distances[0] > right_distances[1]:
+                new_left_right_coord = last_left_right
+            elif right_distances[1] > right_distances[0]:
+                new_right_right_coord = last_right_right
+
+            #Report iterations if called for
             if print_intermediate_steps:
-                #
                 print()
-                
                 print(f"Iteration {iteration_cntr}: ")
                 print(f"Point_name \t\t Point_coord  \t\t Edge  \t\t Radial-distances \t\t Calc. Thickness")
                 print('-'*75)
                 print(f"  L-left   \t\t {new_left_left_coord} \t\t {left_left_edge_pos} \t\t {left_distances[0]} \t\t {average_left_thickness}")
-                print(f"  L-right  \t\t {new_left_right_coord} \t\t {left_right_edge_pos} \t\t {left_distances[1]} \t\t {average_left_thickness}")
-                print(f"  R-left   \t\t {new_right_left_coord} \t\t {right_left_edge_pos} \t\t {right_distances[0]} \t\t {average_right_thickness}")
+                print(f"  L-right  \t\t {new_left_right_coord} \t\t {left_right_edge_pos} \t\t {right_distances[0]} \t\t {average_right_thickness}")
+                print(f"  R-left   \t\t {new_right_left_coord} \t\t {right_left_edge_pos} \t\t {left_distances[1]} \t\t {average_left_thickness}")
                 print(f"  R-right  \t\t {new_right_right_coord} \t\t {right_right_edge_pos} \t\t {right_distances[1]} \t\t {average_right_thickness}")
-
+            
             #Store current position for next iteration
             last_right_right = new_right_right_coord
             last_right_left = new_right_left_coord

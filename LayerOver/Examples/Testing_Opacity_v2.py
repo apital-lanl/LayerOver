@@ -57,15 +57,15 @@ diw_structure_dict = {
     'part_pitch': None,
     'number_of_layers': 4,
     'layer_strand_extrusion': None,
-    'layer_strand_diameter': [150, 150, 150, 150],
+    'layer_strand_diameter': [250, 250],
     'layer_types': ['skin', 'helicoidal', 'helicoidal', 'helicoidal'],
     'layer_type_modifiers': ['None', 'None', 'None', 'None'],
     'layer_points': [[],[],[],[]],
-    'layer_steps': [0, 125, 250, 275],
-    'layer_angles': [0, 45, 90, 135],
-    'layer_lateral_offsets': [0, 0, 0, 0],
+    'layer_steps': [0, 125],
+    'layer_angles': [0, 60, 120],
+    'layer_lateral_offsets': [0, 0],
     'layer_materials': ['LL50', 'LL50', 'LL50', 'LL50'],
-    'layer_pitches': [600, 600, 600, 600]
+    'layer_pitches': [600, 600]
     }
 
 #Do the generatin'

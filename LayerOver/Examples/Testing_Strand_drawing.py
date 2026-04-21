@@ -23,8 +23,8 @@ from LayerOver.Core.Points import draw_2D_strand_line_bythickness
 show_intermediate_step_plots = True
 print_intermediate_steps = True
 strand_diam = 150           #in microns, converted to pixels below
-array_dim = (5000, 5000)
-array_side_length_mm = 15   #in mm
+array_dim = (1000, 1000)
+array_side_length_mm = 3   #in mm
 
 #Secondary user defined parameters
 # interior_points = (20,45)
@@ -37,13 +37,11 @@ strand_diameter = 50
   # testing parameters
 interior_point_list = [
     [200, 300],
-    [20,60],
-    [170,1490],
-    [1490, 300],
+    [600, 600]
     ]
 # angle_list = [
 #     0,1,40,90,135,179,180]
-angle_list = [20, 45, 115, 135, 170]
+angle_list = [60]
 
 
 for angle in angle_list:
