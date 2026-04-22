@@ -67,7 +67,9 @@ blank_diw_structure_dict = {
     'layer_angles': None,
     'layer_lateral_offsets': None,
     'layer_materials': None,
-    'layer_pitches': None
+    'layer_pitches': None,
+    'layer_height_modifiers': None,
+    'layer_heights': None
     }
 
 default_diw_structure_dict = {
@@ -108,7 +110,9 @@ default_diw_structure_dict = {
     'layer_angles': [],
     'layer_lateral_offsets': [],
     'layer_materials': [],
-    'layer_pitches': []
+    'layer_pitches': [],
+    'layer_height_modifiers': [],
+    'layer_heights': []
     }
 
 '''
@@ -137,6 +141,8 @@ layer_angles                list of int/float; angular offset for each layer rel
 layer_lateral_offsets
 layer_materials
 layer_pitches
+layer_height_modifiers
+layer_heights
 '''
 
 #DIW material-to-opacity
@@ -296,6 +302,8 @@ def structure_dict_from_logbook_row(logbook_row):
     logbook_row['Humidity'] = logbook_row['Humidity']
     logbook_row['Column1'] = logbook_row['Column1']
     logbook_row['Pitch Layer List'] = logbook_row['Pitch Layer List'].astype(str)
+    logbook_row['Layer 1 Height Multiplier'] = logbook_row['Layer 1 Height Multiplier'].astype(float)
+    logbook_row['Layer 2+ Height Multiplier'] = logbook_row['Layer 2+ Height Multiplier'].astype(float)
 
     #Add direct metadata and other fields
     structure_dict['part_structure'] = logbook_row['Structure'].values[0]
@@ -323,12 +331,12 @@ def structure_dict_from_logbook_row(logbook_row):
     structure_dict['layer_pitches'] = logbook_row['Pitch Layer List'].values[0]
 
     #Pull variables that require interpretation
-      # parse structure code to get list of layer types and number of layers  
+    #Parse structure code to get list of layer types and number of layers  
     layer_list = parse_structure(logbook_row['Structure'].values[0])
     number_of_layers = len(layer_list)
     structure_dict['layer_types'] = layer_list
     structure_dict['number_of_layers'] = number_of_layers
-      # material
+    #Material
     raw_logbook_material_string = logbook_row['Syringe/Material'].values[0]
     parsed_material_note = parse_material_note(raw_logbook_material_string)
     split_material_note = parsed_material_note.split('_')
@@ -344,7 +352,7 @@ def structure_dict_from_logbook_row(logbook_row):
         for i in range(number_of_layers):
             pass
     structure_dict['layer_materials'] = layer_material_list   
-      # parse the pitch 
+    #Parse the pitch 
       #TODO: add support for parsing the 'raw_pitch_string' 
     raw_pitch_string = structure_dict['metadata']['pitch_offset']
     pitch_entry = logbook_row['Pitch Layer List'].values[0]
@@ -369,7 +377,7 @@ def structure_dict_from_logbook_row(logbook_row):
     else:
         pitch_list = pitch_entry
     structure_dict['layer_pitches'] = pitch_list
-      # layer strand diameters
+    #Layer strand diameters
     skin_diam = structure_dict['part_skin_nozzle_size']
     layer_diam = structure_dict['part_layer_nozzle_size']
     strand_diam_list = []
@@ -379,7 +387,7 @@ def structure_dict_from_logbook_row(logbook_row):
         else:
             strand_diam_list.append(layer_diam)
     structure_dict['layer_strand_diameter'] = strand_diam_list
-      # lateral offsets
+    #Lateral offsets
       #TODO: add support for variable offsets by layer from logbook files
     offset = structure_dict['part_lateral_offset']
     offset_list = []
@@ -402,7 +410,7 @@ def structure_dict_from_logbook_row(logbook_row):
         for i in range(number_of_layers):
             offset_list.append(0)
     structure_dict['layer_lateral_offsets'] = offset_list       
-      # angular offsets
+    #Angular offsets
     angle = structure_dict['part_angular_offset']
     angle_list = []
     if type(angle)== float:
@@ -434,6 +442,22 @@ def structure_dict_from_logbook_row(logbook_row):
     else:
         print(f"Failure in angular offset for angle {angle} of type {type(angle)}")
     structure_dict['layer_angles'] = angle_list
+    #Layer height modifiers
+    first_layer_mod = logbook_row['Layer 1 Height Multiplier'].values[0]
+    all_other_layer_mod = logbook_row['Layer 2+ Height Multiplier'].values[0]
+    mod_list = []
+    for i in range(number_of_layers):
+        if i == 0:
+            mod_list.append(first_layer_mod)
+        else:
+            mod_list.append(all_other_layer_mod)
+    structure_dict['layer_height_modifiers'] = mod_list
+    #Layer heights
+    height_list = []
+    for strand_diam, height_mod in zip(strand_diam_list, mod_list):
+            layer_height = strand_diam * height_mod
+            height_list.append(layer_height)
+    structure_dict['layer_heights'] = height_list
 
     #TODO: add better functionality to these entries
     structure_dict['layer_strand_extrusion'] = [None for i in range(number_of_layers)]
@@ -471,6 +495,10 @@ def parse_structure(structure_string, flag = ''):
     
     #Condition variables
     structure_string = str(structure_string)
+
+    #Check if empty string is passed, and if so simply return an empty list
+    if structure_string == '':
+        return []
 
     #Flag option for changing parsing behavior 
     if flag == '':

@@ -18,8 +18,6 @@ Version:   1.2.0
 Description: Combined library for gcode, STL, voxelization, and related operations for Direct Ink Write (DIW) work.
 
 """
-version = '1.2.0'
-last_modified_date = '2025-07-07'
 
   #System and built-ins
 import os
@@ -37,10 +35,11 @@ import numpy as np
 from tqdm.auto import tqdm
 
   #LayerOver imports
-from Part import Gcode
-from Points import Point_Clod
-import Voxel
-import Opacity
+# from LayerOver.Analysis import
+# from LayerOver.Configs import 
+# from LayerOver.Core import
+# from LayerOver.DataAnalysis import 
+# from LayerOver.PSPP import 
 
 
 # Define package-variables

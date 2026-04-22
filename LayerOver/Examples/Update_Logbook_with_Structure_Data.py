@@ -55,6 +55,8 @@ logbook_filepath = filedialog.askopenfilename(title = "Select a logbook 'Automat
                                               filetypes = [('Logbook CSV Files', '*AutomatedAnalysis.csv')])
 root.destroy()
   # select a dataset to add (from "WaffleData.csv") file
+  #NOTE: structure generation from logbook creates a file "Unique_structure_dict.csv" that's a direct output of the DataFrame for unique structures
+  #     That data (from the output CSV) needs to be transposed and saved as a new  "*WaffleData.csv" file for the below filepath 
 root = Tk()
 waffledata_filepath = filedialog.askopenfilename(title = "Select a logbook 'WaffleData' file", \
                                               filetypes = [('Waffle Structure Summary Files', '*WaffleData.csv')])
@@ -106,7 +108,7 @@ else:
   # copy the logbook DataFrame to serve as the base for the updated DataFrame that's saved at the end of this
 # results_df = logbook_df.copy(deep= True)
 results_df = logbook_df.copy()
-  # add columns to DataFrame to be updated with structure-specific data from
+  # add columns to DataFrame to be updated with structure-specific data from WaffleData
   #NOTE: must be in "LayerOver.PSPP.DIWStructure.additional_structure_fields" to be filled-in (updated) from 'wafflebook'
 results_df['unique_structure_id'] = None   #this is the 'index' field
 results_df['vox_1_average'] = None
@@ -121,6 +123,13 @@ results_df['vox_3_density'] = None
 results_df['full_voxel_dimensions'] = None
 results_df['array_side_length_mm'] = None
 results_df['vox_resolution_micron'] = None
+  # add new columns for summary data
+results_df['vox_n3_average_mean'] = None
+results_df['vox_n3_average_stdev'] = None
+results_df['vox_n3_density_mean'] = None
+results_df['vox_n3_density_stdev'] = None
+results_df['vox_n3_sum_mean'] = None
+results_df['vox_n3_sum_stdev'] = None
 
 #Run through logbook and update each row with any supplemental data 1) as available or 2) as called for by user above in 'Main Settings'
 for idx, name in enumerate(print_names):
@@ -158,13 +167,35 @@ for idx, name in enumerate(print_names):
                     print(f"\t Dict lookup error:")
                     print(f"\t {traceback.format_exc()}")
 
+            analysis_set_names = [
+                'vox_n3_average',
+                'vox_n3_sum',
+                'vox_n3_density',
+                ]
+
+            analysis_set_columns = [
+                ['vox_1_average', 'vox_2_average','vox_3_average'],
+                ['vox_1_sum', 'vox_2_sum','vox_3_sum'],
+                ['vox_1_density', 'vox_2_density','vox_3_density'],
+                ]
+            
+            for analysis_basename, column_name_list in zip(analysis_set_names, analysis_set_columns):
+                mean_name = f"{analysis_basename}_mean"
+                stddev_name = f"{analysis_basename}_stdev"
+                data_series = logbook_df.loc[logbook_df['Name']==name, column_name_list]
+
+                this_mean = data_series.values.mean()
+                this_stdev = data_series.values.std()
+
+                logbook_df.loc[logbook_df['Name']==name, mean_name] = this_mean
+                logbook_df.loc[logbook_df['Name']==name, stddev_name] = this_stdev
 
         ############################################################################################################################
         #####  Add mechanical data updating  #######################################################################################
         ############################################################################################################################
 
         if update_with_mechanical_data:
-            pass
+            mech_df = pd.fr
 
     except Exception as e:
         print()

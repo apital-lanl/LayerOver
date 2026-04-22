@@ -21,7 +21,8 @@ import os
 import pandas as pd
 from tkinter import Tk, filedialog
   # other LayerOver imports
-from LayerOver.Analysis.MechanicalData import open_logbook
+from LayerOver.PSPP.DIWLogbook import open_logbook
+from LayerOver.PSPP.DIWLogbook import get_latest_logbook
 from LayerOver.Analysis.MechanicalData import split_filename_for_printname_guessing
 
 #Select the file to open
@@ -43,7 +44,8 @@ for column_name in list(logbook_df.columns):
     print(f"\t {column_name}")
 
 #Save DataFrame to CSV with a similar name
-savebook_filename = os.path.basename(logbook_filepath).replace('AutomatedAnalysis', 'AutomatedResults')
+if 'automatedresults' not in logbook_filepath.lower():
+    savebook_filename = os.path.basename(logbook_filepath).replace('.csv', 'AutomatedResults.csv')
 savebook_filepath = os.path.join(os.path.dirname(logbook_filepath), savebook_filename)
 with open(savebook_filepath, 'w') as file:
     logbook_df.to_csv(file, index= False, lineterminator='\n')

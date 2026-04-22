@@ -29,6 +29,7 @@ from tkinter import filedialog, Tk
 from LayerOver.PSPP.DIWStructure import blank_diw_logbook_row_dict
 from LayerOver.PSPP.DIWStructure import standard_logbook_columnnames
 from LayerOver.PSPP.DIWStructure import parse_structure
+from LayerOver.PSPP.DIWStructure import structure_dict_from_logbook_row
 
 #Define variables
 #Define hard-coded thresholds and setting values
@@ -224,7 +225,7 @@ def open_logbook(logbook_filepath,
       # get the column names for columns to be cleaned
     for column_name in header_row:
         #Set some default column names
-
+        pitch_list_column_name = None
         if 'strand diameter' in column_name.lower():
             diameter_column_name = column_name
         if 'pitch' in column_name.lower():
@@ -232,14 +233,18 @@ def open_logbook(logbook_filepath,
                 pitch_list_column_name = column_name
             else:
                 pitch_column_name = column_name
+    if (pitch_list_column_name == None):
+        pitch_list_column_name = 'Pitch Layer List'
 
-      # split out skin vs. layer nozzle size if different
+    #Split out skin vs. layer nozzle size if different
       # Logbook column name as of 2026-01-22 = "Strand Diameter, nominal (skin/heli)"
     logbook_df['Strand Diameter, Skin'] = [entry[0] if (len(entry)>1) else entry[0] for entry in logbook_df[diameter_column_name].apply(lambda s: str(s).split(r'/'))]
     logbook_df['Strand Diameter, Layer'] = [entry[1] if (len(entry)>1) else entry[0] for entry in logbook_df[diameter_column_name].apply(lambda s: str(s).split(r'/'))]
     logbook_df['Strand Diameter, Skin'] = logbook_df['Strand Diameter, Skin'].astype(float)
     logbook_df['Strand Diameter, Layer'] = logbook_df['Strand Diameter, Layer'].astype(float)
 
+    #Clean the pitch column
+    #'Pitch Layer List' and 'layer_pitch_list'
       # if pitch column as an 'x', replace cell value with layer nozzle size times 'x' ammount (i.e. '1.25x' becomes "1.25 * layer_nozzle_size")
     logbook_df[pitch_column_name] = logbook_df[pitch_column_name].astype(str)
     x_mask = logbook_df[pitch_column_name].str.contains('x', case=False, na=False)
@@ -247,8 +252,54 @@ def open_logbook(logbook_filepath,
         logbook_df.loc[x_mask, pitch_column_name].str.replace('x', '', case=False).astype(float) * 
         logbook_df.loc[x_mask, 'Strand Diameter, Layer']
         )
-
     logbook_df.loc[x_mask, pitch_list_column_name] = logbook_df.loc[x_mask, pitch_column_name]
+
+    #Pull all the names and generate structures
+    print_names = logbook_df['Name'].values
+    for name in print_names:
+        #Pull just this data row to be passed for structure parsing
+        this_logbook_row = logbook_df[logbook_df['Name'] == name]
+    
+        #Generate structure dict
+        diw_structure_dict = structure_dict_from_logbook_row(this_logbook_row)
+        '''diw_structure_dict columns
+            metadata                    Metadata from logbook; if more than one entry exists for the given structure, lists are passed. Othewise str, int, or bool
+            part_structure              Generic 'S-code' structure; can be complete or short; parsed as string
+            part_skin_nozzle_size
+            part_layer_nozzle_size
+            part_angular_offset
+            part_lateral_offset
+            part_material
+            part_pitch
+            number_of_layers            number of layers in the part
+            layer_strand_extrusion      str ('constant', 'variable') or list (str for each layer ('constant', 'variable'), discreet values)
+            layer_strand_diameter       list; parsed based on 'layer_strand_extrusion' strand type
+            layer_types                 list of str for each layer ('helicoidal', 'spiral', 'maze')
+                'helicoidal'             - generic layer for parallel strands; includes 'skin' layers; parsed as linear movements unless a 'layer_type_modifier' is used
+                'spiral'                 - special layer type, parsed as an arc
+                'maze'                   - generic flag for grid-based geometries
+            layer_type_modifiers        str ('None', 'Perturbed')
+                'Perturbed'              - stochasticity added to the otherwise linear path
+                'None'                   - just printed coordinate-to-coordinate with no perturbation or stochasticity added
+            layer_points                list of lists or numpy.array for each layer; initialized as empty list
+            layer_steps                 list of int/float; height of each layer from the substrate
+            layer_angles                list of int/float; angular offset for each layer relative to a global '0'; 
+                eg. [0, 40, 80] would be a 40 degree offset for each subsequent layer to the previous
+            layer_lateral_offsets
+            layer_materials
+            layer_pitches
+            layer_height_modifiers
+            layer_heights
+        '''
+
+        #Add parsed columns back to the logbook DataFrame
+        logbook_df['layer_structure_list'] = diw_structure_dict['layer_types']
+        logbook_df['layer_diameter_list'] = diw_structure_dict['layer_strand_diameter']
+        logbook_df['layer_angle_list'] = diw_structure_dict['layer_angles']
+        logbook_df['layer_lateral_offset_list'] = diw_structure_dict['layer_lateral_offsets']
+        logbook_df['layer_pitch_list'] = diw_structure_dict['layer_pitches']
+        logbook_df['layer_height_modifier_list'] = diw_structure_dict['layer_height_modifiers']
+        logbook_df['layer_heights'] = diw_structure_dict['layer_heights']
 
     return logbook_df
 
