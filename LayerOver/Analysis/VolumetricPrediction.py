@@ -34,8 +34,9 @@ from LayerOver.Core.Points import ideal_tile_from_initial_line
 
 #Hard-coded assumptions and conversion ratios
 default_compression_factors= {
-    'default': 0.7,
-    'general-siloxane': 0.7,
+    'default': 0.78,
+    'general-siloxane': 0.78,
+    'bottom_layer': 0.78/2
     }
 
 #Generic dictionaries 
@@ -69,7 +70,7 @@ def flat_ideal_volume_guess(structure_dict,
                             n_structures= 1, 
                             voxel_side_length= 0,
                             voxel_resolution_microns= 0,
-                            compression_factor= 0.7,
+                            compression_factor= 0,
                             save_layer_images= False,
                             save_layer_arrays= False,
                             save_final_image= False,
@@ -136,6 +137,37 @@ def flat_ideal_volume_guess(structure_dict,
     layer_lateral_offsets= structure_dict['layer_lateral_offsets']
     layer_materials= structure_dict['layer_materials']
     layer_pitches= structure_dict['layer_pitches']
+    layer_height_modifiers = structure_dict['layer_height_modifiers']
+    layer_heights = structure_dict['layer_heights']
+    #Condition layer heights and modifieres to ensure they're actual numbers
+      # modifiers
+    new_mod_list = []
+    for idx, modifier in enumerate(layer_height_modifiers):
+        if isinstance(modifier, (int, float)):
+            new_mod_list.append(modifier)
+        elif isinstance(modifier, str):
+            try: 
+                new_mod_list.append(float(modifier))
+            except:
+                new_mod_list.append(default_compression_factors['default'])
+        else:
+            new_mod_list.append(default_compression_factors['default'])
+    layer_height_modifiers = new_mod_list
+    
+      # heights
+    new_height_list = []    
+    for idx, height in enumerate(layer_heights):
+        if isinstance(height, (int, float)):
+            new_height_list.append(height)
+        elif isinstance(height, str):
+            try: 
+                new_height_list.append(float(height))
+            except:
+                this_diameter = strand_diameters[idx]
+                this_mod = layer_height_modifiers[idx]
+                new_height_list.append(this_diameter * this_mod)
+    layer_heights = new_height_list
+
 
     #Check initial data types and coerce
     if type(compression_factor) == float:
@@ -144,7 +176,7 @@ def flat_ideal_volume_guess(structure_dict,
             pass
         else:
             #TODO: add flag for non-fractional compression factors
-            pass
+            compression_factor = default_compression_factors['default']
     elif type(compression_factor) == int:
         if compression_factor >1 and compression_factor <=100:
             compression_factor = round(compression_factor/100, 5)
@@ -183,6 +215,8 @@ def flat_ideal_volume_guess(structure_dict,
             this_lateral_offset = layer_lateral_offsets[layer_idx]
             strand_diameter = strand_diameters[layer_idx]
             this_pitch = layer_pitches[layer_idx]
+            this_layer_height = layer_heights[layer_idx]
+            this_height_modifier = layer_height_modifiers[layer_idx]
             #TODO: 4 of these are not used and passed 'None' values throw errors
             #   -Add funcitonality for default value passing
             #   -Implement functionality for modification of layer specs due to theses values
@@ -309,10 +343,19 @@ def flat_ideal_volume_guess(structure_dict,
                 #Adjust for compression, strand-to-strand interactions and add to global volume array
                 if layer_idx == 0:
                     #Apply flat-plate compression (i.e. compression of strand against plate surface)
-                    pass
+                    plate_compression_cutoff = round(strand_diameter - (strand_diameter * default_compression_factors['bottom_layer']), 7)   #max_height of layer after compression against substrate
+                    this_layer[this_layer > plate_compression_cutoff] = plate_compression_cutoff
                 else:
                     last_layer_array = ideal_layer_arrays[layer_idx-1]
-                    
+                    max_ideal_diameter = strand_diameters[layer_idx-1] + strand_diameter   #hypothetical max height if layer below and this layer were perfectly cylindrical and not interacting
+                    cutoff_height = round(max_ideal_diameter * this_height_modifier, 7)   #max height of layer after compression and strand-strand interactions
+                    #Find where strands overlap
+                    ideal_overlap_layer = (last_layer_array+this_layer)
+                    overlap_mask = ideal_overlap_layer > cutoff_height
+                    difference_layer = ideal_overlap_layer.copy()
+                    difference_layer[overlap_mask] = difference_layer[overlap_mask] - cutoff_height  #layer of adjustments to subtract from the ideal overlap layers
+                    difference_layer[difference_layer < cutoff_height] = 0   #For non-overlapping regions, make no adjustments
+                    this_layer = this_layer - difference_layer   #subtract adjustments from ideal layer to get adjusted layer; accounts for compression and strand-strand interactions
             
                 #Handle images for each layer (ideal, no compression)
                 if save_location:

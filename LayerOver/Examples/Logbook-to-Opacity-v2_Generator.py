@@ -145,14 +145,17 @@ for idx, name in enumerate(print_names):
                         max_volume = this_max * array_dims[0] * array_dims[1]
                         this_fractional_density = this_sum/max_volume
                         if vox_idx == 0:
+                            trial_unique_structure_dict[unique_structure_id].update({'vox_1_max': this_max})
                             trial_unique_structure_dict[unique_structure_id].update({'vox_1_average': this_average})
                             trial_unique_structure_dict[unique_structure_id].update({'vox_1_sum': this_sum})
                             trial_unique_structure_dict[unique_structure_id].update({'vox_1_density': this_fractional_density})
                         if vox_idx == 1:
+                            trial_unique_structure_dict[unique_structure_id].update({'vox_2_max': this_max})
                             trial_unique_structure_dict[unique_structure_id].update({'vox_2_average': this_average})
                             trial_unique_structure_dict[unique_structure_id].update({'vox_2_sum': this_sum})
                             trial_unique_structure_dict[unique_structure_id].update({'vox_2_density': this_fractional_density})
                         if vox_idx == 2:
+                            trial_unique_structure_dict[unique_structure_id].update({'vox_3_max': this_max})
                             trial_unique_structure_dict[unique_structure_id].update({'vox_3_average': this_average})
                             trial_unique_structure_dict[unique_structure_id].update({'vox_3_sum': this_sum})
                             trial_unique_structure_dict[unique_structure_id].update({'vox_3_density': this_fractional_density})

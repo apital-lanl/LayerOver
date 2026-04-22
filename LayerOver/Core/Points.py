@@ -906,6 +906,10 @@ def draw_2D_strand_line_bythickness(interior_points,
         'control_point_dict'    dict; specifics of line end points and the 
     """
 
+    #Function settings
+    array_edge_threshold = 5   # number of pixels from edge of array to consider as 'edge'
+    #NOTE: if no 'good' array edge value is found, use any value for within this threshold of the edge
+
     #Initialize variables
       # return dict
     control_point_dict = {
@@ -1065,6 +1069,29 @@ def draw_2D_strand_line_bythickness(interior_points,
                 else:
                     #Negative slope
                     right_edge_point = [(array_y_dim-1), x_at_right]
+            else:
+                if (abs(x_at_right) <= array_edge_threshold):
+                    if slope > 0:
+                        right_edge_point = [0, 0]
+                    elif abs(slope) < 1e-5:
+                        #Essentially 0 slope; allow for weird floating point errors by just treating as horizontal line
+                        right_edge_point = [y_at_right, (array_x_dim-1)]
+                    else:
+                        #Negative slope
+                        right_edge_point = [(array_y_dim-1), 0]
+                elif (abs(x_at_right - (array_x_dim-1)) <= array_edge_threshold):
+                    if slope > 0:
+                        right_edge_point = [0, (array_x_dim-1)]
+                    elif abs(slope) < 1e-5:
+                        #Essentially 0 slope; allow for weird floating point errors by just treating as horizontal line
+                        right_edge_point = [y_at_right, (array_x_dim-1)]
+                    else:
+                        #Negative slope
+                        right_edge_point = [(array_y_dim-1), (array_x_dim-1)]
+                elif (abs(y_at_right) <= array_edge_threshold):
+                    right_edge_point = [0, (array_x_dim-1)]
+                elif (abs(y_at_right - (array_y_dim-1)) <= array_edge_threshold):
+                    right_edge_point = [(array_y_dim-1), (array_x_dim-1)]
 
 
             #For the left side of the point
@@ -1104,6 +1131,29 @@ def draw_2D_strand_line_bythickness(interior_points,
                 else:
                     #Negative slope
                     left_edge_point = [0, x_at_left]
+            else:
+                if (abs(x_at_left) <= array_edge_threshold):
+                    if slope >0:
+                        left_edge_point = [(array_y_dim-1), 0]
+                    elif abs(slope) < 1e-5:
+                        #Essentially 0 slope; allow for weird floating point errors by just treating as horizontal line
+                        left_edge_point = [y_at_left, 0]
+                    else:
+                        #Negative slope
+                        left_edge_point = [0, 0]
+                elif (abs(y_at_left - (array_x_dim-1)) <= array_edge_threshold):
+                    if slope >0:
+                        left_edge_point = [(array_y_dim-1), (array_x_dim-1)]
+                    elif abs(slope) < 1e-5:
+                        #Essentially 0 slope; allow for weird floating point errors by just treating as horizontal line
+                        left_edge_point = [y_at_left, 0]
+                    else:
+                        #Negative slope
+                        left_edge_point = [0, (array_x_dim-1)]
+                elif (abs(y_at_left) <= array_edge_threshold):
+                    left_edge_point = [0, 0]
+                elif (abs(y_at_left - (array_y_dim-1)) <= array_edge_threshold):
+                    left_edge_point = [(array_y_dim-1), 0]
 
             #Fix garbage return of identical points; caused by slope being weird
             if (left_edge_point == right_edge_point):
@@ -1917,6 +1967,12 @@ def pole_point_to_array_interior_point(pole_point,
     #Define hard-coded settings
     pole_point_line_padding = 30    #distance 'left' and 'right' to draw a line through the pole_point;
 
+    #Condition inputs
+    offset_angle = float(offset_angle)
+    strand_pitch = float(strand_pitch)
+    lateral_offset = float(lateral_offset)
+    strand_diameter = float(strand_diameter)
+
     #Initialize variables
     interior_point = [-1,-1]  #default return value; improper trial point to flag failed process
     pole_point = np.array(pole_point)
@@ -1952,6 +2008,8 @@ def pole_point_to_array_interior_point(pole_point,
         elif offset_angle > 270 and offset_angle < 360:
             left_angle = offset_angle - 180
             right_angle = offset_angle
+        else:
+            print(f"Failure in Core.Points ~ line 1946: bad angle {offset_angle}")
           # round to avoid overflow errors in trig functions at extreme angles
         right_y = round(math.sin(math.radians(right_angle)), 5) * pole_point_line_padding
         right_x = round(math.cos(math.radians(right_angle)), 5) * pole_point_line_padding
@@ -2116,6 +2174,11 @@ def ideal_tile_from_initial_line(initial_line_points,
                             'drawn_array'   numpy array of size 'array_dims' with tiled structure drawn in; values represent thickness of strand at each point
     """
 
+    #Condition inputs
+    offset_angle = float(offset_angle)
+    strand_pitch = float(strand_pitch)
+    strand_diameter = float(strand_diameter)
+
     #Initialize and format variables
     tile_dict = {
         'drawn_array': None,
@@ -2151,21 +2214,29 @@ def ideal_tile_from_initial_line(initial_line_points,
             line_type = 'vertical'
             left_coord = [0, (array_y_dim-1)/2]
             right_coord = [(array_x_dim-1), (array_y_dim-1)/2]
+            backup_left_coord = left_coord
+            backup_right_coord = right_coord
         else:
             #negative slope in the drawn array, positive Cartesian
             line_type = 'negative'
-            left_coord = [(array_y_dim-1), 0]
-            right_coord = [0, (array_x_dim-1)]
+            left_coord = [(array_x_dim-1), 0]
+            backup_left_coord = [(array_x_dim-1), (array_y_dim-1)/2]
+            right_coord = [0, (array_y_dim-1)]
+            backup_right_coord = [0, (array_y_dim-1)/2]
     elif slope < 0:
         if abs(slope) > 1e6:
             line_type = 'vertical'
             left_coord = [0, (array_y_dim-1)/2]
             right_coord = [(array_x_dim-1), (array_y_dim-1)/2]
+            backup_left_coord = left_coord
+            backup_right_coord = right_coord
         else:
             #positive slope in the drawn array, negative Cartesian
             line_type = 'positive'
             left_coord = [0,0]
+            backup_left_coord = [(array_x_dim-1)/2, 0]
             right_coord = [(array_x_dim-1),(array_y_dim-1)]
+            backup_right_coord = [(array_x_dim-1), (array_y_dim-1)/2]
     
     #Fill the array by stepping 'left'
     prior_line_points = [initial_start_point, initial_end_point]
@@ -2175,6 +2246,9 @@ def ideal_tile_from_initial_line(initial_line_points,
     while (distance_left >= strand_pitch) and (stepping_counter <500) and (not exterior_hit):
         #'left_coord' is left boundary point on the array
         p_left_line = intersect_point_and_segment(left_coord, prior_line_points[0], prior_line_points[1])
+        #If no intercept found, try a backup point and re-run
+        if p_left_line is None:
+            p_left_line = intersect_point_and_segment(backup_left_coord, prior_line_points[0], prior_line_points[1])
         if p_left_line is None:
             #If point has no intercept with clamped line segment within the array, quite the loop.
             #  This should only happen if the orthogonal distance is undefined, which SHOULD only happen when no more lines can be drawn in this direction
@@ -2249,6 +2323,9 @@ def ideal_tile_from_initial_line(initial_line_points,
     while (distance_right >= strand_pitch) and (stepping_counter <500) and (not exterior_hit):
         #'right_coord' is left boundary point on the array
         p_right_line = intersect_point_and_segment(right_coord, prior_line_points[0], prior_line_points[1])
+         #If no intercept found, try a backup point and re-run
+        if p_right_line is None:
+            p_right_line = intersect_point_and_segment(backup_right_coord, prior_line_points[0], prior_line_points[1])
         #If point has no intercept with clamped line segment within the array, quite the loop.
         if p_right_line is None:
             #  This should only happen if the orthogonal distance is undefined, which SHOULD only happen when no more lines can be drawn in this direction
@@ -2294,7 +2371,7 @@ def ideal_tile_from_initial_line(initial_line_points,
 
             #Set values for next iteration
             if prior_line_points == [new_line_start, new_line_end]:
-                break
+                pass
             else:
                 prior_line_points = [new_line_start, new_line_end]
             stepping_counter += 1
