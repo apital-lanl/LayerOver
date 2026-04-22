@@ -283,9 +283,17 @@ def structure_dict_from_logbook_row(logbook_row):
     logbook_row['Strand Diameter, Skin'] = logbook_row['Strand Diameter, Skin'].astype(float)
     logbook_row['Strand Diameter, Layer'] = logbook_row['Strand Diameter, Layer'].astype(float)
     logbook_row['Angle of Rotation (deg)'] = logbook_row['Angle of Rotation (deg)'].astype(float)
-    logbook_row['Lateral Offset (µm)'] = logbook_row['Lateral Offset (µm)'].astype(float)
+    try:
+        logbook_row['Lateral Offset (µm)'] = logbook_row['Lateral Offset (µm)'].astype(float)
+    except:
+        #Read errors may pass micron symbol as empty on import
+        logbook_row['Lateral Offset (µm)'] = logbook_row['Lateral Offset (m)'].astype(float)
     logbook_row['Name'] = logbook_row['Name']
-    logbook_row['Pitch (µm)'] = logbook_row['Pitch (µm)'].astype(float)
+    try:
+        logbook_row['Pitch (µm)'] = logbook_row['Pitch (µm)'].astype(str)
+    except:
+        #Read errors may pass micron symbol as empty on import
+        logbook_row['Pitch (µm)'] = logbook_row['Pitch (m)'].astype(str)
     logbook_row['Machine Name'] = logbook_row['Machine Name']
     logbook_row['LayerUp File'] = logbook_row['LayerUp File']
     logbook_row['Version #'] = logbook_row['LayerUp File']
@@ -354,7 +362,7 @@ def structure_dict_from_logbook_row(logbook_row):
     structure_dict['layer_materials'] = layer_material_list   
     #Parse the pitch 
       #TODO: add support for parsing the 'raw_pitch_string' 
-    raw_pitch_string = structure_dict['metadata']['pitch_offset']
+    raw_pitch_string = logbook_row['Pitch (µm)'].values[0]
     pitch_entry = logbook_row['Pitch Layer List'].values[0]
     if type(pitch_entry) == str:
         pitch_list = []
@@ -366,7 +374,7 @@ def structure_dict_from_logbook_row(logbook_row):
                 if layer_type == 'skin':
                     pitch_list.append(structure_dict['part_skin_nozzle_size'])
                 else:
-                    pitch_list.append(float(pitch_entry))
+                    pitch_list.append(pitch_entry)
     elif type(pitch_entry) == float:
         pitch_list = []
         for i, layer_type in zip(range(number_of_layers), structure_dict['layer_types']):

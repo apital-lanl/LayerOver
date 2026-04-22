@@ -220,6 +220,22 @@ def open_logbook(logbook_filepath,
             #TODO: add functionality to look for appropriate sheet if 'target_sheetname' fails
             pass
         header_row = list(logbook_df.columns)
+
+    #Add columns and format
+    logbook_df['layer_structure_list'] = None
+    logbook_df['layer_diameter_list'] = None
+    logbook_df['layer_angle_list'] = None
+    logbook_df['layer_lateral_offset_list'] = None
+    logbook_df['layer_pitch_list'] = None
+    logbook_df['layer_height_modifier_list'] = None
+    logbook_df['layer_heights'] = None
+    logbook_df['layer_structure_list'] = logbook_df['layer_structure_list'].astype('object')
+    logbook_df['layer_diameter_list'] = logbook_df['layer_diameter_list'].astype('object')
+    logbook_df['layer_angle_list'] = logbook_df['layer_angle_list'].astype('object')
+    logbook_df['layer_lateral_offset_list'] = logbook_df['layer_lateral_offset_list'].astype('object')
+    logbook_df['layer_pitch_list'] = logbook_df['layer_pitch_list'].astype('object')
+    logbook_df['layer_height_modifier_list'] = logbook_df['layer_height_modifier_list'].astype('object')
+    logbook_df['layer_heights'] = logbook_df['layer_heights'].astype('object')
     
     #Clean the dataframe
       # get the column names for columns to be cleaned
@@ -235,6 +251,12 @@ def open_logbook(logbook_filepath,
                 pitch_column_name = column_name
     if (pitch_list_column_name == None):
         pitch_list_column_name = 'Pitch Layer List'
+
+    #Clean columns that tend to have garbage
+    logbook_df['Thickness (Checkline) (mm)'] = logbook_df['Thickness (Checkline) (mm)'].apply(lambda x: float(x) if (isinstance(x, (int, float))) else np.nan)
+    logbook_df['Mass (g)'] = logbook_df['Mass (g)'].apply(lambda x: float(x) if (isinstance(x, (int, float))) else np.nan)
+    logbook_df['Density (g/cc)'] = logbook_df['Density (g/cc)'].apply(lambda x: float(x) if (isinstance(x, (int, float))) else np.nan)
+    logbook_df['Thickness (Additional) (mm)'] = logbook_df['Thickness (Additional) (mm)'].apply(lambda x: float(x) if (isinstance(x, (int, float))) else np.nan)    
 
     #Split out skin vs. layer nozzle size if different
       # Logbook column name as of 2026-01-22 = "Strand Diameter, nominal (skin/heli)"
@@ -259,7 +281,8 @@ def open_logbook(logbook_filepath,
     for name in print_names:
         #Pull just this data row to be passed for structure parsing
         this_logbook_row = logbook_df[logbook_df['Name'] == name]
-    
+
+        # try:
         #Generate structure dict
         diw_structure_dict = structure_dict_from_logbook_row(this_logbook_row)
         '''diw_structure_dict columns
@@ -293,13 +316,47 @@ def open_logbook(logbook_filepath,
         '''
 
         #Add parsed columns back to the logbook DataFrame
-        logbook_df['layer_structure_list'] = diw_structure_dict['layer_types']
-        logbook_df['layer_diameter_list'] = diw_structure_dict['layer_strand_diameter']
-        logbook_df['layer_angle_list'] = diw_structure_dict['layer_angles']
-        logbook_df['layer_lateral_offset_list'] = diw_structure_dict['layer_lateral_offsets']
-        logbook_df['layer_pitch_list'] = diw_structure_dict['layer_pitches']
-        logbook_df['layer_height_modifier_list'] = diw_structure_dict['layer_height_modifiers']
-        logbook_df['layer_heights'] = diw_structure_dict['layer_heights']
+        #NOTE: .at[] used to assign a list to that cell location
+        mask = logbook_df['Name'] == name
+        idx = logbook_df.index[mask][0]
+        #
+        if diw_structure_dict['layer_strand_diameter'] == []:
+            logbook_df[logbook_df['Name'] == name]['layer_diameter_list'] = ['']
+        else:
+            logbook_df.at[idx, 'layer_diameter_list'] = diw_structure_dict['layer_strand_diameter']
+        #
+        if diw_structure_dict['layer_types'] == []:
+            logbook_df[logbook_df['Name'] == name]['layer_structure_list'] = ['']
+        else:
+            logbook_df.at[idx, 'layer_structure_list'] = diw_structure_dict['layer_types']
+        #
+        if diw_structure_dict['layer_angles'] ==[]:
+            logbook_df[logbook_df['Name'] == name]['layer_angle_list'] = ['']
+        else:
+            logbook_df.at[idx, 'layer_angle_list'] = diw_structure_dict['layer_angles']
+        #
+        if diw_structure_dict['layer_lateral_offsets'] ==[]:
+            logbook_df[logbook_df['Name'] == name]['layer_lateral_offset_list'] = ['']
+        else:
+            logbook_df.at[idx, 'layer_lateral_offset_list'] = diw_structure_dict['layer_lateral_offsets']
+        #
+        if diw_structure_dict['layer_pitches'] ==[]:
+            logbook_df[logbook_df['Name'] == name]['layer_pitch_list'] = ['']
+        else:
+            logbook_df.at[idx, 'layer_pitch_list'] = diw_structure_dict['layer_pitches']
+        #
+        if diw_structure_dict['layer_height_modifiers'] ==[]:
+            logbook_df[logbook_df['Name'] == name]['layer_height_modifier_list'] = ['']
+        else:
+            logbook_df.at[idx, 'layer_height_modifier_list'] = diw_structure_dict['layer_height_modifiers']
+        #
+        if diw_structure_dict['layer_heights'] ==[]:
+            logbook_df[logbook_df['Name'] == name]['layer_heights']= ['']
+        else:
+            logbook_df.at[idx, 'layer_heights'] = diw_structure_dict['layer_heights']
+        # except:
+        #     print(f"Fail on printname: {name}. Continuing to next entry.")
+       
 
     return logbook_df
 

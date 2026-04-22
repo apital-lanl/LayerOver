@@ -44,8 +44,10 @@ for column_name in list(logbook_df.columns):
     print(f"\t {column_name}")
 
 #Save DataFrame to CSV with a similar name
-if 'automatedresults' not in logbook_filepath.lower():
-    savebook_filename = os.path.basename(logbook_filepath).replace('.csv', 'AutomatedResults.csv')
+if 'automatedanalysis' not in logbook_filepath.lower():
+    savebook_filename = os.path.basename(logbook_filepath).replace('.csv', '_AutomatedAnalysis.csv')
+else:
+    savebook_filename = logbook_filepath
 savebook_filepath = os.path.join(os.path.dirname(logbook_filepath), savebook_filename)
 with open(savebook_filepath, 'w') as file:
     logbook_df.to_csv(file, index= False, lineterminator='\n')
