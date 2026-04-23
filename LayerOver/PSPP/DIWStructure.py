@@ -236,19 +236,23 @@ blank_unique_structure_dict = {
     'layer_angles': None,
     'layer_lateral_offsets': None,
     'layer_materials': None,
-    'layer_pitches': None
+    'layer_pitches': None,
+    'layer_height_modifiers': None,
     }
 
 #The following list items are additional fields that may be appended to logbook entries based on various operations
 #  Possible operations: mechanical data import, opacity/volumetric prediction from structure, analysis of PSPP
 additional_structure_fields = [
     'index',  #unique structure ID name from opacity/volumetric prediction
+    'vox_1_max',
     'vox_1_average',
     'vox_1_sum',
     'vox_1_density',
+    'vox_2_max',
     'vox_2_average',
     'vox_2_sum',
     'vox_2_density',
+    'vox_3_max',
     'vox_3_average',
     'vox_3_sum',
     'vox_3_density',
@@ -635,7 +639,7 @@ def match_structure_to_unique_name(structure_dict, unique_structure_dict):
         #Create the new unique structure ID and add to passed structure dict
         new_index = int(last_index) +1
         unique_structure_numbers[this_structure]= new_index
-        new_structure_id = this_structure+'_'+str(new_index)
+        new_structure_id = str(this_structure)+'_'+str(new_index)
         unique_structure_dict.update({new_structure_id:new_entry})
         is_unique_bool = True
         #return 'True', <new unique structure id>, <updated structure dict>

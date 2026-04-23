@@ -29,8 +29,11 @@ from LayerOver.PSPP.DIWStructure import open_wafflebook
 from LayerOver.Analysis.VolumetricPrediction import flat_ideal_volume_guess
 from LayerOver.PSPP.DIWStructure import structure_dict_from_logbook_row
 from LayerOver.PSPP.DIWStructure import match_structure_to_unique_name
+from LayerOver.PSPP.DIWMechanicalProperties import open_mechanical_summary
+from LayerOver.PSPP.DIWMechanicalProperties import add_mechdata_to_logbook_df
   #list of fields that come from PSPP analysis: mechanical data, ideal structure prediction, etc.
 from LayerOver.PSPP.DIWStructure import additional_structure_fields
+
 
 
 #######################################################################################################################
@@ -40,7 +43,7 @@ from LayerOver.PSPP.DIWStructure import additional_structure_fields
 #Main settings
 print_name_start_row  = 1   #default is 1; starting logbook row 
 print_name_end_row = 0   #default is 0; ending logbook row
-update_with_mechanical_data = False #option to add mech data; 
+update_with_mechanical_data = True #option to add mech data; 
     #NOTE: will try the following in order: 1) look for scraped mech data, 2) search directory for appropriate data, 3) give up
 
 #######################################################################################################################
@@ -61,10 +64,13 @@ root = Tk()
 waffledata_filepath = filedialog.askopenfilename(title = "Select a logbook 'WaffleData' file", \
                                               filetypes = [('Waffle Structure Summary Files', '*WaffleData.csv')])
 root.destroy()
+  # If mech data is to be added, select a file to pull data from
 if update_with_mechanical_data:
     root = Tk()
-    mechdata_directory = filedialog.askdirectory(title = "Select a directory with mechanical summary data or raw mech data")
+    mechsummary_filepath = filedialog.askopenfilename(title = "Select a 'Summary of Directory Mechanical Data' file", \
+                                                    filetypes = [('Mech Summary CSV Files', '*Mechanical Data.csv')])
     root.destroy()
+    mech_df = open_mechanical_summary(mechsummary_filepath)
 
   # open the files as a pd.DataFrames
 logbook_df = open_logbook(logbook_filepath,
@@ -111,12 +117,15 @@ results_df = logbook_df.copy()
   # add columns to DataFrame to be updated with structure-specific data from WaffleData
   #NOTE: must be in "LayerOver.PSPP.DIWStructure.additional_structure_fields" to be filled-in (updated) from 'wafflebook'
 results_df['unique_structure_id'] = None   #this is the 'index' field
+results_df['vox_1_max'] = None
 results_df['vox_1_average'] = None
 results_df['vox_1_sum'] = None
 results_df['vox_1_density'] = None
+results_df['vox_2_max'] = None
 results_df['vox_2_average'] = None
 results_df['vox_2_sum'] = None
 results_df['vox_2_density'] = None
+results_df['vox_3_max'] = None
 results_df['vox_3_average'] = None
 results_df['vox_3_sum'] = None
 results_df['vox_3_density'] = None
@@ -124,6 +133,8 @@ results_df['full_voxel_dimensions'] = None
 results_df['array_side_length_mm'] = None
 results_df['vox_resolution_micron'] = None
   # add new columns for summary data
+results_df['vox_n3_max_mean'] = None
+results_df['vox_n3_max_stdev'] = None
 results_df['vox_n3_average_mean'] = None
 results_df['vox_n3_average_stdev'] = None
 results_df['vox_n3_density_mean'] = None
@@ -138,7 +149,7 @@ for idx, name in enumerate(print_names):
 
     try:
         #Pull logbook row
-        this_logbook_row = logbook_df[logbook_df['Name'] == name].copy()
+        this_logbook_row = results_df[results_df['Name'] == name].copy()
     
         #Generate a generalized and homogenous structure dict
         diw_structure_dict = structure_dict_from_logbook_row(this_logbook_row)
@@ -152,7 +163,7 @@ for idx, name in enumerate(print_names):
         #Check if this is a new structure or not; don't update 'unique_structure_dict' as we're just checking
         is_unique_bool, unique_structure_id,_ = match_structure_to_unique_name(diw_structure_dict, unique_structure_dict)
         print(f"\t Structure {diw_structure_dict['part_structure']} flagged as {unique_structure_id}: unique={is_unique_bool}")
-        logbook_df.loc[logbook_df['Name']==name, 'unique_structure_id'] = unique_structure_id
+        results_df.loc[results_df['Name']==name, 'unique_structure_id'] = unique_structure_id
 
         if unique_structure_id in unique_structure_id_list:
             unique_structure_id = str(unique_structure_id)
@@ -161,50 +172,62 @@ for idx, name in enumerate(print_names):
                 #Try and find any of the expected analyses values to add to the logbook row for that structure
                 try:
                     update_value = waffledata_df[waffledata_df['index']==unique_structure_id][structure_key].values[0]
-                    logbook_df.loc[logbook_df['Name']==name, structure_key] = update_value
+                    results_df.loc[results_df['Name']==name, structure_key] = update_value
                 #Catch incorrect key pull attempts
                 except KeyError:
                     print(f"\t Dict lookup error:")
                     print(f"\t {traceback.format_exc()}")
 
-            analysis_set_names = [
-                'vox_n3_average',
-                'vox_n3_sum',
-                'vox_n3_density',
-                ]
+        analysis_set_names = [
+            'vox_n3_max',
+            'vox_n3_average',
+            'vox_n3_sum',
+            'vox_n3_density',
+            ]
 
-            analysis_set_columns = [
-                ['vox_1_average', 'vox_2_average','vox_3_average'],
-                ['vox_1_sum', 'vox_2_sum','vox_3_sum'],
-                ['vox_1_density', 'vox_2_density','vox_3_density'],
-                ]
+        analysis_set_columns = [
+            ['vox_1_max', 'vox_2_max','vox_3_max'],
+            ['vox_1_average', 'vox_2_average','vox_3_average'],
+            ['vox_1_sum', 'vox_2_sum','vox_3_sum'],
+            ['vox_1_density', 'vox_2_density','vox_3_density'],
+            ]
             
-            for analysis_basename, column_name_list in zip(analysis_set_names, analysis_set_columns):
-                mean_name = f"{analysis_basename}_mean"
-                stddev_name = f"{analysis_basename}_stdev"
-                data_series = logbook_df.loc[logbook_df['Name']==name, column_name_list]
+        for analysis_basename, column_name_list in zip(analysis_set_names, analysis_set_columns):
+            mean_name = f"{analysis_basename}_mean"
+            stddev_name = f"{analysis_basename}_stdev"
+            data_series = waffledata_df[waffledata_df['index']==unique_structure_id][column_name_list]
 
-                this_mean = data_series.values.mean()
-                this_stdev = data_series.values.std()
+            # this_mean = data_series.values.mean(numeric_only=True)
+            # this_stdev = data_series.values.std(numeric_only=True)
+            this_mean = np.mean(data_series.values)
+            this_stdev = np.std(data_series.values)
 
-                logbook_df.loc[logbook_df['Name']==name, mean_name] = this_mean
-                logbook_df.loc[logbook_df['Name']==name, stddev_name] = this_stdev
-
-        ############################################################################################################################
-        #####  Add mechanical data updating  #######################################################################################
-        ############################################################################################################################
-
-        if update_with_mechanical_data:
-            mech_df = pd.fr
+            results_df.loc[results_df['Name']==name, mean_name] = this_mean
+            results_df.loc[results_df['Name']==name, stddev_name] = this_stdev
 
     except Exception as e:
         print()
-        print(f"Updating of logbook row with supplemental data failed with error: {e}")
-        print()
+        print(f"Updating of logbook row with waffle data failed with error: {e}")
         print(f"\t {traceback.format_exc()}")
+        print()
+
+############################################################################################################################
+#####  Add mechanical data updating  #######################################################################################
+############################################################################################################################
+
+try:
+    if update_with_mechanical_data:
+        results_df = add_mechdata_to_logbook_df(results_df, mech_df)
+
+except Exception as e:
+        print()
+        print(f"Updating of logbook row with mechanical data failed with error: {e}")
+        print(f"\t {traceback.format_exc()}")
+        print()
+
 
 #Save DataFrame to CSV with a similar name
 savebook_filename = logbook_filepath.replace("AutomatedAnalysis", "UpdatedResults")
 savebook_filepath = os.path.join(os.path.dirname(logbook_filepath), savebook_filename)
 with open(savebook_filepath, 'w') as file:
-    logbook_df.to_csv(file, index= False, lineterminator='\n')
+    results_df.to_csv(file, index= False, lineterminator='\n')

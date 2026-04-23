@@ -37,6 +37,10 @@ default_stress_threshold = 0.2   #in kPa; for silicone elastomers, but should be
 strain_minimum_mask_threshold = -0.1  #minimum strain to accept (<0 to allow for noise at 0 strain)
   # default name for the digital logbook sheet with all the actual logbook data
 default_digital_logbok_sheetname = 'Digital Logbook'   #Appropriate sheet as of 2026-01-21
+logbook_exclusion_strings = ['-', 'x', 'xn', ' ', '1.23 (per Sam)', 'Outer = 0.5482\nInner = 0.4699',
+                             '1.09474 (dubious on measurements)']   #someone keeps putting garbage in the logbook number columns; these are all the garbages found so far
+  #convert to lowercase for better matching
+logbook_exclusion_strings = [snippet.lower() for snippet in logbook_exclusion_strings]
 
 #Example column names for various types of report from mechanical testing instruments
 # used to guess which 1) type of mech data is being parsed, 2) which row in the spreadsheet contains the column names, 
@@ -253,10 +257,12 @@ def open_logbook(logbook_filepath,
         pitch_list_column_name = 'Pitch Layer List'
 
     #Clean columns that tend to have garbage
-    logbook_df['Thickness (Checkline) (mm)'] = logbook_df['Thickness (Checkline) (mm)'].apply(lambda x: float(x) if (isinstance(x, (int, float))) else np.nan)
-    logbook_df['Mass (g)'] = logbook_df['Mass (g)'].apply(lambda x: float(x) if (isinstance(x, (int, float))) else np.nan)
-    logbook_df['Density (g/cc)'] = logbook_df['Density (g/cc)'].apply(lambda x: float(x) if (isinstance(x, (int, float))) else np.nan)
-    logbook_df['Thickness (Additional) (mm)'] = logbook_df['Thickness (Additional) (mm)'].apply(lambda x: float(x) if (isinstance(x, (int, float))) else np.nan)    
+    # someone keeps putting letters in the number column
+    # NOTE: prior instance assignment for posterity:  (isinstance(x, (int, float, str)))
+    logbook_df['Mass (g)'] = logbook_df['Mass (g)'].apply(lambda x: float(x) if ((str(x).lower() not in logbook_exclusion_strings) and (str(x).lower() != "")) else np.nan)
+    logbook_df['Thickness (Checkline) (mm)'] = logbook_df['Thickness (Checkline) (mm)'].apply(lambda x: float(x) if ((str(x).lower() not in logbook_exclusion_strings) and (str(x).lower() != "")) else np.nan) 
+    logbook_df['Density (g/cc)'] = logbook_df['Density (g/cc)'].apply(lambda x: float(x) if ((str(x).lower() not in logbook_exclusion_strings) and (str(x).lower() != "")) else np.nan)
+    logbook_df['Thickness (Additional) (mm)'] = logbook_df['Thickness (Additional) (mm)'].apply(lambda x: float(x) if ((str(x).lower() not in logbook_exclusion_strings) and (str(x).lower() != "")) else np.nan)    
 
     #Split out skin vs. layer nozzle size if different
       # Logbook column name as of 2026-01-22 = "Strand Diameter, nominal (skin/heli)"
@@ -356,7 +362,6 @@ def open_logbook(logbook_filepath,
             logbook_df.at[idx, 'layer_heights'] = diw_structure_dict['layer_heights']
         # except:
         #     print(f"Fail on printname: {name}. Continuing to next entry.")
-       
 
     return logbook_df
 
