@@ -19,6 +19,7 @@ Description: Quick script to run 'VolumetricPrediction' generation of layer imag
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+import traceback
 
 from LayerOver.Analysis.VolumetricPrediction import flat_ideal_volume_guess
 from LayerOver.PSPP.DIWStructure import blank_diw_structure_dict
@@ -48,24 +49,26 @@ diw_structure_dict = {
         'thickness_mm': None,
         'density_g/cc': None
         },
-    'part_structure': 'SHH',
-    'part_skin_nozzle_size': 250,
-    'part_layer_nozzle_size': 250,
-    'part_angular_offset': 60,
+    'part_structure': 'S8HS',
+    'part_skin_nozzle_size': 150,
+    'part_layer_nozzle_size': 150,
+    'part_angular_offset': 45,
     'part_lateral_offset': 0,
     'part_material': '',
     'part_pitch': None,
-    'number_of_layers': 3,
+    'number_of_layers': 10,
     'layer_strand_extrusion': None,
-    'layer_strand_diameter': [250, 250,250],
-    'layer_types': ['skin', 'helicoidal', 'helicoidal'],
-    'layer_type_modifiers': ['None', 'None', 'None'],
-    'layer_points': [[],[],[],[]],
-    'layer_steps': [0, 125, 250],
-    'layer_angles': [0, 60, 120],
-    'layer_lateral_offsets': [0, 0, 0],
-    'layer_materials': ['LL50', 'LL50', 'LL50'],
-    'layer_pitches': [600, 600, 600]
+    'layer_strand_diameter': [150,150,150,150,150,150,150,150,150,150],
+    'layer_types': ['skin', 'helicoidal', 'helicoidal', 'helicoidal', 'helicoidal', 'helicoidal', 'helicoidal', 'helicoidal', 'helicoidal', 'skin'],
+    'layer_type_modifiers': ['None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None'],
+    'layer_points': [[],[],[],[],[],[],[],[],[],[]],
+    'layer_steps': [0, 125, 250, 250, 250,250,250,250,250,250],
+    'layer_angles': [0, 45, 90, 135, 180, 225, 270, 315, 0, 45],
+    'layer_lateral_offsets': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    'layer_materials': ['LL50', 'LL50', 'LL50', 'LL50', 'LL50', 'LL50', 'LL50', 'LL50', 'LL50', 'LL50'],
+    'layer_pitches': [450, 450, 450, 450, 450, 450, 450, 450, 450, 450],
+    'layer_height_modifiers': [0.78 for i in range(10)],
+    'layer_heights': [0, 125, 250, 250, 250,250,250,250,250,250]
     }
 
 #Do the generatin'
@@ -89,6 +92,7 @@ for i in range(number_of_duplicates):
     except Exception as e:
         print()
         print(f'Failed on exception: {e}')
+        print(f"\t {traceback.format_exc()}")
 
 
 #Returned keys:

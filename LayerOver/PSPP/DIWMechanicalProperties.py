@@ -122,13 +122,14 @@ def add_mechdata_to_logbook_df(logbook_df, mechdata_df):
     #Pull 'Name' column from mech data summary (direct logbook printnames)
     mechdata_printnames = mechdata_df['Name'].unique().tolist()
     logbook_df['mech_data_directory'] = None
+    logbook_df['lower_name'] = logbook_df['Name'].apply(lambda s: str(s).lower())
 
     #Run through each unique printname and add data to logbook_df
     for idx, printname in enumerate(mechdata_printnames):
         #Pull mech data for this printname
         mechdata_printname_df = mechdata_df[mechdata_df['Name'] == printname]
         #Pull logbook rows with matching printname
-        logbook_printname_mask = logbook_df['Name'] == printname
+        logbook_printname_mask = logbook_df['lower_name'] == printname
         try:
             #Pull directory mech data for printname was found in and add to logbook_df
             mechdata_filepath = mechdata_printname_df['filepath'].values[0]
@@ -146,6 +147,7 @@ def add_mechdata_to_logbook_df(logbook_df, mechdata_df):
             logbook_df.loc[logbook_printname_mask, 'mean_strain_assymptote'] = mean_strain_assymptote.astype(float)
             logbook_df.loc[logbook_printname_mask, 'mean_extension_assymptote'] = mean_extension_assymptote.astype(float)
             logbook_df.loc[logbook_printname_mask, 'n_mech_replicates'] = len(mechdata_printname_df)
+
         except:
             strain_means = mechdata_printname_df['strain_assymptote'].values
             ext_means = mechdata_printname_df['extension_assymptote'].values
