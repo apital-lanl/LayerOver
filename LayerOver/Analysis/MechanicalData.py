@@ -56,8 +56,10 @@ assymptotic_stress_threshold = 5e4   # in kPa; stupid-high number for 'max lock-
 example_namerows = {
     'mech-generic': ['Load', 'Stress', 'Strain'],
     'mech-type1': ['Index','Time (sec)', 'Load (kN)', 'Crosshead (mm)', 'PrimaryExtension (mm)', 'Stress (kPa)', 'Strain (mm/mm)', 'Specimen Height (in)'],
-    'mech-type2': ['Index','Time (sec)', 'Load (N)', 'Stress (kPa)', 'Gap (mm)', 'GapEx1 (mm)', 'Extension (mm)', 'Extension Ex1 (mm)', 'Strain (mm/mm)', 'Strain Ex1 (mm/mm)']
+    'mech-type2': ['Index','Time (sec)', 'Load (N)', 'Stress (kPa)', 'Gap (mm)', 'GapEx1 (mm)', 'Extension (mm)', 'Extension Ex1 (mm)', 'Strain (mm/mm)', 'Strain Ex1 (mm/mm)'],
+    'mech-type3': ['Time (sec)', 'Load (N)', 'Stress (kPa)', 'Uncorrected Gap (mm)', 'Corrected Gap (mm)', 'Strain (mm/mm)']
     }
+
 
 #Details for parsing files of the types in 'example_namerows'
 #'__exclusion_terms' are lists of terms that disqualify a name. I.E. 'Strain Ex1 (mm/mm)' is a valid 'strain' name for 'mech-type2', but we only want the 'Strain (mm/mm)' column and 
