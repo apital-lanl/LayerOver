@@ -942,7 +942,12 @@ def pull_mechanical_replicates(data_df, data_dict = None,
     #     initial_max = mech_dict['all_strain_data'].max()
     #     mech_dict['all_strain_data'] = mech_dict['all_strain_data'] - initial_max
     #     mech_dict['all_strain_data'] = mech_dict['all_strain_data'].abs()
-    ext_check = bool(mech_dict['all_extension_data'].iloc[-10:-1].sum() > mech_dict['all_extension_data'].iloc[0:10].sum())
+
+    #Sometimes lists are passed
+    try:
+        ext_check = bool(mech_dict['all_extension_data'].iloc[-10:-1].sum() > mech_dict['all_extension_data'].iloc[0:10].sum())
+    except AttributeError:
+        ext_check = bool(sum(mech_dict['all_extension_data'][-10:-1]) > sum(mech_dict['all_extension_data'][0:10]))
     if not ext_check:
         #Flip the x-axis data
         #NOTE: also 0-corrects the data by default
