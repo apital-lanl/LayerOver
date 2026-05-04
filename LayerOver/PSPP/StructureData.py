@@ -105,9 +105,3 @@ def parse_material_note(raw_material_note):
         'parsed_material_string'    materials from dict above
     """
     #Initialize variables
-
-
-
-
-
-
