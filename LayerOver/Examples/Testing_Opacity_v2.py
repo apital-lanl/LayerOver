@@ -29,6 +29,7 @@ array_dims = (1000,1000)
 #Number of "identical" structures to generate
 number_of_duplicates = 7
 #Structure to generate
+overwrite_layer_lists = False
 diw_structure_dict = {
     'metadata': {
         'unique_structure_name': None,
@@ -53,22 +54,9 @@ diw_structure_dict = {
     'part_skin_nozzle_size': 150,
     'part_layer_nozzle_size': 150,
     'part_angular_offset': 45,
+    'part_pitch': 0,
     'part_lateral_offset': 0,
-    'part_material': '',
-    'part_pitch': None,
-    'number_of_layers': 10,
-    'layer_strand_extrusion': None,
-    'layer_strand_diameter': [150,150,150,150,150,150,150,150,150,150],
-    'layer_types': ['skin', 'helicoidal', 'helicoidal', 'helicoidal', 'helicoidal', 'helicoidal', 'helicoidal', 'helicoidal', 'helicoidal', 'skin'],
-    'layer_type_modifiers': ['None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None', 'None'],
-    'layer_points': [[],[],[],[],[],[],[],[],[],[]],
-    'layer_steps': [0, 125, 250, 250, 250,250,250,250,250,250],
-    'layer_angles': [0, 45, 90, 135, 180, 225, 270, 315, 0, 45],
-    'layer_lateral_offsets': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    'layer_materials': ['LL50', 'LL50', 'LL50', 'LL50', 'LL50', 'LL50', 'LL50', 'LL50', 'LL50', 'LL50'],
-    'layer_pitches': [450, 450, 450, 450, 450, 450, 450, 450, 450, 450],
-    'layer_height_modifiers': [0.78 for i in range(10)],
-    'layer_heights': [0, 125, 250, 250, 250,250,250,250,250,250]
+    'part_material': ''
     }
 
 #Do the generatin'

@@ -477,17 +477,50 @@ def structure_dict_from_logbook_row(logbook_row):
     return structure_dict
 
 
-def structure_dict_from_param_kwargs(structure_code = None,
-                                     nozzle_size = None,
-                                     skin_nozzle_size = None,
-                                     layer_nozzle_size = None,
-                                     ):
+def fill_in_structure_dict(structure_dict,
+                           overwrite_layer_lists = True):
     '''
-    Description: Given a 'blank_diw_param_dict'-like dictionary, generate a skeleton 'blank_structure_dict'.
+    Description: Take a structure dict that has required part fields filled in and fill in layer lists.
     '''
-    #Attempt to pull 
+    
+    #Pull variables
+    part_structure = structure_dict['part_structure']
+    skin_strand_diam = structure_dict['part_skin_nozzle_size']
+    layer_strand_diam = structure_dict['part_layer_nozzle_size']
+    angular_offset = structure_dict['part_angular_offset']
+    lateral_offset = structure_dict['part_lateral_offset']
+    part_pitch = structure_dict['part_pitch']
+    layer_type_list = parse_structure(part_structure)
+    structure_dict['layer_types'] = layer_type_list
+    structure_dict['number_of_layers'] = len(layer_type_list)
 
-    pass
+    if overwrite_layer_lists:
+        for i, layer_type in zip(range(structure_dict['number_of_layers']), structure_dict['layer_types']):
+            #Fill in values to layer list depending on layer type
+            if layer_type.lower() == 'skin':
+                structure_dict['layer_strand_diameter'].append(skin_strand_diam)
+                structure_dict['layer_pitches'].append(skin_strand_diam)
+                structure_dict['layer_lateral_offsets'].append(0)
+            else:
+                structure_dict['layer_strand_diameter'].append(layer_strand_diam)
+                structure_dict['layer_pitches'].append(part_pitch)
+                structure_dict['layer_lateral_offsets'].append(lateral_offset)
+        
+            #All angles are incremented the same
+            structure_dict['layer_angles'].append(i * angular_offset)
+        
+            #TODO: add betterfunctionality to fill these in
+            structure_dict['layer_steps'].append(structure_dict['layer_strand_diameter'][i])
+            structure_dict['layer_materials'].append('default')
+            structure_dict['layer_height_modifiers'].append(1)
+    
+        #Same as 'layer_steps' for almost all cases
+        structure_dict['layer_heights'] = structure_dict['layer_steps']
+    else:
+        #TODO: check if list exists and fill in empty lists
+        pass
+
+    return structure_dict
 
 
 def parse_structure(structure_string, flag = ''):
