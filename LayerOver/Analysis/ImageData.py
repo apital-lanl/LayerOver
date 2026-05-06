@@ -16,6 +16,10 @@ Description: Module for image analysis functions and standards.
 
 """
 
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+
 
 
 def dynamic_threshold(array, num_bins = 100,
@@ -36,9 +40,21 @@ def dynamic_threshold(array, num_bins = 100,
 
     OUTPUT:
         return_dict     dict; contains the following keys:
-            ''      description
-
-
+            'name'                      description
+            'cnts'                      list of counts for each bin    
+            'bins'                      list of bin edges
+            'max_middle_cnt'            maximum count in the middle bins (i.e. not edge bins)
+            'bin_size'                  size of the bins (assumes consistent bin sizes)
+            'lower_FWHM_bin_idx'        index of the lower bin closest to the FWHM value
+            'upper_FWHM_bin_idx'        index of the upper bin closest to the FWHM value
+            'FWHM'                      count value at the FWHM (i.e. the minimum of the two closest bins to the half-max value)
+            'calculation'               string describing the calculation performed (e.g. 'outside_CLT;below')
+            'calculation_cnt_sum'       sum of counts that meet the criteria of the calculation (e.g. sum of counts below the lower threshold)
+            'upper_FWHM_pix_value'      pixel value corresponding to the upper FWHM bin
+            'peak_pix_value'            pixel value corresponding to the peak bin
+            'lower_FWHM_pix_value'      pixel value corresponding to the lower FWHM bin
+            'max_threshold_pix_value'   pixel value corresponding to the upper threshold bin
+            'min_threshold_pix_value'   pixel value corresponding to the lower threshold bin
     '''
 
     #Define and initialize variables
@@ -191,6 +207,7 @@ def dynamic_threshold(array, num_bins = 100,
         plt.plot([upper_threshold, upper_threshold], [0, half_max], color = 'lime', linewidth = 2)
         plt.plot([lower_threshold, lower_threshold], [0, half_max], color = 'red', linewidth = 2)
             #finish plotting the histogram values
+        plt.plot(bins[1::], cnts, linewidth = 1)
         plt.scatter(bins[1::], cnts)
         plt.title(f"Height hist- {name}")
         plt.show()

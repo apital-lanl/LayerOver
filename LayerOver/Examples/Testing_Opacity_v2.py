@@ -23,11 +23,16 @@ import traceback
 
 from LayerOver.Analysis.VolumetricPrediction import flat_ideal_volume_guess
 from LayerOver.PSPP.DIWStructure import blank_diw_structure_dict
+from LayerOver.PSPP.DIWStructure import fill_in_structure_dict
+from LayerOver.Analysis.ImageData import dynamic_threshold
+
+
 
 #Size of the resulting generation array
 array_dims = (1000,1000)
 #Number of "identical" structures to generate
-number_of_duplicates = 7
+number_of_duplicates = 3
+
 #Structure to generate
 overwrite_layer_lists = False
 diw_structure_dict = {
@@ -43,8 +48,9 @@ diw_structure_dict = {
         'layerup_file': None,
         'version_number': None,
         'notes': None,
-        'mech_data_flag': None,
-        'keyence_data_flag': None,
+        'mech_data_note': None,
+        'mech_data_filepaths': None,
+        'keyence_data_note': None,
         'punch_diameter': None,
         'mass_g': None,
         'thickness_mm': None,
@@ -53,11 +59,28 @@ diw_structure_dict = {
     'part_structure': 'S8HS',
     'part_skin_nozzle_size': 150,
     'part_layer_nozzle_size': 150,
-    'part_angular_offset': 45,
-    'part_pitch': 0,
+    'part_angular_offset': 40,
     'part_lateral_offset': 0,
-    'part_material': ''
+    'part_material': '',
+    'part_pitch': 500,
+    'number_of_layers': None,
+    'layer_strand_extrusion': None,
+    'layer_strand_diameter': None,
+    'layer_types': None,
+    'layer_type_modifiers': None,
+    'layer_points': None,
+    'layer_steps': None,
+    'layer_angles': None,
+    'layer_lateral_offsets': None,
+    'layer_materials': None,
+    'layer_pitches': None,
+    'layer_height_modifiers': None,
+    'layer_heights': None
     }
+
+#Fill in logbook
+diw_structure_dict= fill_in_structure_dict(diw_structure_dict,
+                                           overwrite_layer_lists = True)
 
 #Do the generatin'
 for i in range(number_of_duplicates):
@@ -65,7 +88,7 @@ for i in range(number_of_duplicates):
     print('#'*50)
     print(f"Running replicate {i+1}")
     try:
-        flat_ideal_volume_guess(diw_structure_dict,
+        volume_dict = flat_ideal_volume_guess(diw_structure_dict,
                                     array_dims, 
                                     n_structures= 1, 
                                     voxel_side_length= 15,
@@ -75,24 +98,72 @@ for i in range(number_of_duplicates):
                                     save_layer_arrays= False,
                                     save_final_image= False,
                                     save_final_array= False,
-                                    show_layer_images= False,
+                                    show_layer_images= True,
                                     show_final_image= True)
+
+        volume_key = list(volume_dict.keys())[0]
+        volume_array = volume_dict[volume_key]['full_volume_prediction']
+        
+        #Returned keys for each 'layer_dict':
+        # 'ideal_layers'      list; each entry is a list of 2D arrays, one per layer, with ideal layer predictions
+        # 'adjusted_layers'   list; each entry is a list of 2D arrays, one per layer, with adjusted layer predictions
+        # 'full_volume_prediction' 3D array of stacked 'adjusted_layers' arrays
+
+        dynamic_threshold(volume_array, 
+                            num_bins = 200,
+                            show_threshold_graph = True,
+                            name = '', 
+                            threshold = True,
+                            calculation_range = 'below',
+                            calculation_type = 'outside_CLT',
+                            fix_bins = False)
+
     except Exception as e:
         print()
         print(f'Failed on exception: {e}')
         print(f"\t {traceback.format_exc()}")
 
 
-#Returned keys:
-#     metadata
-#     number_of_layers
-#     layer_strand_extrusion
-#     layer_strand_diameter
-#     layer_types
-#     layer_type_modifiers
-#     layer_points
-#     layer_steps
-#     layer_angles
-#     layer_lateral_offsets
-#     layer_materials
-#     layer_pitches
+
+# blank_diw_structure_dict = {
+#     'metadata': {
+#         'unique_structure_name': None,
+#         'print_name': None,
+#         'structure': None,
+#         'nozzle_size_um': None,
+#         'pitch_offset': None,
+#         'syringe-material': None,
+#         'project': None,
+#         'machine_name': None,
+#         'layerup_file': None,
+#         'version_number': None,
+#         'notes': None,
+#         'mech_data_note': None,
+#         'mech_data_filepaths': None,
+#         'keyence_data_note': None,
+#         'punch_diameter': None,
+#         'mass_g': None,
+#         'thickness_mm': None,
+#         'density_g/cc': None
+#         },
+#     'part_structure': None,
+#     'part_skin_nozzle_size': None,
+#     'part_layer_nozzle_size': None,
+#     'part_angular_offset': None,
+#     'part_lateral_offset': None,
+#     'part_material': '',
+#     'part_pitch': None,
+#     'number_of_layers': None,
+#     'layer_strand_extrusion': None,
+#     'layer_strand_diameter': None,
+#     'layer_types': None,
+#     'layer_type_modifiers': None,
+#     'layer_points': None,
+#     'layer_steps': None,
+#     'layer_angles': None,
+#     'layer_lateral_offsets': None,
+#     'layer_materials': None,
+#     'layer_pitches': None,
+#     'layer_height_modifiers': None,
+#     'layer_heights': None
+#     }

@@ -1991,6 +1991,11 @@ def pole_point_to_array_interior_point(pole_point,
     
     #If 'pole_point' is exterior to array (most common case by far), calculate angles and distances to array points/edges
     else:
+        #Coerce angle to be a normal value
+        if offset_angle >= 360:
+            while (offset_angle//360) > 0:
+                offset_angle = offset_angle-360
+
         #Generate a line at the 'pole_point' based on structure values and calculate the intersection of that line with the array boundaries
         #Step ~5 pixels along the line in each direction
         if (offset_angle < 90 and offset_angle  >= 0):
@@ -2220,9 +2225,11 @@ def ideal_tile_from_initial_line(initial_line_points,
             #negative slope in the drawn array, positive Cartesian
             line_type = 'negative'
             left_coord = [(array_x_dim-1), 0]
-            backup_left_coord = [(array_x_dim-1), (array_y_dim-1)/2]
             right_coord = [0, (array_y_dim-1)]
+            backup_left_coord = [(array_x_dim-1), (array_y_dim-1)/2]
             backup_right_coord = [0, (array_y_dim-1)/2]
+            backup_backup_right_coord = [(array_x_dim-1)/2, (array_y_dim-1)]
+            backup_backup_left_coord = [(array_x_dim-1)/2, 0]
     elif slope < 0:
         if abs(slope) > 1e6:
             line_type = 'vertical'
@@ -2234,10 +2241,12 @@ def ideal_tile_from_initial_line(initial_line_points,
             #positive slope in the drawn array, negative Cartesian
             line_type = 'positive'
             left_coord = [0,0]
-            backup_left_coord = [(array_x_dim-1)/2, 0]
             right_coord = [(array_x_dim-1),(array_y_dim-1)]
             backup_right_coord = [(array_x_dim-1), (array_y_dim-1)/2]
-    
+            backup_left_coord = [(array_x_dim-1)/2, 0]
+            backup_backup_right_coord = [(array_x_dim-1)/2, (array_y_dim-1)]
+            backup_backup_left_coord = [0, (array_y_dim-1)/2]
+
     #Fill the array by stepping 'left'
     prior_line_points = [initial_start_point, initial_end_point]
     distance_left = 1e6  #arbitrary big number for initialization
@@ -2249,6 +2258,9 @@ def ideal_tile_from_initial_line(initial_line_points,
         #If no intercept found, try a backup point and re-run
         if p_left_line is None:
             p_left_line = intersect_point_and_segment(backup_left_coord, prior_line_points[0], prior_line_points[1])
+        #If no intercept found, try a backup point and re-run
+        if p_left_line is None:
+            p_left_line = intersect_point_and_segment(backup_backup_left_coord, prior_line_points[0], prior_line_points[1])
         if p_left_line is None:
             #If point has no intercept with clamped line segment within the array, quite the loop.
             #  This should only happen if the orthogonal distance is undefined, which SHOULD only happen when no more lines can be drawn in this direction
@@ -2326,6 +2338,9 @@ def ideal_tile_from_initial_line(initial_line_points,
          #If no intercept found, try a backup point and re-run
         if p_right_line is None:
             p_right_line = intersect_point_and_segment(backup_right_coord, prior_line_points[0], prior_line_points[1])
+         #If no intercept found, try a backup point and re-run
+        if p_right_line is None:
+            p_right_line = intersect_point_and_segment(backup_backup_right_coord, prior_line_points[0], prior_line_points[1])
         #If point has no intercept with clamped line segment within the array, quite the loop.
         if p_right_line is None:
             #  This should only happen if the orthogonal distance is undefined, which SHOULD only happen when no more lines can be drawn in this direction

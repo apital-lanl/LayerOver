@@ -494,6 +494,17 @@ def fill_in_structure_dict(structure_dict,
     structure_dict['layer_types'] = layer_type_list
     structure_dict['number_of_layers'] = len(layer_type_list)
 
+    #Initialize lists
+    structure_dict['layer_strand_diameter'] = []
+    structure_dict['layer_lateral_offsets'] = []
+    structure_dict['layer_steps']= []
+    structure_dict['layer_angles'] = [] 
+    structure_dict['layer_materials'] = []
+    structure_dict['layer_pitches'] = []
+    structure_dict['layer_height_modifiers'] = []
+    structure_dict['layer_heights'] = []
+
+    #Fill in layer lists
     if overwrite_layer_lists:
         for i, layer_type in zip(range(structure_dict['number_of_layers']), structure_dict['layer_types']):
             #Fill in values to layer list depending on layer type
