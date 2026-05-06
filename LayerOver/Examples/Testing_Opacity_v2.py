@@ -98,7 +98,7 @@ for i in range(number_of_duplicates):
                                     save_layer_arrays= False,
                                     save_final_image= False,
                                     save_final_array= False,
-                                    show_layer_images= True,
+                                    show_layer_images= False,
                                     show_final_image= True)
 
         volume_key = list(volume_dict.keys())[0]

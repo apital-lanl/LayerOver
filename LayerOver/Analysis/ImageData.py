@@ -58,7 +58,12 @@ def dynamic_threshold(array, num_bins = 100,
     '''
 
     #Define and initialize variables
-    array= np.array(array)
+    averaging_window = 3
+
+      #Only pull volumes greater than 0 for obvious reasons
+    array= np.array(array[array>0])
+    average_array = np.convolve(array, np.ones(averaging_window), 'valid') / averaging_window
+    array = average_array
 
         # define pixel integers if 256 is given (strong assumption)
     if num_bins == 256:
@@ -162,10 +167,12 @@ def dynamic_threshold(array, num_bins = 100,
             
         #get variance of 'cnts' values, assume Gaussian, and set 5 std. dev. threshold
     if calculation_type == 'outside_CLT':
-            #set minimum threshold as 1/8 of the FWHM; 
-            #TODO: make this less weird and hard-coded; pick a more rational minimum
-        max_cnt_threshold = round(cnt_max/16)
-        
+        #     #set minimum threshold as 1/8 of the FWHM; 
+        #     #TODO: make this less weird and hard-coded; pick a more rational minimum
+        # max_cnt_threshold = round(cnt_max/16)
+        #Hard-code a threshold for cnts; choosing 25 based on testing
+        max_cnt_threshold = 25
+
         if calculation_range == 'below':
                 
             #Make sure the threshold is below about 1000 cnts
