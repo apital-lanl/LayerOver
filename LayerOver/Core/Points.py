@@ -2221,6 +2221,8 @@ def ideal_tile_from_initial_line(initial_line_points,
             right_coord = [(array_x_dim-1), (array_y_dim-1)/2]
             backup_left_coord = left_coord
             backup_right_coord = right_coord
+            backup_backup_right_coord = right_coord
+            backup_backup_left_coord = left_coord
         else:
             #negative slope in the drawn array, positive Cartesian
             line_type = 'negative'
@@ -2237,6 +2239,8 @@ def ideal_tile_from_initial_line(initial_line_points,
             right_coord = [(array_x_dim-1), (array_y_dim-1)/2]
             backup_left_coord = left_coord
             backup_right_coord = right_coord
+            backup_backup_right_coord = right_coord
+            backup_backup_left_coord = left_coord
         else:
             #positive slope in the drawn array, negative Cartesian
             line_type = 'positive'

@@ -26,15 +26,22 @@ from LayerOver.PSPP.DIWStructure import blank_diw_structure_dict
 from LayerOver.PSPP.DIWStructure import fill_in_structure_dict
 from LayerOver.Analysis.ImageData import dynamic_threshold
 
+###############################################################################################################
+###  User parameters  #########################################################################################
+###############################################################################################################
 
-
-#Size of the resulting generation array
-array_dims = (1000,1000)
-#Number of "identical" structures to generate
-number_of_duplicates = 3
-
-#Structure to generate
+#Main user options
+show_prediction_histograms = False
+show_each_layer= True
+show_full_prediction= False
 overwrite_layer_lists = False
+
+#Structure parameters
+  #size of the resulting generation array
+array_dims = (1000,1000)
+  #number of "identical" structures to generate
+number_of_duplicates = 3
+  #structure to generate
 diw_structure_dict = {
     'metadata': {
         'unique_structure_name': None,
@@ -78,7 +85,11 @@ diw_structure_dict = {
     'layer_heights': None
     }
 
-#Fill in logbook
+###############################################################################################################
+###  Prediction and Visualization  ############################################################################
+###############################################################################################################
+
+#Fill in structure dict with lists for each layer
 diw_structure_dict= fill_in_structure_dict(diw_structure_dict,
                                            overwrite_layer_lists = True)
 
@@ -98,25 +109,48 @@ for i in range(number_of_duplicates):
                                     save_layer_arrays= False,
                                     save_final_image= False,
                                     save_final_array= False,
-                                    show_layer_images= False,
-                                    show_final_image= True)
+                                    show_layer_images= show_each_layer,
+                                    show_final_image= show_full_prediction)
 
         volume_key = list(volume_dict.keys())[0]
         volume_array = volume_dict[volume_key]['full_volume_prediction']
+        ideal_array = volume_dict[volume_key]['full_ideal_prediction']
+        overlap_array = volume_dict[volume_key]['full_overlap_prediction']
         
         #Returned keys for each 'layer_dict':
-        # 'ideal_layers'      list; each entry is a list of 2D arrays, one per layer, with ideal layer predictions
-        # 'adjusted_layers'   list; each entry is a list of 2D arrays, one per layer, with adjusted layer predictions
-        # 'full_volume_prediction' 3D array of stacked 'adjusted_layers' arrays
+        # 'ideal_layers'            list; each entry is a list of 2D arrays, one per layer, with ideal layer predictions
+        # 'adjusted_layers'         list; each entry is a list of 2D arrays, one per layer, with adjusted layer predictions
+        # 'full_volume_prediction'  np.array; 3D array of stacked 'adjusted_layers' arrays
+        # 'full_ideal_prediction'   np.array; 3D array of stacked 'ideal_layers' arrays
+        # 'full_overlap_prediction' np.array; 3D array of stacked adjustments made to layers to account for overlap (i.e. the difference between 'full_volume_prediction' and 'full_ideal_prediction')
 
-        dynamic_threshold(volume_array, 
+        if show_prediction_histograms:
+            dynamic_threshold(volume_array, 
                             num_bins = 200,
                             show_threshold_graph = True,
-                            name = '', 
+                            name = f'Duplicate {i} compression factored prediction', 
                             threshold = True,
                             calculation_range = 'below',
                             calculation_type = 'outside_CLT',
-                            fix_bins = False)
+                            fix_bins = True)
+
+            dynamic_threshold(ideal_array, 
+                            num_bins = 200,
+                            show_threshold_graph = True,
+                            name = f'Duplicate {i} ideal prediction', 
+                            threshold = True,
+                            calculation_range = 'below',
+                            calculation_type = 'outside_CLT',
+                            fix_bins = True)
+
+            dynamic_threshold(overlap_array, 
+                            num_bins = 100,
+                            show_threshold_graph = True,
+                            name = f'Duplicate {i} compression compensation', 
+                            threshold = True,
+                            calculation_range = 'below',
+                            calculation_type = 'outside_CLT',
+                            fix_bins = True)
 
     except Exception as e:
         print()

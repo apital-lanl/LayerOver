@@ -199,9 +199,13 @@ def flat_ideal_volume_guess(structure_dict,
             voxel_name = f'UNK-Structure-ID_Voxel-{voxel_idx}'
         print(f"\t Voxel name: {voxel_name}")
 
+        #Initialize arrays for this structure
         voxel_volume_array = np.zeros((y_array_dim, x_array_dim))  #each dim should be the same, but keeping them separable for now in case that's not true in the future
+        ideal_volume_array = np.zeros((y_array_dim, x_array_dim))
+        strand_overlap_array = np.zeros((y_array_dim, x_array_dim))  
         ideal_layer_arrays = []    #store raw strand volume array for each layer
         adjusted_layer_arrays = []    #store volume array adjusted for compression and strand-strand interaction
+        
         #Generate each layer's thickness projection
         for layer_idx in range(n_layers):
             print(f"\t\t adding layer {layer_idx +1}")
@@ -339,12 +343,16 @@ def flat_ideal_volume_guess(structure_dict,
             
                 #Store a 'raw' version of the layer
                 ideal_layer_arrays.append(this_layer)
+                  # store the ideal layer like the adjust layer below
+                ideal_volume_array = ideal_volume_array + this_layer
 
                 #Adjust for compression, strand-to-strand interactions and add to global volume array
+                initial_layer = this_layer.copy()  #make a copy of the initial layer to modify for compression and strand-strand interactions; this will be used for the next layer's calculations
                 if layer_idx == 0:
                     #Apply flat-plate compression (i.e. compression of strand against plate surface)
                     plate_compression_cutoff = round(strand_diameter - (strand_diameter * default_compression_factors['bottom_layer']), 7)   #max_height of layer after compression against substrate
                     this_layer[this_layer > plate_compression_cutoff] = plate_compression_cutoff
+                    strand_overlap_array = strand_overlap_array + (initial_layer-this_layer)
                 else:
                     last_layer_array = ideal_layer_arrays[layer_idx-1]
                     max_ideal_diameter = strand_diameters[layer_idx-1] + strand_diameter   #hypothetical max height if layer below and this layer were perfectly cylindrical and not interacting
@@ -356,6 +364,7 @@ def flat_ideal_volume_guess(structure_dict,
                     difference_layer[overlap_mask] = difference_layer[overlap_mask] - cutoff_height  #layer of adjustments to subtract from the ideal overlap layers
                     difference_layer[difference_layer < cutoff_height] = 0   #For non-overlapping regions, make no adjustments
                     this_layer = this_layer - difference_layer   #subtract adjustments from ideal layer to get adjusted layer; accounts for compression and strand-strand interactions
+                    strand_overlap_array = strand_overlap_array + difference_layer   #add to global strand-strand interaction array for reporting and analysis
             
                 #Handle images for each layer (ideal, no compression)
                 if save_location:
@@ -394,6 +403,8 @@ def flat_ideal_volume_guess(structure_dict,
             layer_dict['ideal_layers'][layer_idx] = ideal_layer_arrays
             layer_dict['adjusted_layers'][layer_idx] = adjusted_layer_arrays
             layer_dict['full_volume_prediction'] = voxel_volume_array
+            layer_dict['full_ideal_prediction'] = ideal_volume_array
+            layer_dict['full_overlap_prediction']= strand_overlap_array
             return_volume_dict.update( {voxel_name: layer_dict})
 
         #Save and/or show results

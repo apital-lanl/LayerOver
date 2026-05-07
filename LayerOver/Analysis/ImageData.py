@@ -58,7 +58,7 @@ def dynamic_threshold(array, num_bins = 100,
     '''
 
     #Define and initialize variables
-    averaging_window = 3
+    averaging_window = 7
 
       #Only pull volumes greater than 0 for obvious reasons
     array= np.array(array[array>0])
@@ -75,7 +75,7 @@ def dynamic_threshold(array, num_bins = 100,
     zero_count = 0
     for cnt in cnts:
         #flag negative values as well for future normalization
-        if cnt <= 0:
+        if cnt == 0:
             zero_count += 1
         #reduce the number of bins by the number of zero_counts
         #NOTE: hard-coded 10% below can be adjusted
@@ -210,13 +210,14 @@ def dynamic_threshold(array, num_bins = 100,
             #show the actual closest-bin level to the FWHM that the psuedo is calculated
         plt.plot([bins[lower_halfmax_idx], bins[upper_halfmax_idx]],[cnts_FWHM, cnts_FWHM], color = 'purple', linewidth = 5)
             #plot the upper and lower 5-sigma threshholds
-        plt.plot([intial_lower_threshold, intial_lower_threshold], [0, half_max], color = 'lime', linewidth = 2)
-        plt.plot([upper_threshold, upper_threshold], [0, half_max], color = 'lime', linewidth = 2)
-        plt.plot([lower_threshold, lower_threshold], [0, half_max], color = 'red', linewidth = 2)
+        plt.plot([intial_lower_threshold, intial_lower_threshold], [0, half_max], color = 'gray', linewidth = 2)
+        plt.plot([upper_threshold, upper_threshold], [0, half_max], color = 'lime', linewidth = 2, alpha = 0.6)
+        plt.plot([lower_threshold, lower_threshold], [0, half_max], color = 'red', linewidth = 2, alpha = 0.6)
             #finish plotting the histogram values
         plt.plot(bins[1::], cnts, linewidth = 1)
         plt.scatter(bins[1::], cnts)
         plt.title(f"Height hist- {name}")
+        plt.legend(['FWHM', 'Peak', 'Closest FWHM Bin', 'Initial Lower Threshold', 'Upper Threshold', 'Lower Threshold'])
         plt.show()
             
     return_dict = {
