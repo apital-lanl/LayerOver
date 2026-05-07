@@ -40,7 +40,7 @@ overwrite_layer_lists = False
   #size of the resulting generation array
 array_dims = (1000,1000)
   #number of "identical" structures to generate
-number_of_duplicates = 3
+number_of_duplicates = 10
   #structure to generate
 diw_structure_dict = {
     'metadata': {
@@ -66,7 +66,7 @@ diw_structure_dict = {
     'part_structure': 'S8HS',
     'part_skin_nozzle_size': 150,
     'part_layer_nozzle_size': 150,
-    'part_angular_offset': 40,
+    'part_angular_offset': 60,
     'part_lateral_offset': 0,
     'part_material': '',
     'part_pitch': 500,

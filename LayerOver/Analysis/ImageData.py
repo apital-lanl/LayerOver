@@ -58,18 +58,18 @@ def dynamic_threshold(array, num_bins = 100,
     '''
 
     #Define and initialize variables
-    averaging_window = 7
+    averaging_window = 9
 
       #Only pull volumes greater than 0 for obvious reasons
     array= np.array(array[array>0])
-    average_array = np.convolve(array, np.ones(averaging_window), 'valid') / averaging_window
-    array = average_array
 
         # define pixel integers if 256 is given (strong assumption)
     if num_bins == 256:
         cnts, bins = np.histogram(array, bins= list(range(0,256)))
     else:    
         cnts, bins = np.histogram(array, bins = num_bins)
+    average_cnts = np.convolve(cnts, np.ones(averaging_window), 'same') / averaging_window
+    cnts = average_cnts
           
         #check to see if 100 bins is overkill; only applicable in small systems (vignettes from images, for example)
     zero_count = 0

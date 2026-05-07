@@ -2178,6 +2178,9 @@ def ideal_tile_from_initial_line(initial_line_points,
             'tile_dict'     dict; contains the following keys:
                             'drawn_array'   numpy array of size 'array_dims' with tiled structure drawn in; values represent thickness of strand at each point
     """
+    #Hard-coded variables
+    exterior_threshold = 2      #if intial points are within 'exterior_threshold' of an array max/min, coerce to max or min
+    #NOTE: this is required because of poor boundary control in other parts of the code. I'm too lazy to track down the better fix.
 
     #Condition inputs
     offset_angle = float(offset_angle)
@@ -2205,7 +2208,15 @@ def ideal_tile_from_initial_line(initial_line_points,
         slope = (initial_end_point[1]-initial_start_point[1])/(initial_end_point[0]-initial_start_point[0])
     else:
         slope = 1e7  #arbitrary large number to represent vertical line
-
+      #condition intitial points if <0 or >array_dim, and also less than 'exterior_threshold'
+    if (initial_start_point[0] <0) and (initial_start_point[0] > (exterior_threshold+1)*-1):
+        initial_start_point[0] = 0
+    if (initial_start_point[1] <0) and (initial_start_point[1] > (exterior_threshold+1)*-1):
+        initial_start_point[1] = 0
+    if (initial_start_point[0] > (array_x_dim-1)) and (initial_start_point[0] < array_x_dim+exterior_threshold):
+        initial_start_point[0] = (array_x_dim-1)
+    if (initial_start_point[1] > (array_y_dim-1)) and (initial_start_point[1] < array_y_dim+exterior_threshold):
+        initial_start_point[1] = (array_y_dim-1)
 
     #Define 'left' and 'right' boundary points (corners of the array)
     #NOTE: 'array_dims' and 'drawn_array' are (Y,X) but all points w/in this function are (X,Y)
@@ -2228,10 +2239,10 @@ def ideal_tile_from_initial_line(initial_line_points,
             line_type = 'negative'
             left_coord = [(array_x_dim-1), 0]
             right_coord = [0, (array_y_dim-1)]
-            backup_left_coord = [(array_x_dim-1), (array_y_dim-1)/2]
-            backup_right_coord = [0, (array_y_dim-1)/2]
-            backup_backup_right_coord = [(array_x_dim-1)/2, (array_y_dim-1)]
-            backup_backup_left_coord = [(array_x_dim-1)/2, 0]
+            backup_left_coord = [(array_x_dim-1)/2, 0]
+            backup_right_coord = [(array_x_dim-1)/2, (array_y_dim-1)]
+            backup_backup_right_coord = [0, (array_y_dim-1)/2]
+            backup_backup_left_coord = [(array_x_dim-1), (array_y_dim-1)/2]
     elif slope < 0:
         if abs(slope) > 1e6:
             line_type = 'vertical'
@@ -2246,9 +2257,9 @@ def ideal_tile_from_initial_line(initial_line_points,
             line_type = 'positive'
             left_coord = [0,0]
             right_coord = [(array_x_dim-1),(array_y_dim-1)]
-            backup_right_coord = [(array_x_dim-1), (array_y_dim-1)/2]
+            backup_right_coord = [(array_x_dim-1)/2, (array_y_dim-1)]
             backup_left_coord = [(array_x_dim-1)/2, 0]
-            backup_backup_right_coord = [(array_x_dim-1)/2, (array_y_dim-1)]
+            backup_backup_right_coord = [(array_x_dim-1), (array_y_dim-1)/2]
             backup_backup_left_coord = [0, (array_y_dim-1)/2]
 
     #Fill the array by stepping 'left'
