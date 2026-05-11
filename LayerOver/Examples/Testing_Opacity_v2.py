@@ -19,6 +19,7 @@ Description: Quick script to run 'VolumetricPrediction' generation of layer imag
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+from scipy.signal import find_peaks
 import traceback
 
 from LayerOver.Analysis.VolumetricPrediction import flat_ideal_volume_guess
@@ -31,10 +32,10 @@ from LayerOver.Analysis.ImageData import dynamic_threshold
 ###############################################################################################################
 
 #Main user options
-show_prediction_histograms = False
-show_each_layer= True
+show_prediction_histograms = True
+show_each_layer= False
 show_full_prediction= False
-overwrite_layer_lists = False
+overwrite_layer_lists = True
 
 #Structure parameters
   #size of the resulting generation array
@@ -125,7 +126,7 @@ for i in range(number_of_duplicates):
         # 'full_overlap_prediction' np.array; 3D array of stacked adjustments made to layers to account for overlap (i.e. the difference between 'full_volume_prediction' and 'full_ideal_prediction')
 
         if show_prediction_histograms:
-            dynamic_threshold(volume_array, 
+            comp_hist_dict = dynamic_threshold(volume_array, 
                             num_bins = 200,
                             show_threshold_graph = True,
                             name = f'Duplicate {i} compression factored prediction', 
@@ -133,6 +134,23 @@ for i in range(number_of_duplicates):
                             calculation_range = 'below',
                             calculation_type = 'outside_CLT',
                             fix_bins = True)
+
+                # ideal_hist_dict keys:
+                #     'name'                    str
+                #     'cnts'                    list; histogram counts
+                #     'bins'                    list; bin edges
+                #     'max_middle_cnt'          int; maximum count in the middle bins
+                #     'bin_size'                float; size of each bin
+                #     'lower_FWHM_bin_idx'      int; index of the lower half-maximum bin
+                #     'upper_FWHM_bin_idx'      int; index of the upper half-maximum bin
+                #     'FWHM'                    float; full width at half maximum counts
+                #     'calculation'             str; calculation type and range
+                #     'calculation_cnt_sum'     int; sum of counts used in calculation
+                #     'upper_FWHM_pix_value'    float; pixel value at upper half-maximum
+                #     'peak_pix_value'          float; pixel value at peak
+                #     'lower_FWHM_pix_value'    float; pixel value at lower half-maximum
+                #     'max_threshold_pix_value' float; maximum threshold pixel value
+                #     'min_threshold_pix_value' float; minimum threshold pixel value
 
             dynamic_threshold(ideal_array, 
                             num_bins = 200,
@@ -143,14 +161,16 @@ for i in range(number_of_duplicates):
                             calculation_type = 'outside_CLT',
                             fix_bins = True)
 
-            dynamic_threshold(overlap_array, 
-                            num_bins = 100,
-                            show_threshold_graph = True,
-                            name = f'Duplicate {i} compression compensation', 
-                            threshold = True,
-                            calculation_range = 'below',
-                            calculation_type = 'outside_CLT',
-                            fix_bins = True)
+            # dynamic_threshold(overlap_array, 
+            #                 num_bins = 100,
+            #                 show_threshold_graph = True,
+            #                 name = f'Duplicate {i} compression compensation', 
+            #                 threshold = True,
+            #                 calculation_range = 'below',
+            #                 calculation_type = 'outside_CLT',
+            #                 fix_bins = True)
+
+            comp_peak_indcs, comp_peak_props = find_peaks(comp_hist_dict['cnts'])
 
     except Exception as e:
         print()
