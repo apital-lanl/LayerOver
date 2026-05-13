@@ -24,6 +24,7 @@ import numpy as np
 import os
 import random
 import skimage.draw as draw
+import traceback
 
 #LayerOver imports
   #separate calls for clarity; 
@@ -206,71 +207,45 @@ def flat_ideal_volume_guess(structure_dict,
         ideal_layer_arrays = []    #store raw strand volume array for each layer
         adjusted_layer_arrays = []    #store volume array adjusted for compression and strand-strand interaction
         
-        #Generate each layer's thickness projection
-        for layer_idx in range(n_layers):
-            print(f"\t\t adding layer {layer_idx +1}")
-            layer_name = f"{voxel_name}_Layer-{layer_idx+1}"
-            layer_dict = {
-                'ideal_layers':{},
-                'adjusted_layers':{},
-                'full_volume_prediction':[]}
-            #Get layer specifics
-            this_angular_offset = layer_angular_offsets[layer_idx]
-            this_lateral_offset = layer_lateral_offsets[layer_idx]
-            strand_diameter = strand_diameters[layer_idx]
-            this_pitch = layer_pitches[layer_idx]
-            this_layer_height = layer_heights[layer_idx]
-            this_height_modifier = layer_height_modifiers[layer_idx]
-            #TODO: 4 of these are not used and passed 'None' values throw errors
-            #   -Add funcitonality for default value passing
-            #   -Implement functionality for modification of layer specs due to theses values
-            if layer_point_coordinates:
-                these_layer_point_coordinates = layer_point_coordinates[layer_idx]
-            else:
-                these_layer_point_coordinates = None
-            # this_layer_type = layer_types[layer_idx]
-            # this_layer_modifier = layer_modifiers[layer_idx]
-            # this_layer_height = layer_heights[layer_idx]
-            # this_material = layer_materials[layer_idx]
+        #Wrap the whole process in a 'try' block to allow for continued replicate generation even if a failure occurs
+        try:
+            #Generate each layer's thickness projection
+            for layer_idx in range(n_layers):
+                print(f"\t\t adding layer {layer_idx +1}")
+                layer_name = f"{voxel_name}_Layer-{layer_idx+1}"
+                layer_dict = {
+                    'ideal_layers':{},
+                    'adjusted_layers':{},
+                    'full_volume_prediction':[]}
+                #Get layer specifics
+                this_angular_offset = layer_angular_offsets[layer_idx]
+                this_lateral_offset = layer_lateral_offsets[layer_idx]
+                strand_diameter = strand_diameters[layer_idx]
+                this_pitch = layer_pitches[layer_idx]
+                this_layer_height = layer_heights[layer_idx]
+                this_height_modifier = layer_height_modifiers[layer_idx]
+                #TODO: 4 of these are not used and passed 'None' values throw errors
+                #   -Add funcitonality for default value passing
+                #   -Implement functionality for modification of layer specs due to theses values
+                if layer_point_coordinates:
+                    these_layer_point_coordinates = layer_point_coordinates[layer_idx]
+                else:
+                    these_layer_point_coordinates = None
+                # this_layer_type = layer_types[layer_idx]
+                # this_layer_modifier = layer_modifiers[layer_idx]
+                # this_layer_height = layer_heights[layer_idx]
+                # this_material = layer_materials[layer_idx]
             
 
-            #Create layer blank
-              # (Y,X) format to align with image libraries (i.e. CV2, Matplotlib, etc.)
-            this_layer = np.zeros((y_array_dim, x_array_dim))
+                #Create layer blank
+                  # (Y,X) format to align with image libraries (i.e. CV2, Matplotlib, etc.)
+                this_layer = np.zeros((y_array_dim, x_array_dim))
 
-            #Populate array with lines 
-            if these_layer_point_coordinates:
-                #TODO: Fix this case to handle actual paths 
-                #If explicit coordinates are passed, use those to draw strands
-                array_dict = draw_2D_strand_line_bythickness(these_layer_point_coordinates,
-                                                            this_angular_offset,
-                                                            strand_diameter,
-                                                            (y_array_dim, x_array_dim),
-                                                            um_to_pix_conversion = um_to_pix_conversion,
-                                                            length = None,
-                                                            line_type = 'simple',
-                                                            thickness_fcn = 'cylinder',
-                                                            show_points = False,
-                                                            show_array_iterations = False,
-                                                            show_final_array = show_layer_images)
-
-                drawn_array = array_dict['drawn_array']
-                drawn_mask = drawn_array[drawn_array > 0]
-                #If 'None' is not passed, assume the array is good and add new values to 'this_layer'
-                if drawn_array:
-                    this_layer[drawn_mask] = drawn_array[drawn_mask]
-
-            #If no explicit coordinates are passed, assume this is a generic layer and populate with strands as appropriate
-            else:
-                #For first layer, generate seed points
-                if layer_idx == 0:
-                    #Create a seed point 
-                    seed_y_idx = random.randrange(0, y_array_dim-1)
-                    seed_x_idx = random.randrange(0, x_array_dim-1)
-                    starting_interior_point = [seed_y_idx, seed_x_idx]
-
-                    #Draw initial line
-                    array_dict = draw_2D_strand_line_bythickness(starting_interior_point,
+                #Populate array with lines 
+                if these_layer_point_coordinates:
+                    #TODO: Fix this case to handle actual paths 
+                    #If explicit coordinates are passed, use those to draw strands
+                    array_dict = draw_2D_strand_line_bythickness(these_layer_point_coordinates,
                                                                 this_angular_offset,
                                                                 strand_diameter,
                                                                 (y_array_dim, x_array_dim),
@@ -282,130 +257,163 @@ def flat_ideal_volume_guess(structure_dict,
                                                                 show_array_iterations = False,
                                                                 show_final_array = show_layer_images)
 
-                    #Extend initial seed point to an arbitrary 'pole_point' that's used for every other layer
-                    #NOTE: 'pole_point' is the point at which the strand will be drawn through for every layer.
-                    #       It is generally outside the drawn array. 
-                    pole_point = generate_random_pole_point_2D([seed_y_idx, seed_x_idx], this_angular_offset, array_dims)
-                
-                #For each additional layer, use pole_point to generate a new line
-                else:
-                    #Get new layer points from 'pole_point' and new layer-structure specification
-                    starting_interior_point = pole_point_to_array_interior_point(pole_point,
-                                                                                this_angular_offset,
-                                                                                this_pitch,
-                                                                                this_lateral_offset,
-                                                                                array_dims,
-                                                                                strand_diameter,
-                                                                                um_to_pix_conversion = um_to_pix_conversion,
-                                                                                line_type = 'simple',
-                                                                                )
+                    drawn_array = array_dict['drawn_array']
+                    drawn_mask = drawn_array[drawn_array > 0]
+                    #If 'None' is not passed, assume the array is good and add new values to 'this_layer'
+                    if drawn_array:
+                        this_layer[drawn_mask] = drawn_array[drawn_mask]
 
-                    #Draw initial line
-                    array_dict = draw_2D_strand_line_bythickness([starting_interior_point[0], starting_interior_point[1]],
-                                                                this_angular_offset,
-                                                                strand_diameter,
-                                                                (y_array_dim, x_array_dim),
-                                                                um_to_pix_conversion = um_to_pix_conversion,
-                                                                length = None,
-                                                                line_type = 'simple',
-                                                                thickness_fcn = 'cylinder',
-                                                                show_points = False,
-                                                                show_array_iterations = False,
-                                                                show_final_array = show_layer_images)
-
-                #Pull array and values from this layer's run
-                line_key = list(array_dict['line_dicts'].keys())[0]
-                line_dict = array_dict['line_dicts'][line_key]  #Should only be one entry, so taking first value is good enough
-                initial_line_start = line_dict['start_coordinates']
-                initial_line_end = line_dict['end_coordinates']
-                drawn_array = line_dict['drawn_array']
-                drawn_mask = drawn_array > 0
-                
-                #If 'drawn_array' has a value that isn't None, assume the array is good and add new values to 'this_layer'
-                if drawn_array is None:
-                    #TODO: add error handling for this case
-                    pass  
+                #If no explicit coordinates are passed, assume this is a generic layer and populate with strands as appropriate
                 else:
-                    this_layer[drawn_mask] = drawn_array[drawn_mask]
+                    #For first layer, generate seed points
+                    if layer_idx == 0:
+                        #Create a seed point 
+                        seed_y_idx = random.randrange(0, y_array_dim-1)
+                        seed_x_idx = random.randrange(0, x_array_dim-1)
+                        starting_interior_point = [seed_y_idx, seed_x_idx]
+
+                        #Draw initial line
+                        array_dict = draw_2D_strand_line_bythickness(starting_interior_point,
+                                                                    this_angular_offset,
+                                                                    strand_diameter,
+                                                                    (y_array_dim, x_array_dim),
+                                                                    um_to_pix_conversion = um_to_pix_conversion,
+                                                                    length = None,
+                                                                    line_type = 'simple',
+                                                                    thickness_fcn = 'cylinder',
+                                                                    show_points = False,
+                                                                    show_array_iterations = False,
+                                                                    show_final_array = show_layer_images)
+
+                        #Extend initial seed point to an arbitrary 'pole_point' that's used for every other layer
+                        #NOTE: 'pole_point' is the point at which the strand will be drawn through for every layer.
+                        #       It is generally outside the drawn array. 
+                        pole_point = generate_random_pole_point_2D([seed_y_idx, seed_x_idx], this_angular_offset, array_dims)
+                
+                    #For each additional layer, use pole_point to generate a new line
+                    else:
+                        #Get new layer points from 'pole_point' and new layer-structure specification
+                        starting_interior_point = pole_point_to_array_interior_point(pole_point,
+                                                                                    this_angular_offset,
+                                                                                    this_pitch,
+                                                                                    this_lateral_offset,
+                                                                                    array_dims,
+                                                                                    strand_diameter,
+                                                                                    um_to_pix_conversion = um_to_pix_conversion,
+                                                                                    line_type = 'simple',
+                                                                                    )
+
+                        #Draw initial line
+                        array_dict = draw_2D_strand_line_bythickness([starting_interior_point[0], starting_interior_point[1]],
+                                                                    this_angular_offset,
+                                                                    strand_diameter,
+                                                                    (y_array_dim, x_array_dim),
+                                                                    um_to_pix_conversion = um_to_pix_conversion,
+                                                                    length = None,
+                                                                    line_type = 'simple',
+                                                                    thickness_fcn = 'cylinder',
+                                                                    show_points = False,
+                                                                    show_array_iterations = False,
+                                                                    show_final_array = show_layer_images)
+
+                    #Pull array and values from this layer's run
+                    line_key = list(array_dict['line_dicts'].keys())[0]
+                    line_dict = array_dict['line_dicts'][line_key]  #Should only be one entry, so taking first value is good enough
+                    initial_line_start = line_dict['start_coordinates']
+                    initial_line_end = line_dict['end_coordinates']
+                    drawn_array = line_dict['drawn_array']
+                    drawn_mask = drawn_array > 0
+                
+                    #If 'drawn_array' has a value that isn't None, assume the array is good and add new values to 'this_layer'
+                    if drawn_array is None:
+                        #TODO: add error handling for this case
+                        pass  
+                    else:
+                        this_layer[drawn_mask] = drawn_array[drawn_mask]
                     
 
-                #Add all the other lines
-                tile_dict = ideal_tile_from_initial_line([initial_line_start, initial_line_end],
-                                                        this_angular_offset, 
-                                                        this_pitch,
-                                                        array_dims,
-                                                        strand_diameter,
-                                                        um_to_pix_conversion= um_to_pix_conversion,
-                                                        show_final_array = False)
-                tile_array = tile_dict['drawn_array']
-                tile_mask = tile_array > 0
-                this_layer[tile_mask] = tile_array[tile_mask]
+                    #Add all the other lines
+                    tile_dict = ideal_tile_from_initial_line([initial_line_start, initial_line_end],
+                                                            this_angular_offset, 
+                                                            this_pitch,
+                                                            array_dims,
+                                                            strand_diameter,
+                                                            um_to_pix_conversion= um_to_pix_conversion,
+                                                            show_final_array = False)
+                    tile_array = tile_dict['drawn_array']
+                    tile_mask = tile_array > 0
+                    this_layer[tile_mask] = tile_array[tile_mask]
             
-                #Store a 'raw' version of the layer
-                ideal_layer_arrays.append(this_layer)
-                  # store the ideal layer like the adjust layer below
-                ideal_volume_array = ideal_volume_array + this_layer
+                    #Store a 'raw' version of the layer
+                    ideal_layer_arrays.append(this_layer)
+                      # store the ideal layer like the adjust layer below
+                    ideal_volume_array = ideal_volume_array + this_layer
 
-                #Adjust for compression, strand-to-strand interactions and add to global volume array
-                initial_layer = this_layer.copy()  #make a copy of the initial layer to modify for compression and strand-strand interactions; this will be used for the next layer's calculations
-                if layer_idx == 0:
-                    #Apply flat-plate compression (i.e. compression of strand against plate surface)
-                    plate_compression_cutoff = round(strand_diameter - (strand_diameter * default_compression_factors['bottom_layer']), 7)   #max_height of layer after compression against substrate
-                    this_layer[this_layer > plate_compression_cutoff] = plate_compression_cutoff
-                    strand_overlap_array = strand_overlap_array + (initial_layer-this_layer)
-                else:
-                    last_layer_array = ideal_layer_arrays[layer_idx-1]
-                    max_ideal_diameter = strand_diameters[layer_idx-1] + strand_diameter   #hypothetical max height if layer below and this layer were perfectly cylindrical and not interacting
-                    cutoff_height = round(max_ideal_diameter * this_height_modifier, 7)   #max height of layer after compression and strand-strand interactions
-                    #Find where strands overlap
-                    ideal_overlap_layer = (last_layer_array+this_layer)
-                    overlap_mask = ideal_overlap_layer > cutoff_height
-                    difference_layer = ideal_overlap_layer.copy()
-                    difference_layer[overlap_mask] = difference_layer[overlap_mask] - cutoff_height  #layer of adjustments to subtract from the ideal overlap layers
-                    difference_layer[difference_layer < cutoff_height] = 0   #For non-overlapping regions, make no adjustments
-                    this_layer = this_layer - difference_layer   #subtract adjustments from ideal layer to get adjusted layer; accounts for compression and strand-strand interactions
-                    strand_overlap_array = strand_overlap_array + difference_layer   #add to global strand-strand interaction array for reporting and analysis
-            
-                #Handle images for each layer (ideal, no compression)
-                if save_location:
-                    layer_save_name = os.path.join(save_location, layer_name)
-                else:
-                    layer_save_name = layer_name
-                if show_layer_images:
-                    plt.figure(figsize=(figure_width,figure_height))
-                    plt.imshow(this_layer)
-                    plt.title(layer_name)
-                    plt.show()
-
-                if save_layer_images:
-                    fig = plt.figure(frameon=False)
-                    fig.set_size_inches(figure_width,figure_height)
-                    ax = plt.Axes(fig, [0., 0., 1., 1.])
-                    ax.set_axis_off()
-                    fig.add_axes(ax)
-                    ax.imshow(this_layer, aspect='auto')
-                    fig.savefig(layer_save_name, dpi = figure_dpi)
-                    plt.close(fig)
-
-                #Save array if applicable
-                if save_layer_arrays:
-                    if save_location:
-                        layer_array_savename = os.path.join(save_location, f"{layer_name}_RawArray")
+                    #Adjust for compression, strand-to-strand interactions and add to global volume array
+                    initial_layer = this_layer.copy()  #make a copy of the initial layer to modify for compression and strand-strand interactions; this will be used for the next layer's calculations
+                    if layer_idx == 0:
+                        #Apply flat-plate compression (i.e. compression of strand against plate surface)
+                        plate_compression_cutoff = round(strand_diameter - (strand_diameter * default_compression_factors['bottom_layer']), 7)   #max_height of layer after compression against substrate
+                        this_layer[this_layer > plate_compression_cutoff] = plate_compression_cutoff
+                        strand_overlap_array = strand_overlap_array + (initial_layer-this_layer)
                     else:
-                        layer_array_savename = f"{layer_name}_RawArray"
-                    np.save(layer_array_savename, this_layer)
+                        last_layer_array = ideal_layer_arrays[layer_idx-1]
+                        max_ideal_diameter = strand_diameters[layer_idx-1] + strand_diameter   #hypothetical max height if layer below and this layer were perfectly cylindrical and not interacting
+                        cutoff_height = round(max_ideal_diameter * this_height_modifier, 7)   #max height of layer after compression and strand-strand interactions
+                        #Find where strands overlap
+                        ideal_overlap_layer = (last_layer_array+this_layer)
+                        overlap_mask = ideal_overlap_layer > cutoff_height
+                        difference_layer = ideal_overlap_layer.copy()
+                        difference_layer[overlap_mask] = difference_layer[overlap_mask] - cutoff_height  #layer of adjustments to subtract from the ideal overlap layers
+                        difference_layer[difference_layer < cutoff_height] = 0   #For non-overlapping regions, make no adjustments
+                        this_layer = this_layer - difference_layer   #subtract adjustments from ideal layer to get adjusted layer; accounts for compression and strand-strand interactions
+                        strand_overlap_array = strand_overlap_array + difference_layer   #add to global strand-strand interaction array for reporting and analysis
+            
+                    #Handle images for each layer (ideal, no compression)
+                    if save_location:
+                        layer_save_name = os.path.join(save_location, layer_name)
+                    else:
+                        layer_save_name = layer_name
+                    if show_layer_images:
+                        plt.figure(figsize=(figure_width,figure_height))
+                        plt.imshow(this_layer)
+                        plt.title(layer_name)
+                        plt.show()
 
-                #Store the layer arrays in memory
-                adjusted_layer_arrays.append(this_layer)    #save adjusted layer; accounts for compression and strand-strand interactions
-                voxel_volume_array = voxel_volume_array + this_layer    #add adjusted layer to global volume array
+                    if save_layer_images:
+                        fig = plt.figure(frameon=False)
+                        fig.set_size_inches(figure_width,figure_height)
+                        ax = plt.Axes(fig, [0., 0., 1., 1.])
+                        ax.set_axis_off()
+                        fig.add_axes(ax)
+                        ax.imshow(this_layer, aspect='auto')
+                        fig.savefig(layer_save_name, dpi = figure_dpi)
+                        plt.close(fig)
+
+                    #Save array if applicable
+                    if save_layer_arrays:
+                        if save_location:
+                            layer_array_savename = os.path.join(save_location, f"{layer_name}_RawArray")
+                        else:
+                            layer_array_savename = f"{layer_name}_RawArray"
+                        np.save(layer_array_savename, this_layer)
+
+                    #Store the layer arrays in memory
+                    adjusted_layer_arrays.append(this_layer)    #save adjusted layer; accounts for compression and strand-strand interactions
+                    voxel_volume_array = voxel_volume_array + this_layer    #add adjusted layer to global volume array
         
-            #Assign to dict for return
-            layer_dict['ideal_layers'][layer_idx] = ideal_layer_arrays
-            layer_dict['adjusted_layers'][layer_idx] = adjusted_layer_arrays
-            layer_dict['full_volume_prediction'] = voxel_volume_array
-            layer_dict['full_ideal_prediction'] = ideal_volume_array
-            layer_dict['full_overlap_prediction']= strand_overlap_array
-            return_volume_dict.update( {voxel_name: layer_dict})
+                #Assign to dict for return
+                layer_dict['ideal_layers'][layer_idx] = ideal_layer_arrays
+                layer_dict['adjusted_layers'][layer_idx] = adjusted_layer_arrays
+                layer_dict['full_volume_prediction'] = voxel_volume_array
+                layer_dict['full_ideal_prediction'] = ideal_volume_array
+                layer_dict['full_overlap_prediction']= strand_overlap_array
+                return_volume_dict.update( {voxel_name: layer_dict})
+        except Exception as e:
+            print()
+            print(f"Replicate {i+1} of {n_structures} failed with error: {e}")
+            print()
+            print(f"\t {traceback.format_exc()}")
 
         #Save and/or show results
         image_name = f"FullStack_Image_{voxel_name}"

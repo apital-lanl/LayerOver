@@ -152,14 +152,14 @@ for i in range(number_of_duplicates):
                 #     'max_threshold_pix_value' float; maximum threshold pixel value
                 #     'min_threshold_pix_value' float; minimum threshold pixel value
 
-            dynamic_threshold(ideal_array, 
-                            num_bins = 200,
-                            show_threshold_graph = True,
-                            name = f'Duplicate {i} ideal prediction', 
-                            threshold = True,
-                            calculation_range = 'below',
-                            calculation_type = 'outside_CLT',
-                            fix_bins = True)
+            # dynamic_threshold(ideal_array, 
+            #                 num_bins = 200,
+            #                 show_threshold_graph = True,
+            #                 name = f'Duplicate {i} ideal prediction', 
+            #                 threshold = True,
+            #                 calculation_range = 'below',
+            #                 calculation_type = 'outside_CLT',
+            #                 fix_bins = True)
 
             # dynamic_threshold(overlap_array, 
             #                 num_bins = 100,
@@ -170,7 +170,14 @@ for i in range(number_of_duplicates):
             #                 calculation_type = 'outside_CLT',
             #                 fix_bins = True)
 
-            comp_peak_indcs, comp_peak_props = find_peaks(comp_hist_dict['cnts'])
+            comp_peak_bins = comp_hist_dict['bins']
+            comp_peak_cnts = comp_hist_dict['cnts']
+            comp_peak_indcs, comp_peak_props = find_peaks(comp_peak_cnts)
+            
+            plt.plot(comp_peak_bins[:-1], comp_peak_cnts)
+            for peak_idx in comp_peak_indcs:
+                plt.scatter(comp_peak_bins[peak_idx+1], comp_peak_cnts[peak_idx], color='red', marker='x')
+            plt.show()
 
     except Exception as e:
         print()

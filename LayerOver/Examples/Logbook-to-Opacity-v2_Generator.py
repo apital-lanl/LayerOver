@@ -26,6 +26,7 @@ Notes:
 """
 
 #Import libraries and functions
+import csv
 import numpy as np
 import os
 import pandas as pd
@@ -38,6 +39,7 @@ from LayerOver.PSPP.DIWLogbook import open_logbook
 from LayerOver.Analysis.VolumetricPrediction import flat_ideal_volume_guess
 from LayerOver.PSPP.DIWStructure import structure_dict_from_logbook_row
 from LayerOver.PSPP.DIWStructure import match_structure_to_unique_name
+from LayerOver.Analysis.ImageData import dynamic_threshold
 
 #Main settings
 print_name_start_row  = 1   #default is 0; starting logbook row 
@@ -54,8 +56,11 @@ save_to_filepath = 'dialog'       #Optional; where to save images and arrays to;
 array_dims  = (1000, 1000)
 number_of_replicates = 3    #Number of separate volumetric predictions to run
 array_side_length_mm = 15   #size of the array in mm (everything gets scaled)
-#Initialize dict for storing structures to check for uniqueness
+#Initialize dicts 
+  #for storing structures to check for uniqueness
 unique_structure_dict ={}
+  #for storing histograms of adjusted volume values
+volume_histogram_dict = {}
 
 #Select the file to open
 root = Tk()
@@ -127,16 +132,19 @@ for idx, name in enumerate(print_names):
                                                 save_location = save_to_filepath,
                                                 show_layer_images= False,
                                                 show_final_image= False)
-                #Returned keys:
-                # <voxel_name>
-                #       ideal_layers
-                #       adjusted_layers
-                #       full_volume_pred
 
             if len(volume_dict) > 0:
                 for vox_idx, voxel_key in enumerate(list(volume_dict.keys())):
                     this_dict = volume_dict[voxel_key]
+                    #Returned keys for each 'this_dict':
+                    # 'ideal_layers'            list; each entry is a list of 2D arrays, one per layer, with ideal layer predictions
+                    # 'adjusted_layers'         list; each entry is a list of 2D arrays, one per layer, with adjusted layer predictions
+                    # 'full_volume_prediction'  np.array; 3D array of stacked 'adjusted_layers' arrays
+                    # 'full_ideal_prediction'   np.array; 3D array of stacked 'ideal_layers' arrays
+                    # 'full_overlap_prediction' np.array; 3D array of stacked adjustments made to layers to account for overlap (i.e. the difference between 'full_volume_prediction' and 'full_ideal_prediction')
                     this_full_volume_array = this_dict['full_volume_prediction']
+                    this_ideal_volume_array = this_dict['full_ideal_prediction']
+                    this_overlap_array = this_dict['full_overlap_prediction']
                     #Only pulling the first three (if more are done)
                     if vox_idx < 3:
                         this_average = np.average(this_full_volume_array)
@@ -159,6 +167,34 @@ for idx, name in enumerate(print_names):
                             trial_unique_structure_dict[unique_structure_id].update({'vox_3_average': this_average})
                             trial_unique_structure_dict[unique_structure_id].update({'vox_3_sum': this_sum})
                             trial_unique_structure_dict[unique_structure_id].update({'vox_3_density': this_fractional_density})
+                
+                    #Generate a histogram of the values in the volume array and save to dict
+                    comp_hist_dict = dynamic_threshold(this_full_volume_array, 
+                                                        num_bins = 200,
+                                                        show_threshold_graph = False,
+                                                        name = f'{voxel_key}-{vox_idx} compression factored prediction', 
+                                                        threshold = True,
+                                                        calculation_range = 'below',
+                                                        calculation_type = 'outside_CLT',
+                                                        fix_bins = True)
+                    # ideal_hist_dict keys:
+                    #     'name'                    str
+                    #     'cnts'                    list; histogram counts; averaged and smoothed out by a window of (typically 9) bins 
+                    #     'bins'                    list; bin edges
+                    #     'max_middle_cnt'          int; maximum count in the middle bins
+                    #     'bin_size'                float; size of each bin
+                    #     'lower_FWHM_bin_idx'      int; index of the lower half-maximum bin
+                    #     'upper_FWHM_bin_idx'      int; index of the upper half-maximum bin
+                    #     'FWHM'                    float; full width at half maximum counts
+                    #     'calculation'             str; calculation type and range
+                    #     'calculation_cnt_sum'     int; sum of counts used in calculation
+                    #     'upper_FWHM_pix_value'    float; pixel value at upper half-maximum
+                    #     'peak_pix_value'          float; pixel value at peak
+                    #     'lower_FWHM_pix_value'    float; pixel value at lower half-maximum
+                    #     'max_threshold_pix_value' float; maximum threshold pixel value
+                    #     'min_threshold_pix_value' float; minimum threshold pixel value
+                    volume_histogram_dict.update({f'{unique_structure_id}_volume-bins': comp_hist_dict['bins'][1::]})
+                    volume_histogram_dict.update({f'{unique_structure_id}_volume-counts': comp_hist_dict['cnts']})
 
                 #Add specifics of how the array used in calculating voxels
                 trial_unique_structure_dict[unique_structure_id].update({'full_voxel_dimensions': array_dims})
@@ -209,3 +245,11 @@ if save_final_unique_structure_dict:
     savebook_filepath = os.path.join(os.path.dirname(logbook_filepath), savebook_filename)
     with open(savebook_filepath, 'w') as file:
         unique_structure_df.to_csv(file, index= False, lineterminator='\n')
+
+#Save 'volume_histogram_dict' as a CSV no matter what
+savedict_filename = "Unique_structure_volume_histogram.csv"
+savedict_filepath = os.path.join(os.path.dirname(logbook_filepath), savedict_filename)
+with open(savedict_filepath, 'w') as file:
+    writer = csv.writer(file)
+    for key, value in volume_histogram_dict.items():
+        writer.writerow([key, value])
