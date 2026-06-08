@@ -24,6 +24,7 @@ pd.options.mode.chained_assignment = None  # default='warn'
 from tkinter import Tk, filedialog
 #Import LayerOver components
 from LayerOver.PSPP.Materials import parse_material_note
+from LayerOver.PSPP.DIWStructure import default_compression_factors
 
 #######################################################################################################################
 #####  Template Variables  ############################################################################################

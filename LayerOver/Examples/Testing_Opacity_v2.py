@@ -35,17 +35,26 @@ from LayerOver.Analysis.ImageData import dynamic_threshold
 ###############################################################################################################
 
 #Main user options
-show_prediction_histograms = False
+  # individual layer options
 show_each_layer= False
+show_layer_overlaps = True
+show_layer_adjustment_diffs = True
+  # final 'stacked' part images
 show_full_prediction= True
-overwrite_layer_lists = True
+show_full_overlap = True
+  # show analysis options
+show_prediction_histograms = False
+  # save/store
 save_histogram = True
+
+#Other options
+overwrite_layer_lists = True
 
 #Structure parameters
   #size of the resulting generation array
 array_dims = (1000,1000)
   #number of "identical" structures to generate
-number_of_duplicates = 5
+number_of_duplicates = 2
   #structure to generate
 diw_structure_dict = {
     'metadata': {
@@ -68,10 +77,10 @@ diw_structure_dict = {
         'thickness_mm': None,
         'density_g/cc': None
         },
-    'part_structure': 'S8HS',
+    'part_structure': 'S5H',
     'part_skin_nozzle_size': 150,
     'part_layer_nozzle_size': 150,
-    'part_angular_offset': 45,
+    'part_angular_offset': 40,
     'part_lateral_offset': 0,
     'part_material': '',
     'part_pitch': 500,
@@ -128,7 +137,6 @@ for i in range(number_of_duplicates):
                                     n_structures= 1, 
                                     voxel_side_length= 15,
                                     voxel_resolution_microns= 0,
-                                    compression_factor= 0.7,
                                     save_layer_images= False,
                                     save_layer_arrays= False,
                                     save_final_image= False,
@@ -140,13 +148,34 @@ for i in range(number_of_duplicates):
         volume_array = volume_dict[volume_key]['full_volume_prediction']
         ideal_array = volume_dict[volume_key]['full_ideal_prediction']
         overlap_array = volume_dict[volume_key]['full_overlap_prediction']
-        
-        #Returned keys for each 'layer_dict':
+        layer_overlaps = volume_dict[volume_key]['layer_overlaps']
+        adjusted_layers = volume_dict[volume_key]['adjusted_layers']
+        ideal_layers = volume_dict[volume_key]['ideal_layers']
+
+        #Returned keys for each 'volume_dict[voxel_key]':
         # 'ideal_layers'            list; each entry is a list of 2D arrays, one per layer, with ideal layer predictions
         # 'adjusted_layers'         list; each entry is a list of 2D arrays, one per layer, with adjusted layer predictions
-        # 'full_volume_prediction'  np.array; 3D array of stacked 'adjusted_layers' arrays
-        # 'full_ideal_prediction'   np.array; 3D array of stacked 'ideal_layers' arrays
-        # 'full_overlap_prediction' np.array; 3D array of stacked adjustments made to layers to account for overlap (i.e. the difference between 'full_volume_prediction' and 'full_ideal_prediction')
+        # 'layer_overlaps'          list; thickness of 'overlap' for each layer (in microns)
+        # 'full_volume_prediction'  np.array; 2D array of stacked 'adjusted_layers' arrays
+        # 'full_ideal_prediction'   np.array; 2D array of stacked 'ideal_layers' arrays
+        # 'full_overlap_prediction' np.array; 2D array of stacked adjustments made to layers to account for overlap (i.e. the difference between 'full_volume_prediction' and 'full_ideal_prediction')
+
+        if show_full_overlap:
+            plt.imshow(overlap_array)
+            plt.title(f"Overlap array for iteration {i}")
+            plt.show()
+
+        if show_layer_overlaps:
+            for idx, overlap_array in enumerate(layer_overlaps):
+                plt.imshow(overlap_array)
+                plt.title(f"Overlap array for iteration {i}-layer {idx}")
+                plt.show()
+
+        if show_layer_adjustment_diffs:
+            for idx, (ideal_array, adjusted_array) in enumerate(zip(ideal_layers, adjusted_layers)):
+                plt.imshow(ideal_array-adjusted_array)
+                plt.title(f"Difference between ideal and compressed; iteration {i}-layer {idx}")
+                plt.show()
 
         if show_prediction_histograms or save_histogram:
             comp_hist_dict = dynamic_threshold(volume_array, 
@@ -216,7 +245,7 @@ for i in range(number_of_duplicates):
 if save_histogram:
     #Save 'volume_histogram_dict' as a CSV no matter what
     savedict_filepath = os.path.join(save_dir, f'volume_histogram_{part_name}.csv')
-    with open(savedict_filepath, 'w') as file:
+    with open(savedict_filepath, 'w', newline='') as file:
         writer = csv.writer(file)
         for key, value in volume_histogram_dict.items():
             writer.writerow([key, value])

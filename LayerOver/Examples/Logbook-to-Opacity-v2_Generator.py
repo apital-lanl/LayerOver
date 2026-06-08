@@ -256,7 +256,7 @@ if save_final_unique_structure_dict:
 #Save 'volume_histogram_dict' as a CSV no matter what
 savedict_filename = "Unique_structure_volume_histogram.csv"
 savedict_filepath = os.path.join(os.path.dirname(logbook_filepath), savedict_filename)
-with open(savedict_filepath, 'w') as file:
+with open(savedict_filepath, 'w', newline='') as file:
     writer = csv.writer(file)
     for key, value in volume_histogram_dict.items():
         writer.writerow([key, value])

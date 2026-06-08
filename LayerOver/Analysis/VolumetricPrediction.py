@@ -37,7 +37,7 @@ from LayerOver.Core.Points import ideal_tile_from_initial_line
 default_compression_factors= {
     'default': 0.78,
     'general-siloxane': 0.78,
-    'bottom_layer': 0.78/2
+    'bottom_layer': (1-((1-0.78)/2))
     }
 
 #Generic dictionaries 
@@ -215,9 +215,12 @@ def flat_ideal_volume_guess(structure_dict,
                 print(f"\t\t adding layer {layer_idx +1}")
                 layer_name = f"{voxel_name}_Layer-{layer_idx+1}"
                 layer_dict = {
-                    'ideal_layers':{},
-                    'adjusted_layers':{},
-                    'full_volume_prediction':[]}
+                    'ideal_layers': {},
+                    'adjusted_layers': {},
+                    'layer_overlaps': {},
+                    'full_volume_prediction': None,
+                    'full_ideal_prediction': None,
+                    'full_overlap_prediction': None}
                 #Get layer specifics
                 this_angular_offset = layer_angular_offsets[layer_idx]
                 this_lateral_offset = layer_lateral_offsets[layer_idx]
@@ -356,7 +359,7 @@ def flat_ideal_volume_guess(structure_dict,
                         #Apply flat-plate compression (i.e. compression of strand against plate surface)
                         plate_compression_cutoff = round(strand_diameter - (strand_diameter * default_compression_factors['bottom_layer']), 7)   #max_height of layer after compression against substrate
                         this_layer[this_layer > plate_compression_cutoff] = plate_compression_cutoff
-                        strand_overlap_array = strand_overlap_array + (initial_layer-this_layer)
+                        report_compress_diff = initial_layer-this_layer
                     else:
                         last_layer_array = ideal_layer_arrays[layer_idx-1]
                         max_ideal_diameter = strand_diameters[layer_idx-1] + strand_diameter   #hypothetical max height if layer below and this layer were perfectly cylindrical and not interacting
@@ -376,6 +379,7 @@ def flat_ideal_volume_guess(structure_dict,
                           # adjust 'this_layer' for overlap compression
                         adjusted_layer = overlap_layer.copy()
                         adjusted_layer[overlap_mask] = adjusted_layer[overlap_mask]-adjusted_overlap_diff[overlap_mask]
+                        this_layer = adjusted_layer.copy()
                           # report compression adjustments in overlap regions
                         report_compress_diff = adjusted_overlap_diff.copy()
                         report_compress_diff[~ overlap_mask] = 0
@@ -396,7 +400,7 @@ def flat_ideal_volume_guess(structure_dict,
                         layer_save_name = layer_name
                     if show_layer_images:
                         plt.figure(figsize=(figure_width,figure_height))
-                        plt.imshow(adjusted_layer)
+                        plt.imshow(this_layer)
                         plt.title(layer_name)
                         plt.show()
 
@@ -406,7 +410,7 @@ def flat_ideal_volume_guess(structure_dict,
                         ax = plt.Axes(fig, [0., 0., 1., 1.])
                         ax.set_axis_off()
                         fig.add_axes(ax)
-                        ax.imshow(adjusted_layer, aspect='auto')
+                        ax.imshow(this_layer, aspect='auto')
                         fig.savefig(layer_save_name, dpi = figure_dpi)
                         plt.close(fig)
 
@@ -416,18 +420,18 @@ def flat_ideal_volume_guess(structure_dict,
                             layer_array_savename = os.path.join(save_location, f"{layer_name}_RawArray")
                         else:
                             layer_array_savename = f"{layer_name}_RawArray"
-                        np.save(layer_array_savename, adjusted_layer)
+                        np.save(layer_array_savename, this_layer)
 
                     #Store the layer arrays in memory
-                    adjusted_layer_arrays.append(adjusted_layer)    #save adjusted layer; accounts for compression and strand-strand interactions
-                    voxel_volume_array = voxel_volume_array + adjusted_layer    #add adjusted layer to global volume array
+                    adjusted_layer_arrays.append(this_layer)    #save adjusted layer; accounts for compression and strand-strand interactions
+                    voxel_volume_array = voxel_volume_array + this_layer    #add adjusted layer to global volume array
                     strand_overlap_arrays.append(report_compress_diff)
                     strand_overlap_array = strand_overlap_array + report_compress_diff
         
                 #Assign to dict for return
-                layer_dict['ideal_layers'][layer_idx] = ideal_layer_arrays
-                layer_dict['adjusted_layers'][layer_idx] = adjusted_layer_arrays
-                layer_dict['layer_overlaps'][layer_idx] = strand_overlap_arrays
+                layer_dict['ideal_layers'] = ideal_layer_arrays
+                layer_dict['adjusted_layers'] = adjusted_layer_arrays
+                layer_dict['layer_overlaps'] = strand_overlap_arrays
                 layer_dict['full_volume_prediction'] = voxel_volume_array
                 layer_dict['full_ideal_prediction'] = ideal_volume_array
                 layer_dict['full_overlap_prediction']= strand_overlap_array
