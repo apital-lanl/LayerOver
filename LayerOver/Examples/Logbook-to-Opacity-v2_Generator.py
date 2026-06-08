@@ -136,12 +136,14 @@ for idx, name in enumerate(print_names):
             if len(volume_dict) > 0:
                 for vox_idx, voxel_key in enumerate(list(volume_dict.keys())):
                     this_dict = volume_dict[voxel_key]
-                    #Returned keys for each 'this_dict':
+                    #Returned keys for each 'volume_dict[voxel_key]':
                     # 'ideal_layers'            list; each entry is a list of 2D arrays, one per layer, with ideal layer predictions
                     # 'adjusted_layers'         list; each entry is a list of 2D arrays, one per layer, with adjusted layer predictions
+                    # 'layer_overlaps'          list; thickness of 'overlap' for each layer (in microns)
                     # 'full_volume_prediction'  np.array; 3D array of stacked 'adjusted_layers' arrays
                     # 'full_ideal_prediction'   np.array; 3D array of stacked 'ideal_layers' arrays
                     # 'full_overlap_prediction' np.array; 3D array of stacked adjustments made to layers to account for overlap (i.e. the difference between 'full_volume_prediction' and 'full_ideal_prediction')
+                    
                     this_full_volume_array = this_dict['full_volume_prediction']
                     this_ideal_volume_array = this_dict['full_ideal_prediction']
                     this_overlap_array = this_dict['full_overlap_prediction']
@@ -193,8 +195,13 @@ for idx, name in enumerate(print_names):
                     #     'lower_FWHM_pix_value'    float; pixel value at lower half-maximum
                     #     'max_threshold_pix_value' float; maximum threshold pixel value
                     #     'min_threshold_pix_value' float; minimum threshold pixel value
-                    volume_histogram_dict.update({f'{unique_structure_id}_volume-bins': comp_hist_dict['bins'][1::]})
-                    volume_histogram_dict.update({f'{unique_structure_id}_volume-counts': comp_hist_dict['cnts']})
+                    volume_histogram_dict.update({f'{unique_structure_id}_volume-thickness-bins': comp_hist_dict['bins'][1::]})
+                    volume_histogram_dict.update({f'{unique_structure_id}_volume-thickness-counts': comp_hist_dict['cnts']})
+
+                    #Generate interaction volume histogram and add to volume_histogram_dict
+                    cnts, bins = np.histogram(this_overlap_array, bins= 100)
+                    volume_histogram_dict.update({f'{unique_structure_id}_overlap-bins': bins[1::]})
+                    volume_histogram_dict.update({f'{unique_structure_id}_overlap-counts': cnts})
 
                 #Add specifics of how the array used in calculating voxels
                 trial_unique_structure_dict[unique_structure_id].update({'full_voxel_dimensions': array_dims})

@@ -206,6 +206,7 @@ def flat_ideal_volume_guess(structure_dict,
         strand_overlap_array = np.zeros((y_array_dim, x_array_dim))  
         ideal_layer_arrays = []    #store raw strand volume array for each layer
         adjusted_layer_arrays = []    #store volume array adjusted for compression and strand-strand interaction
+        strand_overlap_arrays = []
         
         #Wrap the whole process in a 'try' block to allow for continued replicate generation even if a failure occurs
         try:
@@ -360,14 +361,33 @@ def flat_ideal_volume_guess(structure_dict,
                         last_layer_array = ideal_layer_arrays[layer_idx-1]
                         max_ideal_diameter = strand_diameters[layer_idx-1] + strand_diameter   #hypothetical max height if layer below and this layer were perfectly cylindrical and not interacting
                         cutoff_height = round(max_ideal_diameter * this_height_modifier, 7)   #max height of layer after compression and strand-strand interactions
+                        
                         #Find where strands overlap
-                        ideal_overlap_layer = (last_layer_array+this_layer)
-                        overlap_mask = ideal_overlap_layer > cutoff_height
-                        difference_layer = ideal_overlap_layer.copy()
-                        difference_layer[overlap_mask] = difference_layer[overlap_mask] - cutoff_height  #layer of adjustments to subtract from the ideal overlap layers
-                        difference_layer[difference_layer < cutoff_height] = 0   #For non-overlapping regions, make no adjustments
-                        this_layer = this_layer - difference_layer   #subtract adjustments from ideal layer to get adjusted layer; accounts for compression and strand-strand interactions
-                        strand_overlap_array = strand_overlap_array + difference_layer   #add to global strand-strand interaction array for reporting and analysis
+                          # modify for max height
+                        adjusted_top = this_layer.copy()
+                        adjusted_bottom = last_layer_array.copy()
+                        adjusted_top[adjusted_top>cutoff_height] = cutoff_height
+                        adjusted_bottom[adjusted_bottom>cutoff_height] = cutoff_height
+                          # overlay layers and calculate adjustment
+                        overlap_layer = this_layer + last_layer_array
+                        adjusted_overlap_diff = ((last_layer_array - adjusted_bottom) + (this_layer- adjusted_top))
+                          # create mask(s)
+                        overlap_mask = (this_layer>0) & (last_layer_array>0)                       #raw overlap mask
+                          # adjust 'this_layer' for overlap compression
+                        adjusted_layer = overlap_layer.copy()
+                        adjusted_layer[overlap_mask] = adjusted_layer[overlap_mask]-adjusted_overlap_diff[overlap_mask]
+                          # report compression adjustments in overlap regions
+                        report_compress_diff = adjusted_overlap_diff.copy()
+                        report_compress_diff[~ overlap_mask] = 0
+
+                        # #Prior implementation (waffles <= 2.6)
+                        # ideal_overlap_layer = (last_layer_array+this_layer)
+                        # overlap_mask = ideal_overlap_layer > cutoff_height
+                        # difference_layer = ideal_overlap_layer.copy()
+                        # difference_layer[overlap_mask] = difference_layer[overlap_mask] - cutoff_height  #layer of adjustments to subtract from the ideal overlap layers
+                        # difference_layer[difference_layer < cutoff_height] = 0   #For non-overlapping regions, make no adjustments
+                        # this_layer = this_layer - difference_layer   #subtract adjustments from ideal layer to get adjusted layer; accounts for compression and strand-strand interactions
+                        # strand_overlap_array = strand_overlap_array + difference_layer   #add to global strand-strand interaction array for reporting and analysis
             
                     #Handle images for each layer (ideal, no compression)
                     if save_location:
@@ -376,7 +396,7 @@ def flat_ideal_volume_guess(structure_dict,
                         layer_save_name = layer_name
                     if show_layer_images:
                         plt.figure(figsize=(figure_width,figure_height))
-                        plt.imshow(this_layer)
+                        plt.imshow(adjusted_layer)
                         plt.title(layer_name)
                         plt.show()
 
@@ -386,7 +406,7 @@ def flat_ideal_volume_guess(structure_dict,
                         ax = plt.Axes(fig, [0., 0., 1., 1.])
                         ax.set_axis_off()
                         fig.add_axes(ax)
-                        ax.imshow(this_layer, aspect='auto')
+                        ax.imshow(adjusted_layer, aspect='auto')
                         fig.savefig(layer_save_name, dpi = figure_dpi)
                         plt.close(fig)
 
@@ -396,19 +416,23 @@ def flat_ideal_volume_guess(structure_dict,
                             layer_array_savename = os.path.join(save_location, f"{layer_name}_RawArray")
                         else:
                             layer_array_savename = f"{layer_name}_RawArray"
-                        np.save(layer_array_savename, this_layer)
+                        np.save(layer_array_savename, adjusted_layer)
 
                     #Store the layer arrays in memory
-                    adjusted_layer_arrays.append(this_layer)    #save adjusted layer; accounts for compression and strand-strand interactions
-                    voxel_volume_array = voxel_volume_array + this_layer    #add adjusted layer to global volume array
+                    adjusted_layer_arrays.append(adjusted_layer)    #save adjusted layer; accounts for compression and strand-strand interactions
+                    voxel_volume_array = voxel_volume_array + adjusted_layer    #add adjusted layer to global volume array
+                    strand_overlap_arrays.append(report_compress_diff)
+                    strand_overlap_array = strand_overlap_array + report_compress_diff
         
                 #Assign to dict for return
                 layer_dict['ideal_layers'][layer_idx] = ideal_layer_arrays
                 layer_dict['adjusted_layers'][layer_idx] = adjusted_layer_arrays
+                layer_dict['layer_overlaps'][layer_idx] = strand_overlap_arrays
                 layer_dict['full_volume_prediction'] = voxel_volume_array
                 layer_dict['full_ideal_prediction'] = ideal_volume_array
                 layer_dict['full_overlap_prediction']= strand_overlap_array
                 return_volume_dict.update( {voxel_name: layer_dict})
+        
         except Exception as e:
             print()
             print(f"Replicate {i+1} of {n_structures} failed with error: {e}")
