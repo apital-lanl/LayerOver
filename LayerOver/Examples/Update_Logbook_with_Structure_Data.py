@@ -230,4 +230,4 @@ except Exception as e:
 savebook_filename = logbook_filepath.replace("AutomatedAnalysis", "UpdatedResults")
 savebook_filepath = os.path.join(os.path.dirname(logbook_filepath), savebook_filename)
 with open(savebook_filepath, 'w') as file:
-    results_df.to_csv(file, index= False, lineterminator='\n', encoding='utf-8', errors='ignore')
+    results_df.to_csv(file, index= False, lineterminator='\n', encoding='utf-8', errors='replace')
