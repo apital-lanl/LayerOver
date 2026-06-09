@@ -184,6 +184,7 @@ def dynamic_threshold(array, num_bins = 100,
                     lower_threshold_idx -= 1
                     if lower_threshold_idx < 0:
                         lower_threshold_idx = 0
+                        break
                     lower_threshold = bins[lower_threshold_idx]
             #Count the thresholds      
             calc_sum = 0
@@ -200,6 +201,7 @@ def dynamic_threshold(array, num_bins = 100,
                     upper_threshold_idx += 1
                     if upper_threshold_idx > (len(bins)-1):
                         upper_threshold_idx = (len(bins)-1)
+                        break
                     upper_threshold = bins[upper_threshold_idx]
             #Count the thresholds      
             calc_sum = 0
