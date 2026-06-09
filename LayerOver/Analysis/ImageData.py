@@ -172,6 +172,7 @@ def dynamic_threshold(array, num_bins = 100,
         # max_cnt_threshold = round(cnt_max/16)
         #Hard-code a threshold for cnts; choosing 25 based on testing
         max_cnt_threshold = 25
+        min_cnt_threshold = 200
 
         if calculation_range == 'below':
                 
@@ -181,6 +182,8 @@ def dynamic_threshold(array, num_bins = 100,
                 max_iterations = 10
                 while (iteration_cnt < max_iterations) and (cnts[lower_threshold_idx] > max_cnt_threshold):
                     lower_threshold_idx -= 1
+                    if lower_threshold_idx < 0:
+                        lower_threshold_idx = 0
                     lower_threshold = bins[lower_threshold_idx]
             #Count the thresholds      
             calc_sum = 0
@@ -190,11 +193,13 @@ def dynamic_threshold(array, num_bins = 100,
             
         if calculation_range == 'above':
             #Make sure the threshold is below about 1000 cnts
-            if cnts[upper_threshold_idx] > max_cnt_threshold:
+            if cnts[upper_threshold_idx] < min_cnt_threshold:
                 iteration_cnt = 0
                 max_iterations = 10
-                while (iteration_cnt < max_iterations) and (cnts[upper_threshold_idx] > max_cnt_threshold):
+                while (iteration_cnt < max_iterations) and (cnts[upper_threshold_idx] < min_cnt_threshold):
                     upper_threshold_idx += 1
+                    if upper_threshold_idx > (len(bins)-1):
+                        upper_threshold_idx = (len(bins)-1)
                     upper_threshold = bins[upper_threshold_idx]
             #Count the thresholds      
             calc_sum = 0
