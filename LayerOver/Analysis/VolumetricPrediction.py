@@ -376,7 +376,7 @@ def flat_ideal_volume_guess(structure_dict,
                           # adjust 'this_layer' for overlap compression
                         adjusted_layer = overlap_layer.copy()
                         adjusted_layer[overlap_mask] = adjusted_layer[overlap_mask]-adjusted_overlap_diff[overlap_mask]
-                        this_layer = adjusted_layer.copy()
+                        this_layer[overlap_mask] = this_layer[overlap_mask]- adjusted_top[overlap_mask]
                           # report compression adjustments in overlap regions
                         report_compress_diff = adjusted_overlap_diff.copy()
                         report_compress_diff[~ overlap_mask] = 0
