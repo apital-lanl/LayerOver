@@ -54,7 +54,7 @@ overwrite_layer_lists = True
   #size of the resulting generation array
 array_dims = (1000,1000)
   #number of "identical" structures to generate
-number_of_duplicates = 2
+number_of_duplicates = 1
   #structure to generate
 diw_structure_dict = {
     'metadata': {
@@ -162,19 +162,19 @@ for i in range(number_of_duplicates):
 
         if show_full_overlap:
             plt.imshow(overlap_array)
-            plt.title(f"Overlap array for iteration {i}")
+            plt.title(f"Full overlap for iteration {i}")
             plt.show()
-
+        
         if show_layer_overlaps:
             for idx, overlap_array in enumerate(layer_overlaps):
                 plt.imshow(overlap_array)
-                plt.title(f"Overlap array for iteration {i}-layer {idx}")
+                plt.title(f"Layer overlap array for iteration {i}-layer {idx+1} of {len(layer_overlaps)}")
                 plt.show()
 
         if show_layer_adjustment_diffs:
             for idx, (ideal_array, adjusted_array) in enumerate(zip(ideal_layers, adjusted_layers)):
                 plt.imshow(ideal_array-adjusted_array)
-                plt.title(f"Difference between ideal and compressed; iteration {i}-layer {idx}")
+                plt.title(f"Difference between ideal and compressed; iteration {i}-layer{idx+1} of {len(ideal_layers)}")
                 plt.show()
 
         if show_prediction_histograms or save_histogram:

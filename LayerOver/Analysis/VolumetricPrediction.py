@@ -351,13 +351,15 @@ def flat_ideal_volume_guess(structure_dict,
                     initial_layer = this_layer.copy()  #make a copy of the initial layer to modify for compression and strand-strand interactions; this will be used for the next layer's calculations
                     if layer_idx == 0:
                         #Apply flat-plate compression (i.e. compression of strand against plate surface)
-                        plate_compression_cutoff = round(strand_diameter - (strand_diameter * default_compression_factors['bottom_layer']), 7)   #max_height of layer after compression against substrate
+                        plate_compression_cutoff = round((strand_diameter * default_compression_factors['bottom_layer']), 7)   #max_height of layer after compression against substrate
                         this_layer[this_layer > plate_compression_cutoff] = plate_compression_cutoff
                         report_compress_diff = initial_layer-this_layer
                     else:
                         last_layer_array = ideal_layer_arrays[layer_idx-1]
                         max_ideal_diameter = strand_diameters[layer_idx-1] + strand_diameter   #hypothetical max height if layer below and this layer were perfectly cylindrical and not interacting
-                        cutoff_height = round(max_ideal_diameter * this_height_modifier, 7)   #max height of layer after compression and strand-strand interactions
+                        # cutoff_height = round(max_ideal_diameter * this_height_modifier, 7)   #max height of layer after compression and strand-strand interactions
+                          # changed from combined diameter max to separate strand diameters; calculating overlap compensation separately for each layer
+                        cutoff_height = round(strand_diameter * this_height_modifier, 7)   #max height of layer after compression and strand-strand interactions
                         
                         #Find where strands overlap
                           # modify for max height
@@ -365,6 +367,7 @@ def flat_ideal_volume_guess(structure_dict,
                         adjusted_bottom = last_layer_array.copy()
                         adjusted_top[adjusted_top>cutoff_height] = cutoff_height
                         adjusted_bottom[adjusted_bottom>cutoff_height] = cutoff_height
+                        #TODO: add 
                           # overlay layers and calculate adjustment
                         overlap_layer = this_layer + last_layer_array
                         adjusted_overlap_diff = ((last_layer_array - adjusted_bottom) + (this_layer- adjusted_top))
@@ -535,8 +538,8 @@ def apply_layer_slump(layers_array,
 
 
 def get_volumetric_array_statistics(array,
-                                 n_histogram_bins = 50,
-                                 n_rounding_places= 4):
+                                     n_histogram_bins = 100,
+                                     n_rounding_places= 4):
     '''
     Description: 
         Standardized reporting function for an array of volumetric data.

@@ -641,7 +641,7 @@ def match_structure_to_unique_name(structure_dict, unique_structure_dict):
     this_structure = structure_dict['part_structure']
     is_unique_bool = False   #"Is the 'structure_dict' already in the 'unique_structure_dict'
       # initialize a list of structure fields to compare
-    structure_fields = list(blank_unique_structure_dict.keys())
+    structure_fields = [field for field in blank_unique_structure_dict.keys() if field not in []]
     
     #Create a dict with each structure's highest id number up to this point
     unique_structure_numbers = {}
