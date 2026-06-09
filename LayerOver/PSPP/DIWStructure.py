@@ -24,7 +24,6 @@ pd.options.mode.chained_assignment = None  # default='warn'
 from tkinter import Tk, filedialog
 #Import LayerOver components
 from LayerOver.PSPP.Materials import parse_material_note
-from LayerOver.PSPP.DIWStructure import default_compression_factors
 
 #######################################################################################################################
 #####  Template Variables  ############################################################################################
@@ -168,6 +167,13 @@ diw_material_opacity_dict = {
         'opacity': 0.1,
         'per_length': 1,
         'length_unit': 'mm'},
+    }
+
+#Hard-coded assumptions and conversion ratios
+default_compression_factors= {
+    'default': 0.78,
+    'general-siloxane': 0.78,
+    'bottom_layer': (1-((1-0.78)/2))
     }
 
 #str literals for structure
@@ -524,7 +530,7 @@ def fill_in_structure_dict(structure_dict,
             #TODO: add betterfunctionality to fill these in
             structure_dict['layer_steps'].append(structure_dict['layer_strand_diameter'][i])
             structure_dict['layer_materials'].append('default')
-            structure_dict['layer_height_modifiers'].append(1)
+            structure_dict['layer_height_modifiers'].append(default_compression_factors['default'])
     
         #Same as 'layer_steps' for almost all cases
         structure_dict['layer_heights'] = structure_dict['layer_steps']

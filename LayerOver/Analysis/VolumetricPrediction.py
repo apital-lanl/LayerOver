@@ -32,13 +32,7 @@ from LayerOver.Core.Points import draw_2D_strand_line_bythickness
 from LayerOver.Core.Points import generate_random_pole_point_2D
 from LayerOver.Core.Points import pole_point_to_array_interior_point
 from LayerOver.Core.Points import ideal_tile_from_initial_line
-
-#Hard-coded assumptions and conversion ratios
-default_compression_factors= {
-    'default': 0.78,
-    'general-siloxane': 0.78,
-    'bottom_layer': (1-((1-0.78)/2))
-    }
+from LayerOver.PSPP.DIWStructure import default_compression_factors
 
 #Generic dictionaries 
 generic_punch_sizes = {
