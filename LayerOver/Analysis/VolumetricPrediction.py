@@ -591,3 +591,58 @@ def get_volumetric_array_statistics(array,
     summary_dict['histogram_cnts']= cnts
     
     return summary_dict
+
+
+def get_volumetric_dict_stats(volumetric_dict,
+                              save_json = True,
+                              save_csv = False):
+    """
+    Description:
+        Lorem
+    INPUTS:
+        Lorem
+    ACTIONS:
+        Lorem
+    OUTPUTS:
+        Lorem
+    """
+    #Initialize and condition variables
+    blank_layer_dict = {
+        'max_value': None,
+        'thickenss_hist_cnts': None,
+        'thickenss_hist_bins': None
+        }
+    blank_voxel_dict = {
+        'n_layers': None,
+        'layer_stats': {
+            },
+        'total_thickness_hist_cnts': None,
+        'total_thickness_hist_bins': None,
+        'total_overlap_hist_cnts': None,
+        'total_overlap_hist_bins': None,
+        'total_thickness_frequency_stats': {},
+        'total_overlap_frequency_stats': {}
+        }
+    volume_dict = {
+        'number_of_replicates': None,
+        'replicate_keys': [],
+        }
+
+    volume_key = list(volume_dict.keys())[0]
+    volume_array = volume_dict[volume_key]['full_volume_prediction']
+    ideal_array = volume_dict[volume_key]['full_ideal_prediction']
+    overlap_array = volume_dict[volume_key]['full_overlap_prediction']
+    layer_overlaps = volume_dict[volume_key]['layer_overlaps']
+    adjusted_layers = volume_dict[volume_key]['adjusted_layers']
+    ideal_layers = volume_dict[volume_key]['ideal_layers']
+
+    #Returned keys for each 'volume_dict[voxel_key]':
+    # 'ideal_layers'            list; each entry is a list of 2D arrays, one per layer, with ideal layer predictions
+    # 'adjusted_layers'         list; each entry is a list of 2D arrays, one per layer, with adjusted layer predictions
+    # 'layer_overlaps'          list; thickness of 'overlap' for each layer (in microns)
+    # 'full_volume_prediction'  np.array; 2D array of stacked 'adjusted_layers' arrays
+    # 'full_ideal_prediction'   np.array; 2D array of stacked 'ideal_layers' arrays
+    # 'full_overlap_prediction' np.array; 2D array of stacked adjustments made to layers to account for overlap (i.e. the difference between 'full_volume_prediction' and 'full_ideal_prediction')
+
+
+    return volume_dict

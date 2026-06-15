@@ -20,6 +20,7 @@ import csv
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 import os
 from scipy.signal import find_peaks
 import traceback
@@ -216,7 +217,7 @@ for i in range(number_of_duplicates):
 
             overlap_hist_dict = dynamic_threshold(overlap_array, 
                             num_bins = 100,
-                            show_threshold_graph = True,
+                            show_threshold_graph = False,
                             name = f'Duplicate {i} compression compensation', 
                             threshold = True,
                             calculation_range = 'below',
@@ -231,21 +232,35 @@ for i in range(number_of_duplicates):
 
             #Create combined spatial overlap-thickness histogram
               # flatten each 2D grid to a 1D sample vector, then make N×2 array
-            stacked_array = np.column_stack((volume_array.ravel(), overlap_array.ravel())) 
+            stacked_array = np.column_stack((volume_array.ravel(), overlap_array.ravel()))
+            x = volume_array.ravel()
+            y = overlap_array.ravel()
               # compute the 3D joint histogram
-            counts_2d, edges_2d = np.histogramdd(stacked_array, bins=(100, 100))
+            counts_2d, xedges, yedges = np.histogram2d(x, y, bins=100)
+            # counts_2d, edges_2d = np.histogramdd(stacked_array, bins=(100, 100))
             #'edges_2d'- [0] = thickness edges
             #            [1] = 
               # plot the results
-            # plt.imshow(counts_2d, extent=[edges_2d[0][0],edges_2d[0][-1],edges_2d[1][0],edges_2d[1][-1]])
-            plt.imshow(counts_2d)
+            t_counts2d = counts_2d.T
+            plt.figure(figsize=(5, 10))
+            # plt.imshow(t_counts2d, interpolation='nearest', origin='lower', 
+            #            extent=[xedges[0], xedges[-1],yedges[0],yedges[-1]])
+            # plt.imshow(t_counts2d, interpolation='nearest', origin='lower', 
+            #            extent=[xedges[0], xedges[-1],yedges[0],yedges[-1]],
+            #            norm=LogNorm(vmin=0.01, vmax=1))
+            # plt.imshow(t_counts2d, interpolation='nearest', origin='lower', 
+            #            extent=[xedges[0], xedges[-1],yedges[0],yedges[-1]],
+            #            norm=LogNorm(vmin=0.01, vmax=1))
+            plt.imshow(t_counts2d, interpolation='nearest', origin='lower', 
+                       extent=[xedges[0], xedges[-1],yedges[0],yedges[-1]],
+                       norm='log')
             plt.title(f"Co-Location Histogram of Overlap and Thickness")
-            plt.xlabel("Opacity values")
-            plt.ylabel("Thickness values")
+            plt.xlabel("Thickness Value")
+            plt.ylabel("Overlap Value")
             plt.show()
             
             if show_prediction_histograms:
-                plt.plot(comp_peak_bins[:-1], comp_peak_cnts)
+                plt.plot(comp_peak_bins, comp_peak_cnts)
                 for peak_idx in comp_peak_indcs:
                     plt.scatter(comp_peak_bins[peak_idx+1], comp_peak_cnts[peak_idx], color='red', marker='x')
                 plt.show()

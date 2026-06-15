@@ -2241,8 +2241,8 @@ def ideal_tile_from_initial_line(initial_line_points,
             right_coord = [0, (array_y_dim-1)]
             backup_left_coord = [(array_x_dim-1)/2, 0]
             backup_right_coord = [(array_x_dim-1)/2, (array_y_dim-1)]
-            backup_backup_right_coord = [0, (array_y_dim-1)/2]
             backup_backup_left_coord = [(array_x_dim-1), (array_y_dim-1)/2]
+            backup_backup_right_coord = [0, (array_y_dim-1)/2]
     elif slope < 0:
         if abs(slope) > 1e6:
             line_type = 'vertical'

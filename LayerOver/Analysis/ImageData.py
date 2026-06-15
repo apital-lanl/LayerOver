@@ -246,3 +246,18 @@ def dynamic_threshold(array, num_bins = 100,
         }
         
     return return_dict
+
+
+
+def load_waffle_image(filepaths=None):
+    """
+    Description: 
+
+    INPUTS:
+        Lorem
+    ACTION:
+        Lorem
+    OUTPUTS:
+        Lorem
+
+    """
