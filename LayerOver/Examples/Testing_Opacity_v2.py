@@ -38,14 +38,14 @@ from LayerOver.Analysis.ImageData import dynamic_threshold
   # individual layer options
 show_each_layer= False
 show_layer_overlaps = True
-show_layer_adjustment_diffs = True
+show_layer_adjustment_diffs = False
   # final 'stacked' part images
 show_full_prediction= True
 show_full_overlap = True
   # show analysis options
-show_prediction_histograms = False
+show_prediction_histograms = True
   # save/store
-save_histogram = True
+save_histogram = False
 
 #Other options
 overwrite_layer_lists = True
@@ -172,8 +172,9 @@ for i in range(number_of_duplicates):
                 plt.show()
 
         if show_layer_adjustment_diffs:
-            for idx, (ideal_array, adjusted_array) in enumerate(zip(ideal_layers, adjusted_layers)):
-                plt.imshow(ideal_array-adjusted_array)
+            for idx, (this_ideal_array, adjusted_array) in enumerate(zip(ideal_layers, adjusted_layers)):
+                this_diff_array = this_ideal_array-adjusted_array
+                plt.imshow(this_diff_array)
                 plt.title(f"Difference between ideal and compressed; iteration {i}-layer{idx+1} of {len(ideal_layers)}")
                 plt.show()
 
@@ -213,18 +214,35 @@ for i in range(number_of_duplicates):
             #                 calculation_type = 'outside_CLT',
             #                 fix_bins = True)
 
-            # dynamic_threshold(overlap_array, 
-            #                 num_bins = 100,
-            #                 show_threshold_graph = True,
-            #                 name = f'Duplicate {i} compression compensation', 
-            #                 threshold = True,
-            #                 calculation_range = 'below',
-            #                 calculation_type = 'outside_CLT',
-            #                 fix_bins = True)
+            overlap_hist_dict = dynamic_threshold(overlap_array, 
+                            num_bins = 100,
+                            show_threshold_graph = True,
+                            name = f'Duplicate {i} compression compensation', 
+                            threshold = True,
+                            calculation_range = 'below',
+                            calculation_type = 'outside_CLT',
+                            fix_bins = True)
 
-            comp_peak_bins = comp_hist_dict['bins']
+            comp_peak_bins = comp_hist_dict['bins'][1::]
             comp_peak_cnts = comp_hist_dict['cnts']
+            overlap_bins = overlap_hist_dict['bins'][1::]
+            overlap_cnts = overlap_hist_dict['cnts']
             comp_peak_indcs, comp_peak_props = find_peaks(comp_peak_cnts)
+
+            #Create combined spatial overlap-thickness histogram
+              # flatten each 2D grid to a 1D sample vector, then make N×2 array
+            stacked_array = np.column_stack((volume_array.ravel(), overlap_array.ravel())) 
+              # compute the 3D joint histogram
+            counts_2d, edges_2d = np.histogramdd(stacked_array, bins=(100, 100))
+            #'edges_2d'- [0] = thickness edges
+            #            [1] = 
+              # plot the results
+            # plt.imshow(counts_2d, extent=[edges_2d[0][0],edges_2d[0][-1],edges_2d[1][0],edges_2d[1][-1]])
+            plt.imshow(counts_2d)
+            plt.title(f"Co-Location Histogram of Overlap and Thickness")
+            plt.xlabel("Opacity values")
+            plt.ylabel("Thickness values")
+            plt.show()
             
             if show_prediction_histograms:
                 plt.plot(comp_peak_bins[:-1], comp_peak_cnts)
@@ -233,8 +251,10 @@ for i in range(number_of_duplicates):
                 plt.show()
 
             if save_histogram:
-                volume_histogram_dict.update({f'bins-replicate{i}': comp_peak_bins})
-                volume_histogram_dict.update({f'cnts-replicate{i}': comp_peak_cnts})
+                volume_histogram_dict.update({f'thickness-bins, replicate{i}': comp_peak_bins})
+                volume_histogram_dict.update({f'thickness-cnts, replicate{i}': comp_peak_cnts})
+                volume_histogram_dict.update({f'overlap-bins, replicate{i}': overlap_bins})
+                volume_histogram_dict.update({f'overlap-cnts, replicate{i}': overlap_cnts})
                
     except Exception as e:
         print()
