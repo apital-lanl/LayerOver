@@ -935,14 +935,6 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             print(f"Multiple extension columns passed. Ignoring {column_name}")
 
     #Check that strain and extension are positive; if not, flip them and the stress data
-    # strain_check = bool(mech_dict['all_strain_data'].iloc[-10:-1].sum() > mech_dict['all_strain_data'].iloc[0:10].sum())
-    # if not strain_check:
-    #     #Flip the x-axis data
-    #     #NOTE: also 0-corrects the data by default
-    #     initial_max = mech_dict['all_strain_data'].max()
-    #     mech_dict['all_strain_data'] = mech_dict['all_strain_data'] - initial_max
-    #     mech_dict['all_strain_data'] = mech_dict['all_strain_data'].abs()
-
     #Sometimes lists are passed
     try:
         ext_check = bool(mech_dict['all_extension_data'].iloc[-10:-1].sum() > mech_dict['all_extension_data'].iloc[0:10].sum())
@@ -954,16 +946,16 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         initial_max = mech_dict['all_extension_data'].max()
         mech_dict['all_extension_data'] = mech_dict['all_extension_data'] - initial_max
         mech_dict['all_extension_data'] = mech_dict['all_extension_data'].abs()
-    # #If stress or strain is flipped, check stress and flip if necessary
-    # #If non-used displacemnt values are flipped, ignore and move on
-    # if (not strain_check) and (displacement_column == 'strain'):
-    #     stress_check = bool(mech_dict['all_stress_data'].iloc[-10:-1].sum() > mech_dict['all_stress_data'].iloc[0:10].sum())
-    #     if not stress_check:
-    #         mech_dict['all_stress_data'] = mech_dict['all_stress_data'][::-1]
-    # if (not ext_check) and (displacement_column == 'extension'):
-    #     stress_check = bool(mech_dict['all_stress_data'].iloc[-10:-1].sum() > mech_dict['all_stress_data'].iloc[0:10].sum())
-    #     if not stress_check:
-    #         mech_dict['all_stress_data'] = mech_dict['all_stress_data'][::-1]
+    #If stress or strain is flipped, check stress and flip if necessary
+    #If non-used displacemnt values are flipped, ignore and move on
+    if (not strain_check) and (displacement_column == 'strain'):
+        stress_check = bool(mech_dict['all_stress_data'].iloc[-10:-1].sum() > mech_dict['all_stress_data'].iloc[0:10].sum())
+        if not stress_check:
+            mech_dict['all_stress_data'] = mech_dict['all_stress_data'][::-1]
+    if (not ext_check) and (displacement_column == 'extension'):
+        stress_check = bool(mech_dict['all_stress_data'].iloc[-10:-1].sum() > mech_dict['all_stress_data'].iloc[0:10].sum())
+        if not stress_check:
+            mech_dict['all_stress_data'] = mech_dict['all_stress_data'][::-1]
 
     #Use peak finding to grab last loading/unloading cycl
     raw_df = pd.DataFrame(data= {stress_col_name: mech_dict['all_stress_data'],

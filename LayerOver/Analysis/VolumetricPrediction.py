@@ -134,36 +134,7 @@ def flat_ideal_volume_guess(structure_dict,
     layer_pitches= structure_dict['layer_pitches']
     layer_height_modifiers = structure_dict['layer_height_modifiers']
     layer_heights = structure_dict['layer_heights']
-    #Condition layer heights and modifieres to ensure they're actual numbers
-      # modifiers
-    new_mod_list = []
-    for idx, modifier in enumerate(layer_height_modifiers):
-        if isinstance(modifier, (int, float)):
-            new_mod_list.append(modifier)
-        elif isinstance(modifier, str):
-            try: 
-                new_mod_list.append(float(modifier))
-            except:
-                new_mod_list.append(default_compression_factors['default'])
-        else:
-            new_mod_list.append(default_compression_factors['default'])
-    layer_height_modifiers = new_mod_list
     
-      # heights
-    new_height_list = []    
-    for idx, height in enumerate(layer_heights):
-        if isinstance(height, (int, float)):
-            new_height_list.append(height)
-        elif isinstance(height, str):
-            try: 
-                new_height_list.append(float(height))
-            except:
-                this_diameter = strand_diameters[idx]
-                this_mod = layer_height_modifiers[idx]
-                new_height_list.append(this_diameter * this_mod)
-    layer_heights = new_height_list
-
-
     #Check initial data types and coerce
     if type(compression_factor) == float:
         # check if a fraction
@@ -178,6 +149,39 @@ def flat_ideal_volume_guess(structure_dict,
         elif compression_factor == 1:
             #Assume no compression and just pass as 1; otherwise compression will be unphysical
             pass
+    
+    #Condition layer heights and modifieres to ensure they're actual numbers
+      ## modifiers
+    new_mod_list = []
+    for idx, modifier in enumerate(layer_height_modifiers):
+        if isinstance(modifier, (int, float)):
+            new_mod_list.append(modifier)
+        elif isinstance(modifier, str):
+            try: 
+                new_mod_list.append(float(modifier))
+            except:
+                new_mod_list.append(default_compression_factors['default'])
+        else:
+            new_mod_list.append(default_compression_factors['default'])
+      ### allow for uncompression pass
+    if compression_factor ==1:
+        layer_height_modifiers = np.ones(len(layer_height_modifiers))
+    else:
+        layer_height_modifiers = new_mod_list
+      # heights
+    new_height_list = []    
+    for idx, height in enumerate(layer_heights):
+        if isinstance(height, (int, float)):
+            new_height_list.append(height)
+        elif isinstance(height, str):
+            try: 
+                new_height_list.append(float(height))
+            except:
+                this_diameter = strand_diameters[idx]
+                this_mod = layer_height_modifiers[idx]
+                new_height_list.append(this_diameter * this_mod)
+    layer_heights = new_height_list
+
     
     #Generate 'n_structures' number of iterations of volume
     for i in range(n_structures):
@@ -351,7 +355,10 @@ def flat_ideal_volume_guess(structure_dict,
                     initial_layer = this_layer.copy()  #make a copy of the initial layer to modify for compression and strand-strand interactions; this will be used for the next layer's calculations
                     if layer_idx == 0:
                         #Apply flat-plate compression (i.e. compression of strand against plate surface)
-                        plate_compression_cutoff = round((strand_diameter * default_compression_factors['bottom_layer']), 7)   #max_height of layer after compression against substrate
+                        if compression_factor ==1:
+                            plate_compression_cutoff = strand_diameter
+                        else:
+                            plate_compression_cutoff = round((strand_diameter * default_compression_factors['bottom_layer']), 7)   #max_height of layer after compression against substrate
                         this_layer[this_layer > plate_compression_cutoff] = plate_compression_cutoff
                         report_compress_diff = initial_layer-this_layer
                     else:

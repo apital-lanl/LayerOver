@@ -37,25 +37,27 @@ from LayerOver.Analysis.ImageData import dynamic_threshold
 
 #Main user options
   # individual layer options
-show_each_layer= False
-show_layer_overlaps = True
+show_each_layer= True
+show_layer_overlaps = False
 show_layer_adjustment_diffs = False
   # final 'stacked' part images
 show_full_prediction= True
 show_full_overlap = True
   # show analysis options
-show_prediction_histograms = True
+show_prediction_histograms = False
+show_thickness_overlap_comp = False
   # save/store
 save_histogram = False
 
 #Other options
 overwrite_layer_lists = True
+squish_factor = 0               #'1'- apply no compression adjustment;  '0'- Apply default compression
 
 #Structure parameters
   #size of the resulting generation array
 array_dims = (1000,1000)
   #number of "identical" structures to generate
-number_of_duplicates = 1
+number_of_duplicates = 3
   #structure to generate
 diw_structure_dict = {
     'metadata': {
@@ -78,7 +80,7 @@ diw_structure_dict = {
         'thickness_mm': None,
         'density_g/cc': None
         },
-    'part_structure': 'S5H',
+    'part_structure': 'S8HS',
     'part_skin_nozzle_size': 150,
     'part_layer_nozzle_size': 150,
     'part_angular_offset': 40,
@@ -121,7 +123,7 @@ if save_histogram:
     angle = diw_structure_dict['part_angular_offset']
     lateral = diw_structure_dict['part_lateral_offset']
     pitch = diw_structure_dict['part_pitch']
-    part_name = f"{structure}_skin({skin_strand})_layer({layer_strand})_angle({angle})_lat({lateral})_pitch({pitch})"
+    part_name = f"{structure}_comp({squish_factor})_skin({skin_strand})_layer({layer_strand})_angle({angle})_lat({lateral})_pitch({pitch})"
 
     #Intialize a dictionary to hold histogram data for each volume prediction
     volume_histogram_dict = {}
@@ -138,6 +140,7 @@ for i in range(number_of_duplicates):
                                     n_structures= 1, 
                                     voxel_side_length= 15,
                                     voxel_resolution_microns= 0,
+                                    compression_factor= squish_factor,
                                     save_layer_images= False,
                                     save_layer_arrays= False,
                                     save_final_image= False,
@@ -230,34 +233,35 @@ for i in range(number_of_duplicates):
             overlap_cnts = overlap_hist_dict['cnts']
             comp_peak_indcs, comp_peak_props = find_peaks(comp_peak_cnts)
 
-            #Create combined spatial overlap-thickness histogram
-              # flatten each 2D grid to a 1D sample vector, then make N×2 array
-            stacked_array = np.column_stack((volume_array.ravel(), overlap_array.ravel()))
-            x = volume_array.ravel()
-            y = overlap_array.ravel()
-              # compute the 3D joint histogram
-            counts_2d, xedges, yedges = np.histogram2d(x, y, bins=100)
-            # counts_2d, edges_2d = np.histogramdd(stacked_array, bins=(100, 100))
-            #'edges_2d'- [0] = thickness edges
-            #            [1] = 
-              # plot the results
-            t_counts2d = counts_2d.T
-            plt.figure(figsize=(5, 10))
-            # plt.imshow(t_counts2d, interpolation='nearest', origin='lower', 
-            #            extent=[xedges[0], xedges[-1],yedges[0],yedges[-1]])
-            # plt.imshow(t_counts2d, interpolation='nearest', origin='lower', 
-            #            extent=[xedges[0], xedges[-1],yedges[0],yedges[-1]],
-            #            norm=LogNorm(vmin=0.01, vmax=1))
-            # plt.imshow(t_counts2d, interpolation='nearest', origin='lower', 
-            #            extent=[xedges[0], xedges[-1],yedges[0],yedges[-1]],
-            #            norm=LogNorm(vmin=0.01, vmax=1))
-            plt.imshow(t_counts2d, interpolation='nearest', origin='lower', 
-                       extent=[xedges[0], xedges[-1],yedges[0],yedges[-1]],
-                       norm='log')
-            plt.title(f"Co-Location Histogram of Overlap and Thickness")
-            plt.xlabel("Thickness Value")
-            plt.ylabel("Overlap Value")
-            plt.show()
+            if show_thickness_overlap_comp:
+                #Create combined spatial overlap-thickness histogram
+                  # flatten each 2D grid to a 1D sample vector, then make N×2 array
+                stacked_array = np.column_stack((volume_array.ravel(), overlap_array.ravel()))
+                x = volume_array.ravel()
+                y = overlap_array.ravel()
+                  # compute the 3D joint histogram
+                counts_2d, xedges, yedges = np.histogram2d(x, y, bins=100)
+                # counts_2d, edges_2d = np.histogramdd(stacked_array, bins=(100, 100))
+                #'edges_2d'- [0] = thickness edges
+                #            [1] = 
+                  # plot the results
+                t_counts2d = counts_2d.T
+                plt.figure(figsize=(5, 10))
+                # plt.imshow(t_counts2d, interpolation='nearest', origin='lower', 
+                #            extent=[xedges[0], xedges[-1],yedges[0],yedges[-1]])
+                # plt.imshow(t_counts2d, interpolation='nearest', origin='lower', 
+                #            extent=[xedges[0], xedges[-1],yedges[0],yedges[-1]],
+                #            norm=LogNorm(vmin=0.01, vmax=1))
+                # plt.imshow(t_counts2d, interpolation='nearest', origin='lower', 
+                #            extent=[xedges[0], xedges[-1],yedges[0],yedges[-1]],
+                #            norm=LogNorm(vmin=0.01, vmax=1))
+                plt.imshow(t_counts2d, interpolation='nearest', origin='lower', 
+                           extent=[xedges[0], xedges[-1],yedges[0],yedges[-1]],
+                           norm='log')
+                plt.title(f"Co-Location Histogram of Overlap and Thickness")
+                plt.xlabel("Thickness Value")
+                plt.ylabel("Overlap Value")
+                plt.show()
             
             if show_prediction_histograms:
                 plt.plot(comp_peak_bins, comp_peak_cnts)
