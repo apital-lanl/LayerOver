@@ -44,7 +44,7 @@ from LayerOver.PSPP.DIWLogbook import get_latest_logbook
 
 #Define variables
 #Define hard-coded thresholds and setting values
-default_stress_threshold = 0.5   #in kPa; for silicone elastomers, but should be relatively general
+default_stress_threshold = 1   #in kPa; for silicone elastomers, but should be relatively general
 strain_minimum_mask_threshold = -0.1  #minimum strain to accept (<0 to allow for noise at 0 strain)
   # default name for the digital logbook sheet with all the actual logbook data
 default_digital_logbok_sheetname = 'Digital Logbook'   #Appropriate sheet as of 2026-01-21
@@ -269,12 +269,13 @@ def process_directory_for_mech_files(directory=None,
             this_file_dict['pandas_readable'] = process_dict['pandas_readable']
             this_file_dict['strain_assymptote'] = process_dict['last_strain_lockup']
             this_file_dict['extension_assymptote'] = process_dict['last_extension_lockup']
-            for strain_value in strain_reporting_points:
+            strain_reporting_keys = list(process_dict['stress_dict'].keys())
+            for strain_value in strain_reporting_keys:
                 this_name = f"stress_at_{strain_value}_strain"
                 try:
                     this_file_dict[this_name] = process_dict['stress_dict'][strain_value]
                 except:
-                    this_file_dict[this_name] = 'Error'
+                    this_file_dict[this_name] = 'nan'
             # this_file_dict[''] = process_dict['']
             # this_file_dict['raw_data'] = data_df  #not sure we actually want to return this, but we could
             
@@ -948,7 +949,7 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         mech_dict['all_extension_data'] = mech_dict['all_extension_data'].abs()
     #If stress or strain is flipped, check stress and flip if necessary
     #If non-used displacemnt values are flipped, ignore and move on
-    if (not strain_check) and (displacement_column == 'strain'):
+    if (not ext_check) and (displacement_column == 'strain'):
         stress_check = bool(mech_dict['all_stress_data'].iloc[-10:-1].sum() > mech_dict['all_stress_data'].iloc[0:10].sum())
         if not stress_check:
             mech_dict['all_stress_data'] = mech_dict['all_stress_data'][::-1]
@@ -1185,7 +1186,13 @@ def pull_mechanical_replicates(data_df, data_dict = None,
                 strain_dict[number] = closest_stress_value
             except IndexError:
                 #If there's an index error, just pass on and hope for the best
-                strain_dict[number] = 'nan'
+                strain_dict[number] = closest_stress_value
+                # strain_dict[number] = 'nan'
+        
+        
+        #Whatever the last 'strain_dict' to be processed was, pass that as the last replicate stress list
+        replicate_dict['last_replicate_stress_dict'] = strain_dict
+
             
         #Create output DataFrame for this replicate
         output_df = pd.DataFrame({
@@ -1206,9 +1213,6 @@ def pull_mechanical_replicates(data_df, data_dict = None,
 
         #Store replicate data with replicate index (starts at 1)
         replicate_dict['replicate_data'][replicate_idx+1] = output_df
-
-    #Whatever the last 'strain_dict' to be processed was, pass that as the last replicate stress list
-    replicate_dict['last_replicate_stress_dict'] = strain_dict
 
     return replicate_dict
 
