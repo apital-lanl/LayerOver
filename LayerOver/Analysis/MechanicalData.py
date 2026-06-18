@@ -44,7 +44,7 @@ from LayerOver.PSPP.DIWLogbook import get_latest_logbook
 
 #Define variables
 #Define hard-coded thresholds and setting values
-default_stress_threshold = 0.05   #in kPa; for silicone elastomers, but should be relatively general
+default_stress_threshold = 0.5   #in kPa; for silicone elastomers, but should be relatively general
 strain_minimum_mask_threshold = -0.1  #minimum strain to accept (<0 to allow for noise at 0 strain)
   # default name for the digital logbook sheet with all the actual logbook data
 default_digital_logbok_sheetname = 'Digital Logbook'   #Appropriate sheet as of 2026-01-21
@@ -274,7 +274,7 @@ def process_directory_for_mech_files(directory=None,
                 try:
                     this_file_dict[this_name] = process_dict['stress_dict'][strain_value]
                 except:
-                    this_file_dict[this_name] = 'nan'
+                    this_file_dict[this_name] = 'Error'
             # this_file_dict[''] = process_dict['']
             # this_file_dict['raw_data'] = data_df  #not sure we actually want to return this, but we could
             
