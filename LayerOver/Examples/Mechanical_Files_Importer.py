@@ -83,7 +83,7 @@ for filename in filenames:
         # 'clean_filename'              str
         # 'data_namerow_dict'           dict; info on which (if any) rows contain likely column names for mechanical data (i.e. 'stress', 'strain')
         # 'pandas_readable'             bool; did parsing into a pd.DataFrame work?
-        # ''
+        # write results to the output row
 
 
     except Exception as le:
