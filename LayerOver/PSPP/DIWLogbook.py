@@ -327,37 +327,44 @@ def open_logbook(logbook_filepath,
         idx = logbook_df.index[mask][0]
         #
         if diw_structure_dict['layer_strand_diameter'] == []:
-            logbook_df[logbook_df['Name'] == name]['layer_diameter_list'] = ['']
+            # logbook_df[logbook_df['Name'] == name]['layer_diameter_list'] = ['']
+            logbook_df.loc[logbook_df['Name'] == name, 'layer_diameter_list'] = ['']
         else:
             logbook_df.at[idx, 'layer_diameter_list'] = diw_structure_dict['layer_strand_diameter']
         #
         if diw_structure_dict['layer_types'] == []:
-            logbook_df[logbook_df['Name'] == name]['layer_structure_list'] = ['']
+            # logbook_df[logbook_df['Name'] == name]['layer_structure_list'] = ['']
+            logbook_df.loc[logbook_df['Name'] == name, 'layer_structure_list'] = ['']
         else:
             logbook_df.at[idx, 'layer_structure_list'] = diw_structure_dict['layer_types']
         #
         if diw_structure_dict['layer_angles'] ==[]:
-            logbook_df[logbook_df['Name'] == name]['layer_angle_list'] = ['']
+            # logbook_df[logbook_df['Name'] == name]['layer_angle_list'] = ['']
+            logbook_df.loc[logbook_df['Name'] == name, 'layer_angle_list'] = ['']
         else:
             logbook_df.at[idx, 'layer_angle_list'] = diw_structure_dict['layer_angles']
         #
         if diw_structure_dict['layer_lateral_offsets'] ==[]:
-            logbook_df[logbook_df['Name'] == name]['layer_lateral_offset_list'] = ['']
+            # logbook_df[logbook_df['Name'] == name]['layer_lateral_offset_list'] = ['']
+            logbook_df.loc[logbook_df['Name'] == name, 'layer_lateral_offset_list'] = ['']
         else:
             logbook_df.at[idx, 'layer_lateral_offset_list'] = diw_structure_dict['layer_lateral_offsets']
         #
         if diw_structure_dict['layer_pitches'] ==[]:
-            logbook_df[logbook_df['Name'] == name]['layer_pitch_list'] = ['']
+            # logbook_df[logbook_df['Name'] == name]['layer_pitch_list'] = ['']
+            logbook_df.loc[logbook_df['Name'] == name, 'layer_pitch_list'] = ['']
         else:
             logbook_df.at[idx, 'layer_pitch_list'] = diw_structure_dict['layer_pitches']
         #
         if diw_structure_dict['layer_height_modifiers'] ==[]:
-            logbook_df[logbook_df['Name'] == name]['layer_height_modifier_list'] = ['']
+            # logbook_df[logbook_df['Name'] == name]['layer_height_modifier_list'] = ['']
+            logbook_df.loc[logbook_df['Name'] == name, 'layer_height_modifier_list'] = ['']
         else:
             logbook_df.at[idx, 'layer_height_modifier_list'] = diw_structure_dict['layer_height_modifiers']
         #
         if diw_structure_dict['layer_heights'] ==[]:
-            logbook_df[logbook_df['Name'] == name]['layer_heights']= ['']
+            # logbook_df[logbook_df['Name'] == name]['layer_heights']= ['']
+            logbook_df.loc[logbook_df['Name'] == name, 'layer_heights'] = ['']
         else:
             logbook_df.at[idx, 'layer_heights'] = diw_structure_dict['layer_heights']
         # except:

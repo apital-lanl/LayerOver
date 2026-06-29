@@ -48,7 +48,8 @@ default_stress_threshold = 1   #in kPa; for silicone elastomers, but should be r
 strain_minimum_mask_threshold = -0.1  #minimum strain to accept (<0 to allow for noise at 0 strain)
   # default name for the digital logbook sheet with all the actual logbook data
 default_digital_logbok_sheetname = 'Digital Logbook'   #Appropriate sheet as of 2026-01-21
-assymptotic_stress_threshold = 5e4   # in kPa; high number for 'max lock-up stress threshold'; quadratic stress increase is calculated as mostly-linear, so a huge number is needed and isn't physical
+# assymptotic_stress_threshold = 1000   # in kPa; high number for 'max lock-up stress threshold'; quadratic stress increase is calculated as mostly-linear, so a huge number is needed and isn't physical
+assymptotic_stress_max_multiplier = 1.5  # assymptote is drawn and 'multiplier' * 'max_stress'; i.e. at 1.5, a 500 kPa peak would be assymptoted at 750
 
 #Example column names for various types of report from mechanical testing instruments
 # used to guess which 1) type of mech data is being parsed, 2) which row in the spreadsheet contains the column names, 
@@ -453,7 +454,7 @@ def process_mechanical_file_against_logbook(data_filepath, logbook_df,
         replicate_dict = pull_mechanical_replicates(data_df, data_dict = None, 
                                                        show_peaks = False,
                                                        stress_threshold = None,
-                                                       strain_zero_offset = 1,
+                                                       displacement_zero_offset = 1,
                                                        strain_min_thresh = None,
                                                        report_nonnegative_strain = True,
                                                        displacement_column = displacement_column,
@@ -951,10 +952,16 @@ def pull_mechanical_replicates(data_df, data_dict = None,
     initial_max = mech_dict['all_extension_data'].max()
     mech_dict['all_extension_data'] = mech_dict['all_extension_data'] - initial_max
     mech_dict['all_extension_data'] = mech_dict['all_extension_data'].abs()
+    initial_max = mech_dict['all_extension_data'].max()
+    mech_dict['all_extension_data'] = mech_dict['all_extension_data'] - initial_max
+    mech_dict['all_extension_data'] = mech_dict['all_extension_data'].abs()
       # normalized strain values (mm/mm)
-    initial_max = mech_dict['all_stress_data'].max()
-    mech_dict['all_stress_data'] = mech_dict['all_stress_data'] - initial_max
-    mech_dict['all_stress_data'] = mech_dict['all_stress_data'].abs()
+    initial_max = mech_dict['all_strain_data'].max()
+    mech_dict['all_strain_data'] = mech_dict['all_strain_data'] - initial_max
+    mech_dict['all_strain_data'] = mech_dict['all_strain_data'].abs()
+    nitial_max = mech_dict['all_strain_data'].max()
+    mech_dict['all_strain_data'] = mech_dict['all_strain_data'] - initial_max
+    mech_dict['all_strain_data'] = mech_dict['all_strain_data'].abs()
 
     #Check/Make strain and extension for small-to-big-ness; if not, flip them the same way as above
       # sometimes lists are passed; adjust with a T:E (AttributeError)
@@ -970,14 +977,14 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         mech_dict['all_extension_data'] = mech_dict['all_extension_data'].abs()
     #strain (mm/mm)
     try:
-        pos_check = bool(mech_dict['all_stress_data'].iloc[-10:-1].sum() > mech_dict['all_stress_data'].iloc[0:10].sum())
+        pos_check = bool(mech_dict['all_strain_data'].iloc[-10:-1].sum() > mech_dict['all_strain_data'].iloc[0:10].sum())
     except AttributeError:
-        pos_check = bool(sum(mech_dict['all_stress_data'][-10:-1]) > sum(mech_dict['all_stress_data'][0:10]))
+        pos_check = bool(sum(mech_dict['all_strain_data'][-10:-1]) > sum(mech_dict['all_strain_data'][0:10]))
     if not pos_check:   #pos_check- False if first part of the strain data is bigger than the end
         #Flip the x-axis data
-        initial_max = mech_dict['all_stress_data'].max()
-        mech_dict['all_stress_data'] = mech_dict['all_stress_data'] - initial_max
-        mech_dict['all_stress_data'] = mech_dict['all_stress_data'].abs()
+        initial_max = mech_dict['all_strain_data'].max()
+        mech_dict['all_strain_data'] = mech_dict['all_strain_data'] - initial_max
+        mech_dict['all_strain_data'] = mech_dict['all_strain_data'].abs()
     #stress (typically kPa)
     #Don't want to zero-adjust strain for now; just flip the values
     try:
@@ -1141,8 +1148,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             if not strain_min_thresh:
                 strain_min_thresh = strain_minimum_mask_threshold
             #Get pandas Series mask for values of strain above threshold
-            loading_mask = strain_loading[strain_loading>= strain_min_thresh]
-            unloading_mask = strain_unloading[strain_unloading>= strain_min_thresh]
+            loading_mask = strain_loading>= strain_min_thresh
+            unloading_mask = strain_unloading>= strain_min_thresh
             #Apply non-negative mask to get appropriate values only
             strain_loading = strain_loading[loading_mask]
             stress_loading = stress_loading[loading_mask]
@@ -1150,6 +1157,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             stress_unloading = stress_unloading[unloading_mask]
 
         #Try and find an assymptote for the loading curve
+          # make a stress threshold to assymptote to
+        assymptotic_stress_threshold = stress_loading.max()*assymptotic_stress_max_multiplier
           # get derivatives
           # only pull the positive derivates to avoid issues from the way data is collected (probably because of time resolution errors and noise)
         extension_loading_diff = extension_loading.diff()
@@ -1185,16 +1194,19 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             strain_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / 1e-6   #avoid division by zero with a very low threshold
         else:
             strain_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / points_n_for_assymptote
+        stress_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / points_n_for_assymptote
           #strain assymptote
           #NOTE: could solve  analytically, but this is easier and more clear; never more than a few thousand of these to do in total
         last_stress = stress_loading.tail(1).values[0]
         last_strain = strain_loading.tail(1).values[0]
         strain_step = strain_loading_diff.mean()
         strain_velocity = strain_loading_diff.tail(3).mean()
+        stress_velocity = loading_stress_diff.tail(3).mean()
         iteration_counter = 0
         strain_delta = 0
         while (last_stress<assymptotic_stress_threshold) and (iteration_counter <100):
-            last_stress = last_stress + (strain_velocity) + (0.5 * strain_accel)**2
+            # last_stress = last_stress + stress_velocity*(strain_step) + 0.5 * stress_accel*(strain_step)**2
+            last_stress = last_stress + stress_velocity + 0.5 * stress_accel
             strain_delta = strain_delta + strain_step
             iteration_counter += 1
         strain_lockup = last_strain + strain_delta
@@ -1207,7 +1219,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         iteration_counter = 0
         ext_delta = 0
         while (last_stress<assymptotic_stress_threshold) and (iteration_counter <100):
-            last_stress = last_stress + (ext_velocity) + (0.5 * extension_accel)**2
+            # last_stress = last_stress + stress_velocity*(ext_step) + 0.5 * stress_accel*(ext_step)**2
+            last_stress = last_stress + stress_velocity + 0.5 * stress_accel
             ext_delta = ext_delta + ext_step
             iteration_counter += 1
         ext_lockup = last_ext + ext_delta
@@ -1216,7 +1229,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         #Finally, grab each stress for every 0.01 value of strain
         strain_list = [round(num, 4).item() for num in np.linspace(0, 1, 101)]
         for number in strain_list:
-            closest_strain_idx = (strain_loading - number).abs().idxmin()
+            strain_diff = strain_loading - number
+            closest_strain_idx = strain_diff.abs().idxmin()
             try:
                 closest_strain_value = strain_loading.iloc[closest_strain_idx]
                 closest_stress_value = stress_loading.iloc[closest_strain_idx]
