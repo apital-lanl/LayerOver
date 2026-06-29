@@ -27,9 +27,10 @@ import traceback
 from LayerOver.Analysis import MechanicalData as mech
 
 
-#Specify some options
-show_each_file_results = True       #show outputs from each file that's read
-
+#Specify some display options
+show_each_file_results = True               #show outputs from each file that's read
+show_displacement_peak_locations = False     #show where mechanical replicate indices have been chosen
+displacement_type = 'extension'             #'extension'    'strain'
 
 #Select a file(s) to import
 root = Tk()
@@ -70,8 +71,10 @@ for filename in filenames:
     try:
         this_file_dict = mech.process_mechanical_file_against_logbook(filename, logbook_df,
                                                                 alternate_save_directory = directory,
+                                                                show_displacement_peaks = show_displacement_peak_locations,
                                                                 show_each_file_results = show_each_file_results,
-                                                                save_last_replicate_graph = show_each_file_results)
+                                                                save_last_replicate_graph = show_each_file_results,
+                                                                displacement_column = displacement_type)
 
         # 'this_file_dict' keys and values:
         #-----------------------------------------------------------

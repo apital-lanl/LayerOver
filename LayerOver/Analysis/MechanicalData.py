@@ -343,6 +343,7 @@ def process_directory_for_mech_files(directory=None,
 def process_mechanical_file_against_logbook(data_filepath, logbook_df,
                                             alternate_save_directory = None,
                                             show_each_file_results = False,
+                                            show_displacement_peaks = False,
                                             save_last_replicate_graph = False,
                                             displacement_column = 'extension'):
     """
@@ -452,7 +453,7 @@ def process_mechanical_file_against_logbook(data_filepath, logbook_df,
             plt.show()
 
         replicate_dict = pull_mechanical_replicates(data_df, data_dict = None, 
-                                                       show_peaks = False,
+                                                       show_peaks = show_displacement_peaks,
                                                        stress_threshold = None,
                                                        displacement_zero_offset = 1,
                                                        strain_min_thresh = None,
@@ -949,42 +950,38 @@ def pull_mechanical_replicates(data_df, data_dict = None,
     #Zero-correct (eliminate negative values) and max-correct raw data
     #  Should flip the x-axis values (bigger magnitude -> smaller magnitude)
       # raw extension values (typically mm)
-    initial_max = mech_dict['all_extension_data'].max()
-    mech_dict['all_extension_data'] = mech_dict['all_extension_data'] - initial_max
-    mech_dict['all_extension_data'] = mech_dict['all_extension_data'].abs()
-    initial_max = mech_dict['all_extension_data'].max()
-    mech_dict['all_extension_data'] = mech_dict['all_extension_data'] - initial_max
-    mech_dict['all_extension_data'] = mech_dict['all_extension_data'].abs()
-      # normalized strain values (mm/mm)
-    initial_max = mech_dict['all_strain_data'].max()
-    mech_dict['all_strain_data'] = mech_dict['all_strain_data'] - initial_max
-    mech_dict['all_strain_data'] = mech_dict['all_strain_data'].abs()
-    nitial_max = mech_dict['all_strain_data'].max()
-    mech_dict['all_strain_data'] = mech_dict['all_strain_data'] - initial_max
-    mech_dict['all_strain_data'] = mech_dict['all_strain_data'].abs()
+    # initial_max = mech_dict['all_extension_data'].max()
+    # mech_dict['all_extension_data'] = mech_dict['all_extension_data'] - initial_max
+    # mech_dict['all_extension_data'] = mech_dict['all_extension_data'].abs()
+    #   # normalized strain values (mm/mm)
+    # initial_max = mech_dict['all_strain_data'].max()
+    # mech_dict['all_strain_data'] = mech_dict['all_strain_data'] - initial_max
+    # mech_dict['all_strain_data'] = mech_dict['all_strain_data'].abs()
 
     #Check/Make strain and extension for small-to-big-ness; if not, flip them the same way as above
       # sometimes lists are passed; adjust with a T:E (AttributeError)
     #extension (typically mm)
-    try:
-        pos_check = bool(mech_dict['all_extension_data'].iloc[-10:-1].sum() > mech_dict['all_extension_data'].iloc[0:10].sum())
-    except AttributeError:
-        pos_check = bool(sum(mech_dict['all_extension_data'][-10:-1]) > sum(mech_dict['all_extension_data'][0:10]))
-    if not pos_check:   #pos_check- False if first part of the extension data is bigger than the end
-        #Flip the x-axis data
-        initial_max = mech_dict['all_extension_data'].max()
-        mech_dict['all_extension_data'] = mech_dict['all_extension_data'] - initial_max
-        mech_dict['all_extension_data'] = mech_dict['all_extension_data'].abs()
-    #strain (mm/mm)
-    try:
-        pos_check = bool(mech_dict['all_strain_data'].iloc[-10:-1].sum() > mech_dict['all_strain_data'].iloc[0:10].sum())
-    except AttributeError:
-        pos_check = bool(sum(mech_dict['all_strain_data'][-10:-1]) > sum(mech_dict['all_strain_data'][0:10]))
-    if not pos_check:   #pos_check- False if first part of the strain data is bigger than the end
-        #Flip the x-axis data
-        initial_max = mech_dict['all_strain_data'].max()
-        mech_dict['all_strain_data'] = mech_dict['all_strain_data'] - initial_max
-        mech_dict['all_strain_data'] = mech_dict['all_strain_data'].abs()
+    # try:
+    #     sorted_mech = np.abs(np.sort(mech_dict['all_extension_data'].copy()))
+    #     pos_check = bool(sorted_mech.abs().iloc[-10:-1].sum() > sorted_mech.abs().iloc[0:10].sum())
+    # except AttributeError:
+    #     pos_check = bool(sum(sorted_mech[-10:-1]) > sum(sorted_mech[0:10]))
+    # if not pos_check:   #pos_check- False if first part of the extension data is bigger than the end
+    #     #Flip the x-axis data
+    #     initial_max = mech_dict['all_extension_data'].max()
+    #     mech_dict['all_extension_data'] = mech_dict['all_extension_data'] - initial_max
+    #     mech_dict['all_extension_data'] = mech_dict['all_extension_data'].abs()
+    # #strain (mm/mm)
+    # try:
+    #     sorted_strain = np.abs(np.sort(mech_dict['all_strain_data'].copy()))
+    #     pos_check = bool(sorted_strain.iloc[-10:-1].sum() > sorted_strain.iloc[0:10].sum())
+    # except AttributeError:
+    #     pos_check = bool(sum(sorted_strain) > sum(sorted_strain[0:10]))
+    # if not pos_check:   #pos_check- False if first part of the strain data is bigger than the end
+    #     #Flip the x-axis data
+    #     initial_max = mech_dict['all_strain_data'].max()
+    #     mech_dict['all_strain_data'] = mech_dict['all_strain_data'] - initial_max
+    #     mech_dict['all_strain_data'] = mech_dict['all_strain_data'].abs()
     #stress (typically kPa)
     #Don't want to zero-adjust strain for now; just flip the values
     try:
@@ -1038,17 +1035,17 @@ def pull_mechanical_replicates(data_df, data_dict = None,
     #Show the peak locations if prompted and replicate parsing was successful
     if show_peaks and replicate_dict['replicate_parse_success']:
         #Pull relevant indices and graph values for replicate indices
-        strain_max = raw_df['all_strain_data'].max()
-        extension_max = raw_df['all_extension_data'].max()
+        strain_max = raw_df[strain_col_name].max()
+        extension_max = raw_df[extension_col_name].max()
 
         #Generate the graph
         if displacement_column == 'strain':
             plt.figure(figsize = (10,10))
-            plt.scatter(list(range(raw_df['all_strain_data'].shape[0])), raw_df['all_strain_data'])
+            plt.scatter(list(range(raw_df[strain_col_name].shape[0])), raw_df[strain_col_name])
             plt.title(f"Strain peaks found")
             #Show peak start/stop locations defining replicates
             for peak in peaks:
-                plt.scatter(peak, raw_df['all_strain_data'][peak], marker = 'x', s = 200, color = 'gray')
+                plt.scatter(peak, raw_df[strain_col_name][peak], marker = 'x', s = 200, color = 'gray')
               # start of last loading replicate
             plt.plot([last_valley_guess_index, last_valley_guess_index], [0, strain_max], color='r', linewidth=3, alpha=0.6)
               # start of last unloading replicate
@@ -1058,11 +1055,11 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             plt.show()
         elif displacement_column == 'extension':
             plt.figure(figsize = (10,10))
-            plt.scatter(list(range(raw_df['all_extension_data'].shape[0])), raw_df['all_extension_data'])
+            plt.scatter(list(range(raw_df[extension_col_name].shape[0])), raw_df[extension_col_name])
             plt.title(f"Extension peaks found")
             #Show peak start/stop locations defining replicates
             for peak in peaks:
-                plt.scatter(peak, raw_df['all_strain_data'][peak], marker = 'x', s = 200, color = 'gray')
+                plt.scatter(peak, raw_df[extension_col_name][peak], marker = 'x', s = 200, color = 'gray')
               # start of last loading replicate
             plt.plot([last_valley_guess_index, last_valley_guess_index], [0, extension_max], color='r', linewidth=3, alpha=0.6)
               # start of last unloading replicate
@@ -1074,10 +1071,10 @@ def pull_mechanical_replicates(data_df, data_dict = None,
     elif show_peaks:
         plt.figure(figsize = (10,10))
         if displacement_column == 'strain':
-            plt.scatter(list(range(raw_df['all_strain_data'].shape[0])), raw_df['all_strain_data'])
+            plt.scatter(list(range(raw_df[strain_col_name].shape[0])), raw_df[strain_col_name])
             plt.xlabel("Strain (mm/mm)")
         elif displacement_column == 'extension':
-            plt.scatter(list(range(raw_df['all_extension_data'].shape[0])), raw_df['all_extension_data'])
+            plt.scatter(list(range(raw_df[extension_col_name].shape[0])), raw_df[extension_col_name])
             plt.xlabel("Extension (mm)")
         plt.ylabel("Stress")
         plt.title(f"Failed to parse replicates from this data")
@@ -1229,7 +1226,7 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         #Finally, grab each stress for every 0.01 value of strain
         strain_list = [round(num, 4).item() for num in np.linspace(0, 1, 101)]
         for number in strain_list:
-            strain_diff = strain_loading - number
+            strain_diff = strain_loading.copy() - number
             closest_strain_idx = strain_diff.abs().idxmin()
             try:
                 closest_strain_value = strain_loading.iloc[closest_strain_idx]
@@ -1237,8 +1234,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
                 strain_dict[number] = closest_stress_value
             except IndexError:
                 #If there's an index error, just pass on and hope for the best
-                strain_dict[number] = closest_stress_value
-                # strain_dict[number] = 'nan'
+                # strain_dict[number] = closest_stress_value
+                strain_dict[number] = 'nan'
         
         
         #Whatever the last 'strain_dict' to be processed was, pass that as the last replicate stress list
