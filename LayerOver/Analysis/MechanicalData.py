@@ -44,7 +44,7 @@ from LayerOver.PSPP.DIWLogbook import get_latest_logbook
 
 #Define variables
 #Define hard-coded thresholds and setting values
-default_stress_threshold = 1   #in kPa; for silicone elastomers, but should be relatively general
+default_stress_threshold = 0.4   #in kPa; for silicone elastomers, but should be relatively general
 strain_minimum_mask_threshold = -0.1  #minimum strain to accept (<0 to allow for noise at 0 strain)
   # default name for the digital logbook sheet with all the actual logbook data
 default_digital_logbok_sheetname = 'Digital Logbook'   #Appropriate sheet as of 2026-01-21
@@ -947,49 +947,25 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             print
             print(f"Multiple extension columns passed. Ignoring {column_name}")
 
+    #Create mask of high-stress and low-stress regions
+    stress_max = mech_dict['all_stress_data'].max()
+    high_stress_mask = mech_dict['all_stress_data'].copy() > stress_max * 0.9
+    low_stress_mask = mech_dict['all_stress_data'].copy() < 5   #in kPa
+
     #Zero-correct (eliminate negative values) and max-correct raw data
     #  Should flip the x-axis values (bigger magnitude -> smaller magnitude)
       # raw extension values (typically mm)
-    # initial_max = mech_dict['all_extension_data'].max()
-    # mech_dict['all_extension_data'] = mech_dict['all_extension_data'] - initial_max
-    # mech_dict['all_extension_data'] = mech_dict['all_extension_data'].abs()
+    ext_pos_check = bool(mech_dict['all_extension_data'][high_stress_mask][-10:-1].sum() > mech_dict['all_extension_data'][low_stress_mask][-10:-1].sum())
+    if not ext_pos_check:   #'False' if low stress extension values are bigger than the peak stress extension values
+        initial_max = mech_dict['all_extension_data'].max()
+        mech_dict['all_extension_data'] = mech_dict['all_extension_data'] - initial_max
+        mech_dict['all_extension_data'] = mech_dict['all_extension_data'].abs()
     #   # normalized strain values (mm/mm)
-    # initial_max = mech_dict['all_strain_data'].max()
-    # mech_dict['all_strain_data'] = mech_dict['all_strain_data'] - initial_max
-    # mech_dict['all_strain_data'] = mech_dict['all_strain_data'].abs()
-
-    #Check/Make strain and extension for small-to-big-ness; if not, flip them the same way as above
-      # sometimes lists are passed; adjust with a T:E (AttributeError)
-    #extension (typically mm)
-    # try:
-    #     sorted_mech = np.abs(np.sort(mech_dict['all_extension_data'].copy()))
-    #     pos_check = bool(sorted_mech.abs().iloc[-10:-1].sum() > sorted_mech.abs().iloc[0:10].sum())
-    # except AttributeError:
-    #     pos_check = bool(sum(sorted_mech[-10:-1]) > sum(sorted_mech[0:10]))
-    # if not pos_check:   #pos_check- False if first part of the extension data is bigger than the end
-    #     #Flip the x-axis data
-    #     initial_max = mech_dict['all_extension_data'].max()
-    #     mech_dict['all_extension_data'] = mech_dict['all_extension_data'] - initial_max
-    #     mech_dict['all_extension_data'] = mech_dict['all_extension_data'].abs()
-    # #strain (mm/mm)
-    # try:
-    #     sorted_strain = np.abs(np.sort(mech_dict['all_strain_data'].copy()))
-    #     pos_check = bool(sorted_strain.iloc[-10:-1].sum() > sorted_strain.iloc[0:10].sum())
-    # except AttributeError:
-    #     pos_check = bool(sum(sorted_strain) > sum(sorted_strain[0:10]))
-    # if not pos_check:   #pos_check- False if first part of the strain data is bigger than the end
-    #     #Flip the x-axis data
-    #     initial_max = mech_dict['all_strain_data'].max()
-    #     mech_dict['all_strain_data'] = mech_dict['all_strain_data'] - initial_max
-    #     mech_dict['all_strain_data'] = mech_dict['all_strain_data'].abs()
-    #stress (typically kPa)
-    #Don't want to zero-adjust strain for now; just flip the values
-    try:
-        stress_check = bool(mech_dict['all_stress_data'].iloc[-10:-1].sum() > mech_dict['all_stress_data'].iloc[0:10].sum())
-    except AttributeError:
-        stress_check = bool(sum(mech_dict['all_stress_data'][-10:-1]) > sum(mech_dict['all_stress_data'][0:10]))
-    if not stress_check:  #stress_check- False if first part of the strain data is bigger than the end
-        mech_dict['all_stress_data'] = mech_dict['all_stress_data'][::-1]
+    strain_pos_check = bool(mech_dict['all_strain_data'][high_stress_mask][-10:-1].sum() > mech_dict['all_strain_data'][low_stress_mask][-10:-1].sum())
+    if not strain_pos_check:   #'False' if low stress extension values are bigger than the peak stress extension values
+        initial_max = mech_dict['all_strain_data'].max()
+        mech_dict['all_strain_data'] = mech_dict['all_strain_data'] - initial_max
+        mech_dict['all_strain_data'] = mech_dict['all_strain_data'].abs()
 
     #Use peak finding to grab last loading/unloading cycl
     raw_df = pd.DataFrame(data= {stress_col_name: mech_dict['all_stress_data'],
@@ -1172,15 +1148,15 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         loading_stress_d2 = loading_stress_diff.diff()
         loading_stress_d2 = loading_stress_d2[loading_stress_d2>0]
         #Prior version
-        #   # pull last 10 values and get a slope for the lock-up acceleration
-        # if (extension_loading_d2.tail(points_n_for_assymptote).mean()) < 1e-6:    
-        #     extension_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / 1e-6   #avoid division by zero with a very low threshold
-        # else:
-        #     extension_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / (extension_loading_d2.tail(points_n_for_assymptote).mean())
-        # if (strain_loading_d2.tail(points_n_for_assymptote).mean()) < 1e-6:    
-        #     strain_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / 1e-6   #avoid division by zero with a very low threshold
-        # else:
-        #     strain_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / (strain_loading_d2.tail(points_n_for_assymptote).mean())
+          # pull last 10 values and get a slope for the lock-up acceleration
+        if (extension_loading_d2.tail(points_n_for_assymptote).mean()) < 1e-6:    
+            extension_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / 1e-6   #avoid division by zero with a very low threshold
+        else:
+            extension_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / (extension_loading_d2.tail(points_n_for_assymptote).mean())
+        if (strain_loading_d2.tail(points_n_for_assymptote).mean()) < 1e-6:    
+            strain_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / 1e-6   #avoid division by zero with a very low threshold
+        else:
+            strain_accel = (loading_stress_d2.tail(points_n_for_assymptote).mean()) / (strain_loading_d2.tail(points_n_for_assymptote).mean())
 
         # pull last 10 values and get a slope for the lock-up acceleration
         if points_n_for_assymptote < 1e-6:    
@@ -1234,8 +1210,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
                 strain_dict[number] = closest_stress_value
             except IndexError:
                 #If there's an index error, just pass on and hope for the best
-                # strain_dict[number] = closest_stress_value
-                strain_dict[number] = 'nan'
+                strain_dict[number] = closest_stress_value
+                # strain_dict[number] = 'nan'
         
         
         #Whatever the last 'strain_dict' to be processed was, pass that as the last replicate stress list
@@ -1261,6 +1237,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
 
         #Store replicate data with replicate index (starts at 1)
         replicate_dict['replicate_data'][replicate_idx+1] = output_df
+
+
 
     return replicate_dict
 

@@ -262,7 +262,9 @@ def open_logbook(logbook_filepath,
     logbook_df['Mass (g)'] = logbook_df['Mass (g)'].apply(lambda x: float(x) if ((str(x).lower() not in logbook_exclusion_strings) and (str(x).lower() != "")) else np.nan)
     logbook_df['Thickness (Checkline) (mm)'] = logbook_df['Thickness (Checkline) (mm)'].apply(lambda x: float(x) if ((str(x).lower() not in logbook_exclusion_strings) and (str(x).lower() != "")) else np.nan) 
     logbook_df['Density (g/cc)'] = logbook_df['Density (g/cc)'].apply(lambda x: float(x) if ((str(x).lower() not in logbook_exclusion_strings) and (str(x).lower() != "")) else np.nan)
-    logbook_df['Thickness (Additional) (mm)'] = logbook_df['Thickness (Additional) (mm)'].apply(lambda x: float(x) if ((str(x).lower() not in logbook_exclusion_strings) and (str(x).lower() != "")) else np.nan)    
+    logbook_df['Thickness (Additional) (mm)'] = logbook_df['Thickness (Additional) (mm)'].apply(lambda x: float(x) if ((str(x).lower() not in logbook_exclusion_strings) and (str(x).lower() != "")) else np.nan)
+    logbook_df[pitch_column_name] = logbook_df[pitch_column_name].str.replace('µ', '', case= False)
+    logbook_df[pitch_column_name] = logbook_df[pitch_column_name].str.replace('x', '', case= False)
 
     #Split out skin vs. layer nozzle size if different
       # Logbook column name as of 2026-01-22 = "Strand Diameter, nominal (skin/heli)"
@@ -277,7 +279,7 @@ def open_logbook(logbook_filepath,
     logbook_df[pitch_column_name] = logbook_df[pitch_column_name].astype(str)
     x_mask = logbook_df[pitch_column_name].str.contains('x', case=False, na=False)
     logbook_df.loc[x_mask, pitch_column_name] = (
-        logbook_df.loc[x_mask, pitch_column_name].str.replace('x', '', case=False).astype(float) * 
+        logbook_df.loc[x_mask, pitch_column_name].astype(float) * 
         logbook_df.loc[x_mask, 'Strand Diameter, Layer']
         )
     logbook_df.loc[x_mask, pitch_list_column_name] = logbook_df.loc[x_mask, pitch_column_name]
