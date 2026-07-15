@@ -1085,7 +1085,7 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             #Find stress index when stress crosses threshold value (hard-coded in module defaults; in kPa typically)
             stress_loading_avg = stress_loading.rolling(5, center=True, min_periods = 1).mean()
             valid_stress_mask = stress_loading_avg >= stress_threshold
-            first_valid_stress_index = valid_stress_mask.idxmax()  #returns first True value
+            first_valid_stress_index = valid_stress_mask.idxmax()-4  #returns first True value; subtract 4 to account for the rolling average window size (5) and center=True
             first_valid_strain_index = first_valid_stress_index-strain_zero_offset   #include a few prior readings to get a clear lead-in to the stress; not a big deal typically
             if first_valid_strain_index < 0:
                 first_valid_strain_index = 0
@@ -1121,8 +1121,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             if not strain_min_thresh:
                 strain_min_thresh = strain_minimum_mask_threshold
             #Get pandas Series mask for values of strain above threshold
-            loading_mask = strain_loading>= strain_min_thresh
-            unloading_mask = strain_unloading>= strain_min_thresh
+            loading_mask = strain_loading>= 0
+            unloading_mask = strain_unloading>= 0
             #Apply non-negative mask to get appropriate values only
             strain_loading = strain_loading[loading_mask]
             stress_loading = stress_loading[loading_mask]
@@ -1210,8 +1210,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
                 strain_dict[number] = closest_stress_value
             except IndexError:
                 #If there's an index error, just pass on and hope for the best
-                strain_dict[number] = closest_stress_value
-                # strain_dict[number] = 'nan'
+                # strain_dict[number] = closest_stress_value
+                strain_dict[number] = 'nan'
         
         
         #Whatever the last 'strain_dict' to be processed was, pass that as the last replicate stress list

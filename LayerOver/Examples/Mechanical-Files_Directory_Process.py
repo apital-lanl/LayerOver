@@ -17,6 +17,7 @@ Description:
 """
 
 from LayerOver.Analysis import MechanicalData as mech
+import os
 import pandas as pd
 pd.set_option('display.max_columns', None)  #Make displayed columns full-width
 from tkinter import Tk, filedialog
@@ -31,12 +32,13 @@ mech_data_df = mech.process_directory_for_mech_files(directory = mech_directory,
                                                      show_each_file_results = False,
                                                      save_last_replicate_graph = True)
 
-#Show the stuff
-print(f"Quick-look at mech data from {mech_directory}")
-print(f"{mech_data_df.head(25)}")
-print()
+# #Show the stuff
+# print(f"Quick-look at mech data from {mech_directory}")
+# print(f"{mech_data_df.head(25)}")
+# print()
 
 # #Save the stuff
+# #Commented out because this is done in 'process_directory_...' already
 # save_dir = os.path.join(mech_directory, 'Extracted Mechanical Summary Data')
 # if os.path.isdir(save_dir):
 #     save_name = "Extracted Mechanical Data.csv"
