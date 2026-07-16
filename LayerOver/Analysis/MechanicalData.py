@@ -44,7 +44,7 @@ from LayerOver.PSPP.DIWLogbook import get_latest_logbook
 
 #Define variables
 #Define hard-coded thresholds and setting values
-default_stress_threshold = 0.4   #in kPa; for silicone elastomers, but should be relatively general
+default_stress_threshold = 0.1   #in kPa; for silicone elastomers, but should be relatively general
 strain_minimum_mask_threshold = -0.1  #minimum strain to accept (<0 to allow for noise at 0 strain)
   # default name for the digital logbook sheet with all the actual logbook data
 default_digital_logbok_sheetname = 'Digital Logbook'   #Appropriate sheet as of 2026-01-21
@@ -838,7 +838,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
                                    strain_min_thresh = None,
                                    report_nonnegative_strain = True,
                                    displacement_column = 'extension',
-                                   points_n_for_assymptote = 5):
+                                   points_n_for_assymptote = 5,
+                                   show_displacement_correction = False):
     '''
     Description: Take cyclic load test data and just return the final loading/unloading cycle as separate columns.
     INPUT:
@@ -1085,8 +1086,8 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             #Find stress index when stress crosses threshold value (hard-coded in module defaults; in kPa typically)
             stress_loading_avg = stress_loading.rolling(5, center=True, min_periods = 1).mean()
             valid_stress_mask = stress_loading_avg >= stress_threshold
-            first_valid_stress_index = valid_stress_mask.idxmax()-4  #returns first True value; subtract 4 to account for the rolling average window size (5) and center=True
-            first_valid_strain_index = first_valid_stress_index-strain_zero_offset   #include a few prior readings to get a clear lead-in to the stress; not a big deal typically
+            first_valid_stress_index = valid_stress_mask.idxmax()  #returns first True value; subtract 4 to account for the rolling average window size (5) and center=True
+            first_valid_strain_index = int(first_valid_stress_index-strain_zero_offset)   #include a few prior readings to get a clear lead-in to the stress; not a big deal typically
             if first_valid_strain_index < 0:
                 first_valid_strain_index = 0
               ## duplicate strain index start for extension; set separately here to allow for specific extension-related compensation in the future
@@ -1102,6 +1103,28 @@ def pull_mechanical_replicates(data_df, data_dict = None,
             strain_zero_correction = first_valid_strain_value
             extension_zero_correction = first_valid_extension
 
+            #Show the 0-displacement correction graphically if prompted
+            if show_displacement_correction:
+                # print(f"Correction factors: \n\t Strain: {strain_zero_correction: 2f} \n\t Ext: {extension_zero_correction: 2f}")
+                last_peak_index = peaks[-1]
+                last_load_start_idx = last_peak_index-cycle_index_diff_guess
+                last_strain_loading = raw_df[strain_col_name].iloc[last_load_start_idx:last_peak_index]
+                last_stress_loading = raw_df[stress_col_name].iloc[last_load_start_idx:last_peak_index]
+                last_extension_loading = raw_df[extension_col_name].iloc[last_load_start_idx:last_peak_index]
+                
+                plt.figure(figsize = (10,10))
+                if displacement_column == 'strain':
+                    plt.scatter(last_strain_loading, last_stress_loading, color= 'gray')
+                    plt.scatter((last_strain_loading-strain_zero_correction), last_stress_loading, color= 'orange')
+                    plt.xlabel("Strain (mm/mm)")
+                elif displacement_column == 'extension':
+                    plt.scatter(last_extension_loading, last_stress_loading, color= 'gray')
+                    plt.scatter((last_extension_loading-extension_zero_correction), last_stress_loading, color= 'orange')
+                    plt.xlabel("Extension (mm)")
+                plt.ylabel("Stress")
+                plt.legend(["Raw loading curve", "0-displacement corrected loading curve"])
+                plt.show()
+
             #Apply 0-displacement corrections to the entire series
             raw_df[strain_col_name] = raw_df[strain_col_name]- strain_zero_correction
             raw_df[extension_col_name] = raw_df[extension_col_name]- extension_zero_correction
@@ -1114,6 +1137,26 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         strain_unloading = raw_df[strain_col_name].iloc[peak_idx:unload_end_idx]
         stress_unloading = raw_df[stress_col_name].iloc[peak_idx:unload_end_idx]
         extension_unloading = raw_df[extension_col_name].iloc[peak_idx:unload_end_idx]
+
+        # #Zero-correct the last cycle again
+        # if replicate_idx == (len(peaks)-1):
+        #     stress_loading_avg = stress_loading.rolling(5, center=True, min_periods = 1).mean()
+        #     valid_stress_mask = stress_loading_avg >= stress_threshold
+        #     first_valid_stress_index = valid_stress_mask.idxmax()  #returns first True value; subtract 4 to account for the rolling average window size (5) and center=True
+        #     first_valid_strain_index = int(first_valid_stress_index-strain_zero_offset)   #include a few prior readings to get a clear lead-in to the stress; not a big deal typically
+        #     if first_valid_strain_index < 0:
+        #         first_valid_strain_index = 0
+        #         ## duplicate strain index start for extension; set separately here to allow for specific extension-related compensation in the future
+        #     first_valid_strain_value = strain_loading.iloc[first_valid_strain_index]
+        #     first_valid_extension = extension_loading.iloc[first_valid_strain_index]
+        #         ## get the strain value at new predicted '0 strain' value
+        #     strain_zero_correction = first_valid_strain_value
+        #     strain_loading = strain_loading - strain_zero_correction
+        #     strain_unloading = strain_unloading - strain_zero_correction
+
+        #     extension_zero_correction = first_valid_extension
+        #     extension_loading = extension_loading - extension_zero_correction
+        #     extension_unloading = extension_unloading - extension_zero_correction
         
         #If flagged, make sure non-negative data is reported
         if report_nonnegative_strain:
@@ -1202,12 +1245,12 @@ def pull_mechanical_replicates(data_df, data_dict = None,
         #Finally, grab each stress for every 0.01 value of strain
         strain_list = [round(num, 4).item() for num in np.linspace(0, 1, 101)]
         for number in strain_list:
-            strain_diff = strain_loading.copy() - number
+            strain_diff = strain_loading.copy().reset_index() - number
             closest_strain_idx = strain_diff.abs().idxmin()
             try:
                 closest_strain_value = strain_loading.iloc[closest_strain_idx]
                 closest_stress_value = stress_loading.iloc[closest_strain_idx]
-                strain_dict[number] = closest_stress_value
+                strain_dict[number] = closest_stress_value[1]
             except IndexError:
                 #If there's an index error, just pass on and hope for the best
                 # strain_dict[number] = closest_stress_value
